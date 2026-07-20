@@ -169,6 +169,25 @@ UHD Source
 The repeated preamble is the continuous acquisition gate. The coarse ZC is only
 checked after the repeated preamble passes.
 
+## Receiver Data-Path Efficiency
+
+The receiver implementation keeps the signal-processing equations and PDU
+interfaces unchanged while avoiding avoidable work in the hot path:
+
+```text
+PMT complex-vector inputs are read through const views instead of copied.
+The frame-detector buffer drops samples logically and compacts in batches.
+FFT and channel-estimation output buffers are reused between messages.
+QPSK pilot reciprocals are precomputed once.
+Channel residual energy is computed from first- and second-order sums.
+TX PRS symbols use GNU Radio's FFT backend instead of a quadratic reference DFT.
+```
+
+These changes reduce scheduler stalls but do not change the acquisition
+thresholds, frame geometry, metadata, phase-slope model, or SS-TWR range
+formula. Compare `O`/`L` counts, CPU load, valid frames per second, and
+measurement statistics before changing signal parameters.
+
 ## Recent Coarse ZC Root / Channel Separation Support
 
 Coarse ZC root configurability has been added for pre-positioning channel
@@ -601,4 +620,3 @@ Delete or rotate old acquisition CSV files before testing new channel metadata:
 rm -f gr-ofdm_prs_ranging/examples/CSV/initiator_acquisition.csv
 rm -f gr-ofdm_prs_ranging/examples/CSV/responder_acquisition.csv
 ```
-

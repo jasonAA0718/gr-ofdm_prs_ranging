@@ -47,18 +47,19 @@ prs_phase_slope_estimator_impl::prs_phase_slope_estimator_impl(double samp_rate,
 void prs_phase_slope_estimator_impl::handle_channel(pmt::pmt_t msg)
 {
     pmt::pmt_t meta;
-    std::vector<gr_complex> channel;
-    if (!pdu_get_c32(msg, meta, channel)) {
+    const gr_complex* channel = nullptr;
+    size_t channel_size = 0;
+    if (!pdu_get_c32_view(msg, meta, channel, channel_size)) {
         return;
     }
-    if (channel.size() < static_cast<size_t>(d_cfg.active_bins)) {
+    if (channel_size < static_cast<size_t>(d_cfg.active_bins)) {
         meta = pmt::dict_add(meta, pmt::mp("valid"), pmt::PMT_F);
         meta = pmt::dict_add(meta, pmt::mp("error_reason"), pmt::mp("short_channel"));
         message_port_pub(pmt::mp("measurement_out"), pmt::cons(meta, pmt::PMT_NIL));
         return;
     }
 
-    const auto phase = unwrap_phase(channel);
+    const auto phase = unwrap_phase(channel, static_cast<size_t>(d_cfg.active_bins));
     double wsum = 0.0;
     double fsum = 0.0;
     double psum = 0.0;

@@ -36,7 +36,12 @@ prs_channel_estimator_impl::prs_channel_estimator_impl(double samp_rate,
     d_cfg.active_bins = active_bins;
     d_cfg.prs_symbols = prs_symbols;
     d_cfg.seed = seed;
-    d_pilots = qpsk_pilots(d_cfg);
+    d_pilot_reciprocals = qpsk_pilots(d_cfg);
+    for (auto& pilot : d_pilot_reciprocals) {
+        pilot = gr_complex(1.0f, 0.0f) / pilot;
+    }
+    d_channel.resize(static_cast<size_t>(d_cfg.active_bins));
+    d_channel_energy.resize(static_cast<size_t>(d_cfg.active_bins));
     message_port_register_in(pmt::mp("symbols_in"));
     message_port_register_out(pmt::mp("channel_out"));
     set_msg_handler(pmt::mp("symbols_in"), [this](pmt::pmt_t msg) { handle_symbols(msg); });
@@ -45,37 +50,38 @@ prs_channel_estimator_impl::prs_channel_estimator_impl(double samp_rate,
 void prs_channel_estimator_impl::handle_symbols(pmt::pmt_t msg)
 {
     pmt::pmt_t meta;
-    std::vector<gr_complex> symbols;
-    if (!pdu_get_c32(msg, meta, symbols)) {
+    const gr_complex* symbols = nullptr;
+    size_t symbols_size = 0;
+    if (!pdu_get_c32_view(msg, meta, symbols, symbols_size)) {
         return;
     }
     const size_t expected = static_cast<size_t>(d_cfg.prs_symbols * d_cfg.active_bins);
-    if (symbols.size() < expected || d_pilots.size() < expected) {
+    if (symbols_size < expected || d_pilot_reciprocals.size() < expected) {
         meta = pmt::dict_add(meta, pmt::mp("channel_error"), pmt::mp("short_symbols"));
         message_port_pub(pmt::mp("channel_out"), pmt::cons(meta, pmt::init_c32vector(0, std::vector<gr_complex>())));
         return;
     }
 
-    std::vector<gr_complex> channel(d_cfg.active_bins, gr_complex(0.0f, 0.0f));
+    std::fill(d_channel.begin(), d_channel.end(), gr_complex(0.0f, 0.0f));
+    std::fill(d_channel_energy.begin(), d_channel_energy.end(), 0.0);
     double signal_power = 0.0;
     double error_power = 0.0;
     for (int sym = 0; sym < d_cfg.prs_symbols; ++sym) {
         for (int k = 0; k < d_cfg.active_bins; ++k) {
             const size_t idx = static_cast<size_t>(sym * d_cfg.active_bins + k);
-            const auto h = symbols[idx] / d_pilots[idx];
-            channel[k] += h;
+            const auto h = symbols[idx] * d_pilot_reciprocals[idx];
+            d_channel[static_cast<size_t>(k)] += h;
+            d_channel_energy[static_cast<size_t>(k)] += std::norm(h);
         }
     }
-    for (auto& h : channel) {
+    for (int k = 0; k < d_cfg.active_bins; ++k) {
+        auto& h = d_channel[static_cast<size_t>(k)];
         h /= static_cast<float>(d_cfg.prs_symbols);
         signal_power += std::norm(h);
-    }
-    for (int sym = 0; sym < d_cfg.prs_symbols; ++sym) {
-        for (int k = 0; k < d_cfg.active_bins; ++k) {
-            const size_t idx = static_cast<size_t>(sym * d_cfg.active_bins + k);
-            const auto h = symbols[idx] / d_pilots[idx];
-            error_power += std::norm(h - channel[k]);
-        }
+        const double residual =
+            d_channel_energy[static_cast<size_t>(k)] -
+            static_cast<double>(d_cfg.prs_symbols) * std::norm(h);
+        error_power += std::max(0.0, residual);
     }
     signal_power /= static_cast<double>(d_cfg.active_bins);
     error_power /= static_cast<double>(expected);
@@ -84,7 +90,7 @@ void prs_channel_estimator_impl::handle_symbols(pmt::pmt_t msg)
     meta = pmt::dict_add(meta, pmt::mp("snr"), pmt::from_double(snr));
     meta = pmt::dict_add(meta, pmt::mp("channel_bins"), pmt::from_long(d_cfg.active_bins));
     message_port_pub(pmt::mp("channel_out"),
-                     pmt::cons(meta, pmt::init_c32vector(channel.size(), channel)));
+                     pmt::cons(meta, pmt::init_c32vector(d_channel.size(), d_channel)));
 }
 
 } // namespace ofdm_prs_ranging

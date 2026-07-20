@@ -89,12 +89,18 @@ std::vector<float> active_frequencies(const prs_rx_config& cfg)
 
 std::vector<float> unwrap_phase(const std::vector<gr_complex>& samples)
 {
+    return unwrap_phase(samples.data(), samples.size());
+}
+
+std::vector<float> unwrap_phase(const gr_complex* samples, size_t size)
+{
     std::vector<float> phase;
-    phase.reserve(samples.size());
+    phase.reserve(size);
     float offset = 0.0f;
     float prev = 0.0f;
     bool have_prev = false;
-    for (const auto& sample : samples) {
+    for (size_t i = 0; i < size; ++i) {
+        const auto& sample = samples[i];
         float p = std::atan2(sample.imag(), sample.real());
         if (have_prev) {
             const float delta = p + offset - prev;
@@ -123,6 +129,23 @@ bool pdu_get_c32(const pmt::pmt_t& msg, pmt::pmt_t& meta, std::vector<gr_complex
         return false;
     }
     data = pmt::c32vector_elements(vec);
+    return true;
+}
+
+bool pdu_get_c32_view(const pmt::pmt_t& msg,
+                      pmt::pmt_t& meta,
+                      const gr_complex*& data,
+                      size_t& size)
+{
+    if (!pmt::is_pair(msg)) {
+        return false;
+    }
+    meta = pmt::car(msg);
+    const auto vec = pmt::cdr(msg);
+    if (!pmt::is_c32vector(vec)) {
+        return false;
+    }
+    data = pmt::c32vector_elements(vec, size);
     return true;
 }
 

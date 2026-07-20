@@ -45,6 +45,7 @@ private:
     int d_min_frame_gap;
     std::vector<gr_complex> d_coarse;
     std::vector<gr_complex> d_buffer;
+    size_t d_buffer_head;
     size_t d_next_scan_index;
     uint64_t d_buffer_abs_start;
     uint64_t d_total_seen;
@@ -56,6 +57,13 @@ private:
     double d_rx_time_frac;
 
     void update_rx_time_tags(uint64_t abs_start, uint64_t abs_stop);
+    size_t buffered_size() const { return d_buffer.size() - d_buffer_head; }
+    const gr_complex& buffered_sample(size_t index) const
+    {
+        return d_buffer[d_buffer_head + index];
+    }
+    void drop_buffer_prefix(size_t count);
+    void compact_buffer(size_t threshold);
     float coarse_sync_metric(size_t coarse_index) const;
     bool find_frame(size_t& frame_start_index,
                     size_t& coarse_index,

@@ -64,6 +64,7 @@ prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
                 gr::io_signature::make(0, 0, 0)),
       d_threshold(threshold),
       d_min_frame_gap(min_frame_gap),
+      d_buffer_head(0),
       d_next_scan_index(0),
       d_buffer_abs_start(0),
       d_total_seen(0),
@@ -87,6 +88,7 @@ prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
     d_cfg.coarse_zc_root = coarse_zc_root;
     d_cfg.channel_id = channel_id;
     d_coarse = coarse_sync_sequence(d_cfg.coarse_sync_len, d_cfg.coarse_zc_root);
+    d_buffer.reserve(static_cast<size_t>(frame_len(d_cfg) + d_cfg.coarse_sync_len) * 2U);
     message_port_register_out(pmt::mp("frame_out"));
 }
 
@@ -113,12 +115,30 @@ void prs_frame_detector_impl::update_rx_time_tags(uint64_t abs_start, uint64_t a
     }
 }
 
+void prs_frame_detector_impl::drop_buffer_prefix(size_t count)
+{
+    d_buffer_head += count;
+    d_buffer_abs_start += count;
+    d_next_scan_index = d_next_scan_index > count ? d_next_scan_index - count : 0;
+}
+
+void prs_frame_detector_impl::compact_buffer(size_t threshold)
+{
+    if (d_buffer_head == d_buffer.size()) {
+        d_buffer.clear();
+        d_buffer_head = 0;
+    } else if (d_buffer_head >= threshold) {
+        d_buffer.erase(d_buffer.begin(), d_buffer.begin() + d_buffer_head);
+        d_buffer_head = 0;
+    }
+}
+
 float prs_frame_detector_impl::coarse_sync_metric(size_t coarse_index) const
 {
     gr_complex corr(0.0f, 0.0f);
     double power = 0.0;
     for (int i = 0; i < d_cfg.coarse_sync_len; ++i) {
-        const auto sample = d_buffer[coarse_index + i];
+        const auto sample = buffered_sample(coarse_index + static_cast<size_t>(i));
         corr += sample * std::conj(d_coarse[i]);
         power += std::norm(sample);
     }
@@ -134,7 +154,7 @@ bool prs_frame_detector_impl::find_frame(size_t& frame_start_index,
     const int flen = frame_len(d_cfg);
     const int coarse_rel = d_cfg.zero_guard_len + d_cfg.preamble_len * d_cfg.preamble_repeats;
     const int preamble_rel = d_cfg.zero_guard_len;
-    if (d_buffer.size() < static_cast<size_t>(flen)) {
+    if (buffered_size() < static_cast<size_t>(flen)) {
         return false;
     }
 
@@ -142,7 +162,7 @@ bool prs_frame_detector_impl::find_frame(size_t& frame_start_index,
     if (d_next_scan_index < first_preamble) {
         d_next_scan_index = first_preamble;
     }
-    const size_t max_preamble = d_buffer.size() - static_cast<size_t>(flen) +
+    const size_t max_preamble = buffered_size() - static_cast<size_t>(flen) +
                                 static_cast<size_t>(preamble_rel);
     if (d_next_scan_index > max_preamble) {
         return false;
@@ -153,8 +173,9 @@ bool prs_frame_detector_impl::find_frame(size_t& frame_start_index,
                                  gr_complex& corr,
                                  double& first_power,
                                  double& second_power) {
-        const auto first = d_buffer[index];
-        const auto second = d_buffer[index + d_cfg.preamble_len];
+        const auto first = buffered_sample(index);
+        const auto second =
+            buffered_sample(index + static_cast<size_t>(d_cfg.preamble_len));
         corr += std::conj(first) * second;
         first_power += std::norm(first);
         second_power += std::norm(second);
@@ -163,8 +184,9 @@ bool prs_frame_detector_impl::find_frame(size_t& frame_start_index,
                                     gr_complex& corr,
                                     double& first_power,
                                     double& second_power) {
-        const auto first = d_buffer[index];
-        const auto second = d_buffer[index + d_cfg.preamble_len];
+        const auto first = buffered_sample(index);
+        const auto second =
+            buffered_sample(index + static_cast<size_t>(d_cfg.preamble_len));
         corr -= std::conj(first) * second;
         first_power -= std::norm(first);
         second_power -= std::norm(second);
@@ -224,8 +246,8 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
     const int flen = frame_len(d_cfg);
     const uint64_t abs_start = d_buffer_abs_start + frame_start_index;
     const uint64_t coarse_abs = d_buffer_abs_start + coarse_index;
-    std::vector<gr_complex> frame(d_buffer.begin() + frame_start_index,
-                                  d_buffer.begin() + frame_start_index + flen);
+    const auto frame_begin = d_buffer.begin() + d_buffer_head + frame_start_index;
+    std::vector<gr_complex> frame(frame_begin, frame_begin + flen);
     prs_payload_info payload_info;
     float payload_metric = 0.0f;
     const int payload_start =
@@ -314,18 +336,14 @@ int prs_frame_detector_impl::general_work(int noutput_items,
     while (find_frame(frame_start, coarse, preamble_metric, coarse_metric)) {
         publish_frame(frame_start, coarse, preamble_metric, coarse_metric);
         const size_t drop = frame_start + static_cast<size_t>(frame_len(d_cfg));
-        d_buffer.erase(d_buffer.begin(), d_buffer.begin() + drop);
-        d_buffer_abs_start += drop;
-        d_next_scan_index = d_next_scan_index > drop ? d_next_scan_index - drop : 0;
+        drop_buffer_prefix(drop);
     }
 
     const size_t keep = static_cast<size_t>(frame_len(d_cfg) + d_cfg.coarse_sync_len);
-    if (d_buffer.size() > keep) {
-        const size_t drop = d_buffer.size() - keep;
-        d_buffer.erase(d_buffer.begin(), d_buffer.begin() + drop);
-        d_buffer_abs_start += drop;
-        d_next_scan_index = d_next_scan_index > drop ? d_next_scan_index - drop : 0;
+    if (buffered_size() > keep) {
+        drop_buffer_prefix(buffered_size() - keep);
     }
+    compact_buffer(keep);
 
     consume_each(ninput);
     return 0;

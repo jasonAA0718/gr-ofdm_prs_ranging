@@ -29,6 +29,7 @@ public:
 private:
     prs_rx_config d_cfg;
     std::unique_ptr<gr::fft::fft_complex_fwd> d_fft;
+    std::vector<gr_complex> d_active;
     void handle_frame(pmt::pmt_t msg);
 };
 

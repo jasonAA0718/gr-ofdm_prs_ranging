@@ -8,6 +8,7 @@
 #include "prs_frame_builder.h"
 #include "prs_payload_codec.h"
 #include "prs_receiver_utils.h"
+#include <gnuradio/fft/fft.h>
 #include <algorithm>
 #include <cmath>
 #include <random>
@@ -16,8 +17,6 @@ namespace gr {
 namespace ofdm_prs_ranging {
 
 namespace {
-constexpr double pi = 3.141592653589793238462643383279502884;
-
 gr_complex deterministic_qpsk(std::mt19937& gen)
 {
     const uint32_t bits = gen();
@@ -25,21 +24,6 @@ gr_complex deterministic_qpsk(std::mt19937& gen)
     const float re = (bits & 0x1U) ? scale : -scale;
     const float im = (bits & 0x2U) ? scale : -scale;
     return gr_complex(re, im);
-}
-
-std::vector<gr_complex> ifft(const std::vector<gr_complex>& freq)
-{
-    std::vector<gr_complex> time(freq.size(), gr_complex(0.0f, 0.0f));
-    const double n = static_cast<double>(freq.size());
-    for (size_t t = 0; t < freq.size(); ++t) {
-        gr_complex acc(0.0f, 0.0f);
-        for (size_t k = 0; k < freq.size(); ++k) {
-            const double phase = 2.0 * pi * static_cast<double>(k * t) / n;
-            acc += freq[k] * gr_complex(std::cos(phase), std::sin(phase));
-        }
-        time[t] = acc / static_cast<float>(n);
-    }
-    return time;
 }
 
 void append_short_preamble(std::vector<gr_complex>& frame, const prs_frame_config& cfg)
@@ -65,8 +49,11 @@ void append_prs_symbols(std::vector<gr_complex>& frame, const prs_frame_config& 
 {
     std::mt19937 gen(cfg.seed);
     const int half_active = cfg.active_bins / 2;
+    gr::fft::fft_complex_rev ifft(cfg.fft_len, 1);
+    const float scale = 1.0f / static_cast<float>(cfg.fft_len);
     for (int sym = 0; sym < cfg.prs_symbols; ++sym) {
-        std::vector<gr_complex> freq(cfg.fft_len, gr_complex(0.0f, 0.0f));
+        auto* freq = ifft.get_inbuf();
+        std::fill(freq, freq + cfg.fft_len, gr_complex(0.0f, 0.0f));
 
         for (int b = -half_active; b < 0; ++b) {
             const int index = (b + cfg.fft_len) % cfg.fft_len;
@@ -76,9 +63,14 @@ void append_prs_symbols(std::vector<gr_complex>& frame, const prs_frame_config& 
             freq[b] = deterministic_qpsk(gen);
         }
 
-        const auto time = ifft(freq);
-        frame.insert(frame.end(), time.end() - cfg.cp_len, time.end());
-        frame.insert(frame.end(), time.begin(), time.end());
+        ifft.execute();
+        const auto* time = ifft.get_outbuf();
+        for (int i = cfg.fft_len - cfg.cp_len; i < cfg.fft_len; ++i) {
+            frame.push_back(time[i] * scale);
+        }
+        for (int i = 0; i < cfg.fft_len; ++i) {
+            frame.push_back(time[i] * scale);
+        }
     }
 }
 } // namespace

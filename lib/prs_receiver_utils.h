@@ -41,7 +41,12 @@ std::vector<gr_complex> coarse_sync_sequence(int len, int root = 25);
 std::vector<gr_complex> qpsk_pilots(const prs_rx_config& cfg);
 std::vector<float> active_frequencies(const prs_rx_config& cfg);
 std::vector<float> unwrap_phase(const std::vector<gr_complex>& samples);
+std::vector<float> unwrap_phase(const gr_complex* samples, size_t size);
 bool pdu_get_c32(const pmt::pmt_t& msg, pmt::pmt_t& meta, std::vector<gr_complex>& data);
+bool pdu_get_c32_view(const pmt::pmt_t& msg,
+                      pmt::pmt_t& meta,
+                      const gr_complex*& data,
+                      size_t& size);
 pmt::pmt_t dict_add_double(pmt::pmt_t dict, const std::string& key, double value);
 pmt::pmt_t dict_add_int(pmt::pmt_t dict, const std::string& key, int64_t value);
 double dict_ref_double(const pmt::pmt_t& dict, const std::string& key, double fallback);
