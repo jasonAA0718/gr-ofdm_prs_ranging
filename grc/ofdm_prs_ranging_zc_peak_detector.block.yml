@@ -1,0 +1,15 @@
+id: ofdm_prs_ranging_zc_peak_detector
+label: ZC Peak Detector
+category: '[ofdm_prs_ranging]/ZC RTT'
+templates:
+  imports: from gnuradio import ofdm_prs_ranging
+  make: ofdm_prs_ranging.zc_peak_detector(${zc_length}, ${peak_metric_threshold}, ${fixed_threshold})
+parameters:
+- {id: zc_length, label: ZC Length, dtype: int, default: 839}
+- {id: peak_metric_threshold, label: Peak Metric Threshold, dtype: real, default: 0.35}
+- {id: fixed_threshold, label: Fixed Threshold, dtype: real, default: 0.0}
+inputs:
+- {label: in, dtype: float}
+outputs:
+- {label: out, dtype: byte}
+file_format: 1

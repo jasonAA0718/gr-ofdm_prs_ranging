@@ -1,0 +1,18 @@
+id: ofdm_prs_ranging_zc_rtt_responder
+label: ZC RTT Responder
+category: '[ofdm_prs_ranging]/ZC RTT'
+templates:
+  imports: from gnuradio import ofdm_prs_ranging
+  make: ofdm_prs_ranging.zc_rtt_responder(${zc_seq}, ${samp_rate}, ${delay_secs}, ${zc_length}, ${peak_metric_threshold}, ${fixed_threshold})
+parameters:
+- {id: zc_seq, label: ZC Sequence, dtype: complex_vector, default: '[1+0j, 1+0j]'}
+- {id: samp_rate, label: Sample Rate, dtype: real, default: 6e6}
+- {id: delay_secs, label: Delay Secs, dtype: real, default: 0.005}
+- {id: zc_length, label: ZC Length, dtype: int, default: 839}
+- {id: peak_metric_threshold, label: Peak Metric Threshold, dtype: real, default: 0.35}
+- {id: fixed_threshold, label: Fixed Threshold, dtype: real, default: 0.0}
+inputs:
+- {label: corr, dtype: complex}
+outputs:
+- {label: out, dtype: complex}
+file_format: 1

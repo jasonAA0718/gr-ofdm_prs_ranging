@@ -1,0 +1,6 @@
+/*!
+ * \defgroup block GNU Radio OFDM_PRS_RANGING C++ Signal Processing Blocks
+ * \brief All C++ blocks that can be used from the OFDM_PRS_RANGING GNU Radio
+ *        module are listed here or in the subcategories below.
+ *
+ */

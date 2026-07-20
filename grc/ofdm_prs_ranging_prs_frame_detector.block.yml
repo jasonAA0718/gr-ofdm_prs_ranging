@@ -1,0 +1,26 @@
+id: ofdm_prs_ranging_prs_frame_detector
+label: PRS Frame Detector
+category: '[ofdm_prs_ranging]'
+templates:
+  imports: from gnuradio import ofdm_prs_ranging
+  make: ofdm_prs_ranging.prs_frame_detector(${samp_rate}, ${fft_len}, ${cp_len}, ${active_bins}, ${prs_symbols}, ${preamble_len}, ${preamble_repeats}, ${coarse_sync_len}, ${zero_guard_len}, ${tail_guard_len}, ${threshold}, ${min_frame_gap}, ${coarse_zc_root}, ${channel_id})
+parameters:
+- {id: samp_rate, label: Sample Rate, dtype: real, default: 10e6}
+- {id: fft_len, label: FFT Length, dtype: int, default: 1024}
+- {id: cp_len, label: CP Length, dtype: int, default: 128}
+- {id: active_bins, label: Active Bins, dtype: int, default: 600}
+- {id: prs_symbols, label: PRS Symbols, dtype: int, default: 16}
+- {id: preamble_len, label: Preamble Length, dtype: int, default: 128}
+- {id: preamble_repeats, label: Preamble Repeats, dtype: int, default: 16}
+- {id: coarse_sync_len, label: Coarse Sync Length, dtype: int, default: 839}
+- {id: zero_guard_len, label: Zero Guard Length, dtype: int, default: 1000}
+- {id: tail_guard_len, label: Tail Guard Length, dtype: int, default: 1000}
+- {id: threshold, label: Threshold, dtype: real, default: 0.35}
+- {id: min_frame_gap, label: Min Frame Gap, dtype: int, default: 10000}
+- {id: coarse_zc_root, label: Coarse ZC Root, dtype: int, default: 25}
+- {id: channel_id, label: Channel ID, dtype: int, default: 0}
+inputs:
+- {label: in, domain: stream, dtype: complex}
+outputs:
+- {label: frame_out, domain: message}
+file_format: 1

@@ -1,0 +1,19 @@
+id: ofdm_prs_ranging_zc_manual_ping_source
+label: ZC Manual Ping Source
+category: '[ofdm_prs_ranging]/ZC RTT'
+templates:
+  imports: from gnuradio import ofdm_prs_ranging
+  make: ofdm_prs_ranging.zc_manual_ping_source(${samp_rate}, ${zc_seq}, ${packet_len}, ${tx_delay_secs}, ${min_period_secs})
+parameters:
+- {id: samp_rate, label: Sample Rate, dtype: real, default: 6e6}
+- {id: zc_seq, label: ZC Sequence, dtype: complex_vector, default: '[1+0j, 1+0j]'}
+- {id: packet_len, label: Packet Length, dtype: int, default: 1024}
+- {id: tx_delay_secs, label: TX Delay Secs, dtype: real, default: 0.5}
+- {id: min_period_secs, label: Min Period Secs, dtype: real, default: 0.1}
+inputs:
+- {label: rx_time_ref, dtype: complex}
+- {label: trig_in, domain: message, optional: true}
+outputs:
+- {label: out, dtype: complex}
+- {label: tx_time_out, domain: message, optional: true}
+file_format: 1

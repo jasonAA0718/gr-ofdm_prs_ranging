@@ -1,0 +1,33 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# GNU Radio temporary files
+*.log
+*.tmp
+
+# Measurement logs
+*.csv
+*.jsonl
+
+# Raw IQ / capture files
+*.dat
+*.bin
+*.cfile
+*.iq
+*.complex
+*.fc32
+
+# Large experiment folders
+logs/*
+captures/*
+
+# Keep folder structure
+!logs/.gitkeep
+!captures/.gitkeep
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

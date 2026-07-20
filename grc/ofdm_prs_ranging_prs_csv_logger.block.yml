@@ -1,0 +1,13 @@
+id: ofdm_prs_ranging_prs_csv_logger
+label: PRS CSV Logger
+category: '[ofdm_prs_ranging]'
+templates:
+  imports: from gnuradio import ofdm_prs_ranging
+  make: ofdm_prs_ranging.prs_csv_logger(${path}, ${append})
+parameters:
+- {id: path, label: CSV Path, dtype: string, default: '"prs_measurements.csv"'}
+- {id: append, label: Append, dtype: bool, default: 'True'}
+inputs:
+- {label: measurement_in, domain: message}
+outputs: []
+file_format: 1

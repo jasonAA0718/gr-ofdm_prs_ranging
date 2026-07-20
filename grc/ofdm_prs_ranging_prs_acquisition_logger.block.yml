@@ -1,0 +1,14 @@
+id: ofdm_prs_ranging_prs_acquisition_logger
+label: PRS Acquisition Logger
+category: '[ofdm_prs_ranging]'
+templates:
+  imports: from gnuradio import ofdm_prs_ranging
+  make: ofdm_prs_ranging.prs_acquisition_logger(${path}, ${node}, ${append})
+parameters:
+- {id: path, label: CSV Path, dtype: string, default: '"prs_acquisition.csv"'}
+- {id: node, label: Node Label, dtype: string, default: '"rx"'}
+- {id: append, label: Append, dtype: bool, default: 'True'}
+inputs:
+- {label: frame_in, domain: message}
+outputs: []
+file_format: 1
