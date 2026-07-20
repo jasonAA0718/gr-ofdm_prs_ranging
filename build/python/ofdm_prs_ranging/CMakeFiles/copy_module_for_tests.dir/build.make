@@ -53,10 +53,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging
+CMAKE_SOURCE_DIR = /home/cnsl/Desktop/gr-ofdm_prs_ranging
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build
+CMAKE_BINARY_DIR = /home/cnsl/Desktop/gr-ofdm_prs_ranging/build
 
 # Utility rule file for copy_module_for_tests.
 
@@ -67,7 +67,7 @@ include python/ofdm_prs_ranging/CMakeFiles/copy_module_for_tests.dir/compiler_de
 include python/ofdm_prs_ranging/CMakeFiles/copy_module_for_tests.dir/progress.make
 
 python/ofdm_prs_ranging/CMakeFiles/copy_module_for_tests:
-	cd /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging && /usr/bin/cmake -E copy_directory /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/python/ofdm_prs_ranging /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/test_modules/gnuradio/ofdm_prs_ranging/
+	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging && /usr/bin/cmake -E copy_directory /home/cnsl/Desktop/gr-ofdm_prs_ranging/python/ofdm_prs_ranging /home/cnsl/Desktop/gr-ofdm_prs_ranging/build/test_modules/gnuradio/ofdm_prs_ranging/
 
 python/ofdm_prs_ranging/CMakeFiles/copy_module_for_tests.dir/codegen:
 .PHONY : python/ofdm_prs_ranging/CMakeFiles/copy_module_for_tests.dir/codegen
@@ -81,10 +81,10 @@ python/ofdm_prs_ranging/CMakeFiles/copy_module_for_tests.dir/build: copy_module_
 .PHONY : python/ofdm_prs_ranging/CMakeFiles/copy_module_for_tests.dir/build
 
 python/ofdm_prs_ranging/CMakeFiles/copy_module_for_tests.dir/clean:
-	cd /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging && $(CMAKE_COMMAND) -P CMakeFiles/copy_module_for_tests.dir/cmake_clean.cmake
+	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging && $(CMAKE_COMMAND) -P CMakeFiles/copy_module_for_tests.dir/cmake_clean.cmake
 .PHONY : python/ofdm_prs_ranging/CMakeFiles/copy_module_for_tests.dir/clean
 
 python/ofdm_prs_ranging/CMakeFiles/copy_module_for_tests.dir/depend:
-	cd /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/python/ofdm_prs_ranging /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/CMakeFiles/copy_module_for_tests.dir/DependInfo.cmake "--color=$(COLOR)"
+	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/cnsl/Desktop/gr-ofdm_prs_ranging /home/cnsl/Desktop/gr-ofdm_prs_ranging/python/ofdm_prs_ranging /home/cnsl/Desktop/gr-ofdm_prs_ranging/build /home/cnsl/Desktop/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging /home/cnsl/Desktop/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/CMakeFiles/copy_module_for_tests.dir/DependInfo.cmake "--color=$(COLOR)"
 .PHONY : python/ofdm_prs_ranging/CMakeFiles/copy_module_for_tests.dir/depend
 

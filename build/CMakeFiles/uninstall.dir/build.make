@@ -53,10 +53,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging
+CMAKE_SOURCE_DIR = /home/cnsl/Desktop/gr-ofdm_prs_ranging
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build
+CMAKE_BINARY_DIR = /home/cnsl/Desktop/gr-ofdm_prs_ranging/build
 
 # Utility rule file for uninstall.
 
@@ -67,7 +67,7 @@ include CMakeFiles/uninstall.dir/compiler_depend.make
 include CMakeFiles/uninstall.dir/progress.make
 
 CMakeFiles/uninstall:
-	/usr/bin/cmake -P /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/cmake_uninstall.cmake
+	/usr/bin/cmake -P /home/cnsl/Desktop/gr-ofdm_prs_ranging/build/cmake_uninstall.cmake
 
 CMakeFiles/uninstall.dir/codegen:
 .PHONY : CMakeFiles/uninstall.dir/codegen
@@ -85,6 +85,6 @@ CMakeFiles/uninstall.dir/clean:
 .PHONY : CMakeFiles/uninstall.dir/clean
 
 CMakeFiles/uninstall.dir/depend:
-	cd /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/CMakeFiles/uninstall.dir/DependInfo.cmake "--color=$(COLOR)"
+	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/cnsl/Desktop/gr-ofdm_prs_ranging /home/cnsl/Desktop/gr-ofdm_prs_ranging /home/cnsl/Desktop/gr-ofdm_prs_ranging/build /home/cnsl/Desktop/gr-ofdm_prs_ranging/build /home/cnsl/Desktop/gr-ofdm_prs_ranging/build/CMakeFiles/uninstall.dir/DependInfo.cmake "--color=$(COLOR)"
 .PHONY : CMakeFiles/uninstall.dir/depend
 

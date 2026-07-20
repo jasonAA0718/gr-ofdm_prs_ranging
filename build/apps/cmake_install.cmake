@@ -1,4 +1,4 @@
-# Install script for directory: /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/apps
+# Install script for directory: /home/cnsl/Desktop/gr-ofdm_prs_ranging/apps
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -45,6 +45,6 @@ endif()
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
 if(CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/apps/install_local_manifest.txt"
+  file(WRITE "/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/apps/install_local_manifest.txt"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()

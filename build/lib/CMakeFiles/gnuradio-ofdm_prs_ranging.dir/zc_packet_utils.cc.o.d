@@ -1,7 +1,7 @@
 lib/CMakeFiles/gnuradio-ofdm_prs_ranging.dir/zc_packet_utils.cc.o: \
- /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/lib/zc_packet_utils.cc \
+ /home/cnsl/Desktop/gr-ofdm_prs_ranging/lib/zc_packet_utils.cc \
  /usr/include/stdc-predef.h \
- /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/lib/zc_packet_utils.h \
+ /home/cnsl/Desktop/gr-ofdm_prs_ranging/lib/zc_packet_utils.h \
  /usr/include/c++/14/cstdint \
  /usr/include/x86_64-linux-gnu/c++/14/bits/c++config.h \
  /usr/include/x86_64-linux-gnu/c++/14/bits/os_defines.h \

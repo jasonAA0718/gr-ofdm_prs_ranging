@@ -1,5 +1,5 @@
 python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/zc_manual_ping_source_python.cc.o: \
- /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/python/ofdm_prs_ranging/bindings/zc_manual_ping_source_python.cc \
+ /home/cnsl/Desktop/gr-ofdm_prs_ranging/python/ofdm_prs_ranging/bindings/zc_manual_ping_source_python.cc \
  /usr/include/stdc-predef.h /usr/include/pybind11/pybind11.h \
  /usr/include/pybind11/detail/class.h /usr/include/pybind11/attr.h \
  /usr/include/pybind11/detail/common.h /usr/include/python3.13/Python.h \
@@ -407,7 +407,7 @@ python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/zc_manua
  /usr/include/c++/14/bits/gslice_array.h \
  /usr/include/c++/14/bits/mask_array.h \
  /usr/include/c++/14/bits/indirect_array.h /usr/include/c++/14/variant \
- /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/python/ofdm_prs_ranging/bindings/../../../include/gnuradio/ofdm_prs_ranging/zc_manual_ping_source.h \
+ /home/cnsl/Desktop/gr-ofdm_prs_ranging/python/ofdm_prs_ranging/bindings/../../../include/gnuradio/ofdm_prs_ranging/zc_manual_ping_source.h \
  /usr/include/gnuradio/block.h /usr/include/gnuradio/api.h \
  /usr/include/gnuradio/attributes.h /usr/include/gnuradio/basic_block.h \
  /usr/include/gnuradio/io_signature.h /usr/include/spdlog/tweakme.h \
@@ -1168,4 +1168,4 @@ python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/zc_manua
  /usr/include/gmpxx.h /usr/include/c++/14/cfloat \
  /usr/lib/gcc/x86_64-linux-gnu/14/include/float.h \
  /usr/include/x86_64-linux-gnu/gmp.h \
- /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/python/ofdm_prs_ranging/bindings/../../../include/gnuradio/ofdm_prs_ranging/api.h
+ /home/cnsl/Desktop/gr-ofdm_prs_ranging/python/ofdm_prs_ranging/bindings/../../../include/gnuradio/ofdm_prs_ranging/api.h

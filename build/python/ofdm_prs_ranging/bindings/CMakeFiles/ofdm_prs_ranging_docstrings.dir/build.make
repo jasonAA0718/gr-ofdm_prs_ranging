@@ -53,10 +53,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging
+CMAKE_SOURCE_DIR = /home/cnsl/Desktop/gr-ofdm_prs_ranging
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build
+CMAKE_BINARY_DIR = /home/cnsl/Desktop/gr-ofdm_prs_ranging/build
 
 # Utility rule file for ofdm_prs_ranging_docstrings.
 
@@ -69,8 +69,8 @@ include python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_docstrings.
 python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_docstrings: python/ofdm_prs_ranging/bindings/docstring_status
 
 python/ofdm_prs_ranging/bindings/docstring_status:
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Copying ofdm_prs_ranging docstring templates as pybind headers ..."
-	cd /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings && /usr/bin/python3 /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/docs/doxygen/update_pydoc.py copy --bindings_dir /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/python/ofdm_prs_ranging/bindings/docstrings --output_dir /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Copying ofdm_prs_ranging docstring templates as pybind headers ..."
+	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings && /usr/bin/python3 /home/cnsl/Desktop/gr-ofdm_prs_ranging/docs/doxygen/update_pydoc.py copy --bindings_dir /home/cnsl/Desktop/gr-ofdm_prs_ranging/python/ofdm_prs_ranging/bindings/docstrings --output_dir /home/cnsl/Desktop/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings
 
 python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_docstrings.dir/codegen:
 .PHONY : python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_docstrings.dir/codegen
@@ -85,10 +85,10 @@ python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_docstrings.dir/buil
 .PHONY : python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_docstrings.dir/build
 
 python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_docstrings.dir/clean:
-	cd /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings && $(CMAKE_COMMAND) -P CMakeFiles/ofdm_prs_ranging_docstrings.dir/cmake_clean.cmake
+	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings && $(CMAKE_COMMAND) -P CMakeFiles/ofdm_prs_ranging_docstrings.dir/cmake_clean.cmake
 .PHONY : python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_docstrings.dir/clean
 
 python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_docstrings.dir/depend:
-	cd /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/python/ofdm_prs_ranging/bindings /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_docstrings.dir/DependInfo.cmake "--color=$(COLOR)"
+	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/cnsl/Desktop/gr-ofdm_prs_ranging /home/cnsl/Desktop/gr-ofdm_prs_ranging/python/ofdm_prs_ranging/bindings /home/cnsl/Desktop/gr-ofdm_prs_ranging/build /home/cnsl/Desktop/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings /home/cnsl/Desktop/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_docstrings.dir/DependInfo.cmake "--color=$(COLOR)"
 .PHONY : python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_docstrings.dir/depend
 

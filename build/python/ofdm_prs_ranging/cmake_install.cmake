@@ -1,4 +1,4 @@
-# Install script for directory: /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/python/ofdm_prs_ranging
+# Install script for directory: /home/cnsl/Desktop/gr-ofdm_prs_ranging/python/ofdm_prs_ranging
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -44,16 +44,16 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings/cmake_install.cmake")
+  include("/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings/cmake_install.cmake")
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/python3.13/dist-packages/gnuradio/ofdm_prs_ranging" TYPE FILE FILES "/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/python/ofdm_prs_ranging/__init__.py")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/python3.13/dist-packages/gnuradio/ofdm_prs_ranging" TYPE FILE FILES "/home/cnsl/Desktop/gr-ofdm_prs_ranging/python/ofdm_prs_ranging/__init__.py")
 endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
 if(CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/install_local_manifest.txt"
+  file(WRITE "/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/install_local_manifest.txt"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()

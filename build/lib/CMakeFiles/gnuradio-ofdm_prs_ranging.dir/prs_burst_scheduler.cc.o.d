@@ -1,7 +1,7 @@
 lib/CMakeFiles/gnuradio-ofdm_prs_ranging.dir/prs_burst_scheduler.cc.o: \
- /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/lib/prs_burst_scheduler.cc \
+ /home/cnsl/Desktop/gr-ofdm_prs_ranging/lib/prs_burst_scheduler.cc \
  /usr/include/stdc-predef.h \
- /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/lib/prs_burst_scheduler.h \
+ /home/cnsl/Desktop/gr-ofdm_prs_ranging/lib/prs_burst_scheduler.h \
  /usr/include/c++/14/cstdint \
  /usr/include/x86_64-linux-gnu/c++/14/bits/c++config.h \
  /usr/include/x86_64-linux-gnu/c++/14/bits/os_defines.h \
@@ -59,7 +59,7 @@ lib/CMakeFiles/gnuradio-ofdm_prs_ranging.dir/prs_burst_scheduler.cc.o: \
  /usr/lib/gcc/x86_64-linux-gnu/14/include/stddef.h \
  /usr/include/c++/14/bits/uses_allocator.h \
  /usr/include/c++/14/bits/uses_allocator_args.h /usr/include/c++/14/tuple \
- /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/lib/prs_payload_codec.h \
+ /home/cnsl/Desktop/gr-ofdm_prs_ranging/lib/prs_payload_codec.h \
  /usr/include/gnuradio/gr_complex.h /usr/include/c++/14/complex \
  /usr/include/c++/14/cmath /usr/include/math.h \
  /usr/include/x86_64-linux-gnu/bits/math-vector.h \

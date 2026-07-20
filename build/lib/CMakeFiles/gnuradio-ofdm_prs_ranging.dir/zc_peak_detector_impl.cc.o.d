@@ -1,9 +1,9 @@
 lib/CMakeFiles/gnuradio-ofdm_prs_ranging.dir/zc_peak_detector_impl.cc.o: \
- /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/lib/zc_peak_detector_impl.cc \
+ /home/cnsl/Desktop/gr-ofdm_prs_ranging/lib/zc_peak_detector_impl.cc \
  /usr/include/stdc-predef.h \
- /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/lib/zc_peak_detector_impl.h \
- /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/lib/../include/gnuradio/ofdm_prs_ranging/zc_peak_detector.h \
- /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/lib/../include/gnuradio/ofdm_prs_ranging/api.h \
+ /home/cnsl/Desktop/gr-ofdm_prs_ranging/lib/zc_peak_detector_impl.h \
+ /home/cnsl/Desktop/gr-ofdm_prs_ranging/lib/../include/gnuradio/ofdm_prs_ranging/zc_peak_detector.h \
+ /home/cnsl/Desktop/gr-ofdm_prs_ranging/lib/../include/gnuradio/ofdm_prs_ranging/api.h \
  /usr/include/gnuradio/attributes.h /usr/include/gnuradio/sync_block.h \
  /usr/include/gnuradio/api.h /usr/include/gnuradio/block.h \
  /usr/include/c++/14/memory /usr/include/c++/14/bits/memoryfwd.h \

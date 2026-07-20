@@ -1,7 +1,7 @@
 lib/CMakeFiles/gnuradio-ofdm_prs_ranging.dir/prs_receiver_utils.cc.o: \
- /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/lib/prs_receiver_utils.cc \
+ /home/cnsl/Desktop/gr-ofdm_prs_ranging/lib/prs_receiver_utils.cc \
  /usr/include/stdc-predef.h \
- /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/lib/prs_receiver_utils.h \
+ /home/cnsl/Desktop/gr-ofdm_prs_ranging/lib/prs_receiver_utils.h \
  /usr/include/gnuradio/gr_complex.h /usr/include/c++/14/complex \
  /usr/include/x86_64-linux-gnu/c++/14/bits/c++config.h \
  /usr/include/x86_64-linux-gnu/c++/14/bits/os_defines.h \

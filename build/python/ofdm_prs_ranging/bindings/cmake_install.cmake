@@ -1,4 +1,4 @@
-# Install script for directory: /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/python/ofdm_prs_ranging/bindings
+# Install script for directory: /home/cnsl/Desktop/gr-ofdm_prs_ranging/python/ofdm_prs_ranging/bindings
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -49,12 +49,12 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "pythonapi" OR NOT CMAKE_INSTALL_COMPONENT)
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/python3.13/dist-packages/gnuradio/ofdm_prs_ranging/ofdm_prs_ranging_python.cpython-313-x86_64-linux-gnu.so"
          RPATH "")
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/python3.13/dist-packages/gnuradio/ofdm_prs_ranging" TYPE MODULE FILES "/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings/ofdm_prs_ranging_python.cpython-313-x86_64-linux-gnu.so")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/python3.13/dist-packages/gnuradio/ofdm_prs_ranging" TYPE MODULE FILES "/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings/ofdm_prs_ranging_python.cpython-313-x86_64-linux-gnu.so")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/python3.13/dist-packages/gnuradio/ofdm_prs_ranging/ofdm_prs_ranging_python.cpython-313-x86_64-linux-gnu.so" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/python3.13/dist-packages/gnuradio/ofdm_prs_ranging/ofdm_prs_ranging_python.cpython-313-x86_64-linux-gnu.so")
     file(RPATH_CHANGE
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/python3.13/dist-packages/gnuradio/ofdm_prs_ranging/ofdm_prs_ranging_python.cpython-313-x86_64-linux-gnu.so"
-         OLD_RPATH "/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/lib:"
+         OLD_RPATH "/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/lib:"
          NEW_RPATH "")
     if(CMAKE_INSTALL_DO_STRIP)
       execute_process(COMMAND "/usr/bin/strip" "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/python3.13/dist-packages/gnuradio/ofdm_prs_ranging/ofdm_prs_ranging_python.cpython-313-x86_64-linux-gnu.so")
@@ -63,12 +63,12 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "pythonapi" OR NOT CMAKE_INSTALL_COMPONENT)
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "pythonapi" OR NOT CMAKE_INSTALL_COMPONENT)
-  include("/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/install-cxx-module-bmi-Release.cmake" OPTIONAL)
+  include("/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/install-cxx-module-bmi-Release.cmake" OPTIONAL)
 endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
 if(CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings/install_local_manifest.txt"
+  file(WRITE "/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/bindings/install_local_manifest.txt"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()

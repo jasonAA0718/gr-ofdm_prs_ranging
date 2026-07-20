@@ -1,4 +1,4 @@
-# Install script for directory: /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging
+# Install script for directory: /home/cnsl/Desktop/gr-ofdm_prs_ranging
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -44,51 +44,51 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/include/gnuradio/ofdm_prs_ranging/cmake_install.cmake")
+  include("/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/include/gnuradio/ofdm_prs_ranging/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/lib/cmake_install.cmake")
+  include("/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/lib/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/apps/cmake_install.cmake")
+  include("/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/apps/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/examples/cmake_install.cmake")
+  include("/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/examples/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/docs/cmake_install.cmake")
+  include("/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/docs/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/cmake_install.cmake")
+  include("/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/python/ofdm_prs_ranging/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/grc/cmake_install.cmake")
+  include("/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/grc/cmake_install.cmake")
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cmake/gnuradio-ofdm_prs_ranging" TYPE FILE FILES "/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/cmake/Modules/gnuradio-ofdm_prs_rangingConfig.cmake")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/cmake/gnuradio-ofdm_prs_ranging" TYPE FILE FILES "/home/cnsl/Desktop/gr-ofdm_prs_ranging/cmake/Modules/gnuradio-ofdm_prs_rangingConfig.cmake")
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/gnuradio/manifests/ofdm_prs_ranging" TYPE FILE RENAME "MANIFEST-1.0.00.yml" FILES "/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/MANIFEST.yml")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/gnuradio/manifests/ofdm_prs_ranging" TYPE FILE RENAME "MANIFEST-1.0.00.yml" FILES "/home/cnsl/Desktop/gr-ofdm_prs_ranging/MANIFEST.yml")
 endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
 if(CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/install_local_manifest.txt"
+  file(WRITE "/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/install_local_manifest.txt"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()
 if(CMAKE_INSTALL_COMPONENT)
@@ -104,6 +104,6 @@ else()
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/${CMAKE_INSTALL_MANIFEST}"
+  file(WRITE "/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()

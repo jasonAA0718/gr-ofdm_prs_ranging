@@ -1,4 +1,4 @@
-# Install script for directory: /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/examples
+# Install script for directory: /home/cnsl/Desktop/gr-ofdm_prs_ranging/examples
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -44,17 +44,17 @@ endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/gnuradio/examples/ofdm_prs_ranging" TYPE FILE FILES
-    "/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/examples/prs_tx_10M_1399.grc"
-    "/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/examples/prs_rx_capture_10M_1399.grc"
-    "/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/examples/prs_rx_estimator_10M_1399.grc"
-    "/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/examples/prs_ssrtt_initiator_10M_1399.grc"
-    "/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/examples/prs_ssrtt_responder_10M_1399.grc"
+    "/home/cnsl/Desktop/gr-ofdm_prs_ranging/examples/prs_tx_10M_1399.grc"
+    "/home/cnsl/Desktop/gr-ofdm_prs_ranging/examples/prs_rx_capture_10M_1399.grc"
+    "/home/cnsl/Desktop/gr-ofdm_prs_ranging/examples/prs_rx_estimator_10M_1399.grc"
+    "/home/cnsl/Desktop/gr-ofdm_prs_ranging/examples/prs_ssrtt_initiator_10M_1399.grc"
+    "/home/cnsl/Desktop/gr-ofdm_prs_ranging/examples/prs_ssrtt_responder_10M_1399.grc"
     )
 endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
 if(CMAKE_INSTALL_LOCAL_ONLY)
-  file(WRITE "/home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging/build/examples/install_local_manifest.txt"
+  file(WRITE "/home/cnsl/Desktop/gr-ofdm_prs_ranging/build/examples/install_local_manifest.txt"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
 endif()
