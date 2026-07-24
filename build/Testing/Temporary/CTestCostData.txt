@@ -1,8 +1,0 @@
-ofdm_prs_ranging_qa_prs_timed_burst_source.cc 7 0.00179347
-qa_prs_timed_burst_source 6 0.0236516
-qa_prs_receiver 0 0
-ofdm_prs_ranging_qa_zc_packet_utils.cc 5 0.000700095
-ofdm_prs_ranging_qa_zc_peak_detector.cc 5 0.00146596
-qa_prs_text_ui 2 0.0430572
----
-qa_prs_receiver
