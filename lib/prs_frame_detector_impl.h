@@ -10,6 +10,7 @@
 
 #include "prs_receiver_utils.h"
 #include <gnuradio/ofdm_prs_ranging/prs_frame_detector.h>
+#include <mutex>
 
 namespace gr {
 namespace ofdm_prs_ranging {
@@ -30,7 +31,11 @@ public:
                             float threshold,
                             int min_frame_gap,
                             int coarse_zc_root,
-                            int channel_id);
+                            int channel_id,
+                            bool time_gating,
+                            double reply_delay_s,
+                            double window_before_s,
+                            double window_after_s);
     ~prs_frame_detector_impl() override = default;
 
     void forecast(int noutput_items, gr_vector_int& ninput_items_required) override;
@@ -55,15 +60,30 @@ private:
     uint64_t d_rx_time_tag_offset;
     uint64_t d_rx_time_secs;
     double d_rx_time_frac;
+    bool d_time_gating;
+    double d_reply_delay_s;
+    double d_window_before_s;
+    double d_window_after_s;
 
+    struct correlation_window {
+        double start;
+        double end;
+    };
+    std::mutex d_window_mutex;
+    std::vector<correlation_window> d_windows;
+
+    void handle_tx_time(const pmt::pmt_t& msg);
     void update_rx_time_tags(uint64_t abs_start, uint64_t abs_stop);
+    double sample_time(uint64_t abs_offset) const;
     size_t buffered_size() const { return d_buffer.size() - d_buffer_head; }
     const gr_complex& buffered_sample(size_t index) const
     {
         return d_buffer[d_buffer_head + index];
     }
+    void reset_buffer(uint64_t abs_start);
     void drop_buffer_prefix(size_t count);
     void compact_buffer(size_t threshold);
+    void process_samples(const gr_complex* samples, size_t count, uint64_t abs_start);
     float coarse_sync_metric(size_t coarse_index) const;
     bool find_frame(size_t& frame_start_index,
                     size_t& coarse_index,

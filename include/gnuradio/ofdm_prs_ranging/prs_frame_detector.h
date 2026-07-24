@@ -31,7 +31,11 @@ public:
                      float threshold = 0.35f,
                      int min_frame_gap = 10000,
                      int coarse_zc_root = 25,
-                     int channel_id = 0);
+                     int channel_id = 0,
+                     bool time_gating = false,
+                     double reply_delay_s = 0.05,
+                     double window_before_s = 0.0002,
+                     double window_after_s = 0.002);
 };
 
 } // namespace ofdm_prs_ranging

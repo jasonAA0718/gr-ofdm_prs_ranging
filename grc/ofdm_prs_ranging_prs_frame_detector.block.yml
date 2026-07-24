@@ -3,7 +3,7 @@ label: PRS Frame Detector
 category: '[ofdm_prs_ranging]'
 templates:
   imports: from gnuradio import ofdm_prs_ranging
-  make: ofdm_prs_ranging.prs_frame_detector(${samp_rate}, ${fft_len}, ${cp_len}, ${active_bins}, ${prs_symbols}, ${preamble_len}, ${preamble_repeats}, ${coarse_sync_len}, ${zero_guard_len}, ${tail_guard_len}, ${threshold}, ${min_frame_gap}, ${coarse_zc_root}, ${channel_id})
+  make: ofdm_prs_ranging.prs_frame_detector(${samp_rate}, ${fft_len}, ${cp_len}, ${active_bins}, ${prs_symbols}, ${preamble_len}, ${preamble_repeats}, ${coarse_sync_len}, ${zero_guard_len}, ${tail_guard_len}, ${threshold}, ${min_frame_gap}, ${coarse_zc_root}, ${channel_id}, ${time_gating}, ${reply_delay_s}, ${window_before_s}, ${window_after_s})
 parameters:
 - {id: samp_rate, label: Sample Rate, dtype: real, default: 10e6}
 - {id: fft_len, label: FFT Length, dtype: int, default: 1024}
@@ -19,8 +19,13 @@ parameters:
 - {id: min_frame_gap, label: Min Frame Gap, dtype: int, default: 10000}
 - {id: coarse_zc_root, label: Coarse ZC Root, dtype: int, default: 25}
 - {id: channel_id, label: Channel ID, dtype: int, default: 0}
+- {id: time_gating, label: Time Gating, dtype: bool, default: 'False'}
+- {id: reply_delay_s, label: Reply Delay (s), dtype: real, default: '0.05'}
+- {id: window_before_s, label: Window Before (s), dtype: real, default: '0.0002'}
+- {id: window_after_s, label: Window After (s), dtype: real, default: '0.002'}
 inputs:
 - {label: in, domain: stream, dtype: complex}
+- {label: tx_time_in, domain: message, optional: true}
 outputs:
 - {label: frame_out, domain: message}
 file_format: 1

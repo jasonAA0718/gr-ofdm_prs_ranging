@@ -98,6 +98,53 @@ class qa_prs_receiver(gr_unittest.TestCase):
 
         self.assertEqual(debug.num_messages(), 0)
 
+    def test_time_gating_only_detects_frame_inside_scheduled_window(self):
+        samp_rate = 1e6
+        tx = ofdm_prs_ranging.prs_timed_burst_source(
+            samp_rate=samp_rate, attach_tx_time=False)
+        frame = list(tx.frame_samples())
+        target_start = 60000
+        data = [0j] * 90000
+        data[1000:1000 + len(frame)] = frame
+        data[target_start:target_start + len(frame)] = frame
+
+        rx_time = pmt.make_tuple(
+            pmt.from_uint64(100), pmt.from_double(0.0))
+        tags = [gr.tag_utils.python_to_tag(
+            (0, pmt.intern("rx_time"), rx_time, pmt.intern("qa")))]
+        timing = blocks.vector_source_c(data, False, 1, tags)
+        throttle = blocks.throttle(gr.sizeof_gr_complex, samp_rate)
+        detector = ofdm_prs_ranging.prs_frame_detector(
+            samp_rate=samp_rate,
+            threshold=0.30,
+            time_gating=True,
+            reply_delay_s=0.0,
+            window_before_s=0.001,
+            window_after_s=0.030)
+        debug = blocks.message_debug()
+
+        tx_meta = pmt.make_dict()
+        tx_meta = pmt.dict_add(
+            tx_meta, pmt.intern("tx_time_secs"), pmt.from_uint64(100))
+        tx_meta = pmt.dict_add(
+            tx_meta, pmt.intern("tx_time_frac"), pmt.from_double(0.060))
+
+        self.tb.connect(timing, throttle, detector)
+        self.tb.msg_connect((detector, "frame_out"), (debug, "store"))
+        self.tb.start()
+        detector.to_basic_block()._post(pmt.intern("tx_time_in"), tx_meta)
+        time.sleep(0.15)
+        self.tb.stop()
+        self.tb.wait()
+
+        self.assertEqual(debug.num_messages(), 1)
+        meta = pmt.car(debug.get_message(0))
+        self.assertEqual(
+            pmt.to_uint64(
+                pmt.dict_ref(
+                    meta, pmt.intern("frame_start"), pmt.PMT_NIL)),
+            target_start)
+
     def test_csv_logger_writes_measurement_row(self):
         fd, path = tempfile.mkstemp(prefix="prs_meas_", suffix=".csv")
         os.close(fd)

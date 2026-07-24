@@ -142,6 +142,144 @@ CRC-16
 
 `recv_id` is a local receiver counter and is not the transmitted frame ID.
 
+## Changes on 2026-07-24
+
+The following performance and scheduling changes were completed without
+changing the PRS frame purpose, signal-processing equations, metadata contract,
+or SS-TWR range formula.
+
+### Signal-Processing Efficiency
+
+```text
+lib/prs_receiver_utils.cc
+    Added zero-copy access to PMT complex vectors.
+
+lib/prs_frame_detector_impl.cc
+    Replaced per-scheduler-call sample shifting with logical buffer drops and
+    batched compaction.
+
+lib/prs_fft_receiver_impl.cc
+    Reused FFT input, output, and symbol buffers between frames.
+
+lib/prs_channel_estimator_impl.cc
+    Precomputed pilot reciprocals and calculated channel residual statistics
+    in one input pass.
+
+lib/prs_frame_builder.cc
+    Replaced the quadratic transmitter DFT with GNU Radio's FFT backend.
+```
+
+At the default geometry, these changes avoid approximately 191 KB, 77 KB, and
+4.8 KB of input copying per frame across the receiver stages. PRS construction
+changed from approximately `O(16 * 1024^2)` to
+`O(16 * 1024 * log2(1024))`.
+
+### RX and TX Scheduling
+
+A new `prs_rx_timekeeper` block was added in:
+
+```text
+include/gnuradio/ofdm_prs_ranging/prs_rx_timekeeper.h
+lib/prs_rx_timekeeper_impl.h
+lib/prs_rx_timekeeper_impl.cc
+python/ofdm_prs_ranging/bindings/prs_rx_timekeeper_python.cc
+grc/ofdm_prs_ranging_prs_rx_timekeeper.block.yml
+```
+
+It continuously consumes the UHD RX branch, tracks the most recent `rx_time`
+tag and absolute sample offset, and converts a strobe into an explicit timed
+trigger. `prs_timed_burst_source` now accepts zero or one stream input, so it
+does not need to consume the RX stream when the trigger already contains
+`tx_time_secs` and `tx_time_frac`.
+
+The updated initiator topology is:
+
+```text
+UHD Source -> prs_frame_detector
+UHD Source -> prs_rx_timekeeper
+message_strobe -> prs_rx_timekeeper -> prs_timed_burst_source -> UHD Sink
+```
+
+The updated responder topology is:
+
+```text
+UHD Source -> prs_frame_detector
+prs_frame_detector -> prs_ssrtt_responder
+prs_ssrtt_responder -> prs_timed_burst_source -> UHD Sink
+```
+
+The direct `UHD Source -> prs_timed_burst_source` connection was removed from
+both SSRTT flowgraphs. This prevents timed transmission from backpressuring the
+RX stream at the strobe or response period.
+
+The scheduling change also updated the timed burst source implementation,
+public header, Python binding, GRC definition, CMake registration, initiator
+flowgraph, responder flowgraph, and timing QA tests.
+
+### Scheduled Correlation Windows
+
+`prs_frame_detector` now has an optional `tx_time_in` message port and these
+backward-compatible parameters:
+
+```text
+time_gating=False
+reply_delay_s=0.05
+window_before_s=0.0002
+window_after_s=0.002
+```
+
+When gating is enabled, a transmit-time message schedules:
+
+```text
+window_start = tx_time + reply_delay_s - window_before_s
+window_end   = tx_time + reply_delay_s + window_after_s
+```
+
+The detector continues consuming all UHD samples and tracking `rx_time` while
+disarmed. It skips sample buffering and preamble/coarse correlation outside the
+window, and resets correlation state across inactive sample gaps.
+
+The initiator connects `prs_timed_burst_source.tx_time_out` to both
+`prs_frame_detector.tx_time_in` and `prs_ssrtt_solver.tx_time_in`. Its current
+50 ms reply delay, 0.2 ms early margin, and 2 ms late window cover the expected
+response from a target below 100 km, including the complete configured frame.
+With a 2.5-second strobe period, correlation is active for about 2.2 ms, or
+approximately 0.09% of each cycle.
+
+The responder remains in continuous correlation mode because it cannot predict
+the first poll without shared radio time or an established slot schedule.
+
+Correlation gating updated:
+
+```text
+include/gnuradio/ofdm_prs_ranging/prs_frame_detector.h
+lib/prs_frame_detector_impl.h
+lib/prs_frame_detector_impl.cc
+python/ofdm_prs_ranging/bindings/prs_frame_detector_python.cc
+python/ofdm_prs_ranging/qa_prs_receiver.py
+grc/ofdm_prs_ranging_prs_frame_detector.block.yml
+examples/prs_ssrtt_initiator_10M_1399.grc
+examples/prs_ssrtt_initiator_10M_1399.py
+README.md
+```
+
+### Validation
+
+```text
+Clean Release build: passed
+Initiator GRC validation and generation: passed
+Responder GRC validation and generation: passed
+Time-gating inside/outside-window test: passed
+Timed burst and ZC focused tests: passed
+git diff --check: passed
+```
+
+`qa_prs_receiver` passes six of seven cases. Its older synthetic SSRTT timestamp
+case still fails because of the existing hard-coded calibration delay; the
+failure is unrelated to the scheduling and correlation-window changes.
+Hardware overflow and CPU measurements must still be repeated after installing
+the updated OOT module.
+
 ## Current Receiver Chain
 
 The OFDM PRS receiver chain is:
@@ -217,6 +355,24 @@ prs_ssrtt_responder -> prs_timed_burst_source -> UHD Sink
 `prs_timed_burst_source` accepts zero or one stream input for compatibility with
 older flowgraphs. New SS-TWR flowgraphs must leave that stream input
 unconnected.
+
+### Time-Gated Correlation
+
+The initiator frame detector can restrict acquisition work to the expected
+response interval. Its `tx_time_in` message input accepts the
+`prs_timed_burst_source` `tx_time_out` dictionary and schedules:
+
+```text
+window_start = tx_time + reply_delay_s - window_before_s
+window_end   = tx_time + reply_delay_s + window_after_s
+```
+
+The 30 MHz initiator example uses a 50 ms responder delay, 0.2 ms early margin,
+and 2 ms late window. The detector continues consuming every UHD sample and
+tracking `rx_time` while disarmed, but it does not copy samples or run preamble
+correlation outside the scheduled window. The responder remains in continuous
+acquisition mode because it cannot predict the first poll without a shared time
+or an established slot schedule.
 
 ## Recent Coarse ZC Root / Channel Separation Support
 
@@ -352,7 +508,6 @@ See `signal.md` for the current signal equations.
 Build command:
 
 ```bash
-cd /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging
 cmake --build build -j$(nproc)
 ```
 
@@ -368,6 +523,7 @@ Current state:
 Build passes.
 prs_timed tests pass.
 New coarse_zc_root/channel_id tests pass.
+New time-gated correlation test passes.
 qa_prs_receiver still fails only at the older synthetic SS-RTT timestamp test.
 ```
 
@@ -386,7 +542,6 @@ After source changes or git pull on another PC, rebuild and reinstall locally.
 Do not copy installed `.so` files between PCs.
 
 ```bash
-cd /home/cnsl/gnuradio-zc-twr/gr-ofdm_prs_ranging
 cmake --build build -j$(nproc)
 sudo cmake --build build --target install
 sudo ldconfig

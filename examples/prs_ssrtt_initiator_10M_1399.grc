@@ -200,9 +200,13 @@ blocks:
     preamble_len: premble_length
     preamble_repeats: premble_rep
     prs_symbols: '16'
+    reply_delay_s: '0.05'
     samp_rate: samp_rate
     tail_guard_len: '1000'
     threshold: '0.35'
+    time_gating: 'True'
+    window_after_s: '0.002'
+    window_before_s: '0.0002'
     zero_guard_len: '1000'
   states:
     bus_sink: false
@@ -1018,6 +1022,7 @@ connections:
 - [prs_phase_slope_estimator_0, measurement_out, prs_ssrtt_solver_0, measurement_in]
 - [prs_rx_timekeeper_0, timed_trigger_out, prs_source, trigger]
 - [prs_source, '0', uhd_usrp_sink_0, '0']
+- [prs_source, tx_time_out, prs_frame_detector_0, tx_time_in]
 - [prs_source, tx_time_out, prs_ssrtt_solver_0, tx_time_in]
 - [prs_ssrtt_solver_0, ssrtt_out, prs_csv_logger_0, measurement_in]
 - [uhd_usrp_source_0_0, '0', prs_frame_detector_0, '0']

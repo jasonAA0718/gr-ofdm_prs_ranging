@@ -20,5 +20,9 @@ void bind_prs_frame_detector(py::module& m)
              py::arg("threshold") = 0.35f,
              py::arg("min_frame_gap") = 10000,
              py::arg("coarse_zc_root") = 25,
-             py::arg("channel_id") = 0);
+             py::arg("channel_id") = 0,
+             py::arg("time_gating") = false,
+             py::arg("reply_delay_s") = 0.05,
+             py::arg("window_before_s") = 0.0002,
+             py::arg("window_after_s") = 0.002);
 }

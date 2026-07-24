@@ -10,6 +10,8 @@
 #include <gnuradio/io_signature.h>
 #include <algorithm>
 #include <cmath>
+#include <limits>
+#include <stdexcept>
 
 namespace gr {
 namespace ofdm_prs_ranging {
@@ -27,7 +29,11 @@ prs_frame_detector::sptr prs_frame_detector::make(double samp_rate,
                                                   float threshold,
                                                   int min_frame_gap,
                                                   int coarse_zc_root,
-                                                  int channel_id)
+                                                  int channel_id,
+                                                  bool time_gating,
+                                                  double reply_delay_s,
+                                                  double window_before_s,
+                                                  double window_after_s)
 {
     return gnuradio::make_block_sptr<prs_frame_detector_impl>(samp_rate,
                                                               fft_len,
@@ -42,7 +48,11 @@ prs_frame_detector::sptr prs_frame_detector::make(double samp_rate,
                                                               threshold,
                                                               min_frame_gap,
                                                               coarse_zc_root,
-                                                              channel_id);
+                                                              channel_id,
+                                                              time_gating,
+                                                              reply_delay_s,
+                                                              window_before_s,
+                                                              window_after_s);
 }
 
 prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
@@ -58,7 +68,11 @@ prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
                                                  float threshold,
                                                  int min_frame_gap,
                                                  int coarse_zc_root,
-                                                 int channel_id)
+                                                 int channel_id,
+                                                 bool time_gating,
+                                                 double reply_delay_s,
+                                                 double window_before_s,
+                                                 double window_after_s)
     : gr::block("prs_frame_detector",
                 gr::io_signature::make(1, 1, sizeof(gr_complex)),
                 gr::io_signature::make(0, 0, 0)),
@@ -73,8 +87,19 @@ prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
       d_have_rx_time(false),
       d_rx_time_tag_offset(0),
       d_rx_time_secs(0),
-      d_rx_time_frac(0.0)
+      d_rx_time_frac(0.0),
+      d_time_gating(time_gating),
+      d_reply_delay_s(reply_delay_s),
+      d_window_before_s(window_before_s),
+      d_window_after_s(window_after_s)
 {
+    if (samp_rate <= 0.0) {
+        throw std::invalid_argument("samp_rate must be positive");
+    }
+    if (reply_delay_s < 0.0 || window_before_s < 0.0 || window_after_s <= 0.0) {
+        throw std::invalid_argument("correlation window timing must be nonnegative");
+    }
+
     d_cfg.samp_rate = samp_rate;
     d_cfg.fft_len = fft_len;
     d_cfg.cp_len = cp_len;
@@ -89,13 +114,64 @@ prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
     d_cfg.channel_id = channel_id;
     d_coarse = coarse_sync_sequence(d_cfg.coarse_sync_len, d_cfg.coarse_zc_root);
     d_buffer.reserve(static_cast<size_t>(frame_len(d_cfg) + d_cfg.coarse_sync_len) * 2U);
+    message_port_register_in(pmt::mp("tx_time_in"));
     message_port_register_out(pmt::mp("frame_out"));
+    set_msg_handler(pmt::mp("tx_time_in"),
+                    [this](pmt::pmt_t msg) { handle_tx_time(msg); });
 }
 
 void prs_frame_detector_impl::forecast(int noutput_items, gr_vector_int& ninput_items_required)
 {
     (void)noutput_items;
     ninput_items_required[0] = 1;
+}
+
+void prs_frame_detector_impl::handle_tx_time(const pmt::pmt_t& message)
+{
+    if (!d_time_gating) {
+        return;
+    }
+
+    const pmt::pmt_t msg =
+        pmt::is_dict(message) ? message
+                              : (pmt::is_pair(message) ? pmt::car(message) : message);
+    if (!pmt::is_dict(msg)) {
+        return;
+    }
+
+    double tx_time =
+        dict_ref_double(msg, "tx_time", std::numeric_limits<double>::quiet_NaN());
+    if (!std::isfinite(tx_time)) {
+        const double secs =
+            dict_ref_double(msg, "tx_time_secs", std::numeric_limits<double>::quiet_NaN());
+        const double frac = dict_ref_double(msg, "tx_time_frac", 0.0);
+        if (std::isfinite(secs)) {
+            tx_time = secs + frac;
+        }
+    }
+    if (!std::isfinite(tx_time)) {
+        return;
+    }
+
+    correlation_window window{ tx_time + d_reply_delay_s - d_window_before_s,
+                               tx_time + d_reply_delay_s + d_window_after_s };
+    std::lock_guard<std::mutex> lock(d_window_mutex);
+    d_windows.push_back(window);
+    std::sort(d_windows.begin(),
+              d_windows.end(),
+              [](const correlation_window& a, const correlation_window& b) {
+                  return a.start < b.start;
+              });
+    size_t merged = 0;
+    for (const auto& candidate : d_windows) {
+        if (merged == 0 || candidate.start > d_windows[merged - 1].end) {
+            d_windows[merged++] = candidate;
+        } else {
+            d_windows[merged - 1].end =
+                std::max(d_windows[merged - 1].end, candidate.end);
+        }
+    }
+    d_windows.resize(merged);
 }
 
 void prs_frame_detector_impl::update_rx_time_tags(uint64_t abs_start, uint64_t abs_stop)
@@ -115,6 +191,22 @@ void prs_frame_detector_impl::update_rx_time_tags(uint64_t abs_start, uint64_t a
     }
 }
 
+double prs_frame_detector_impl::sample_time(uint64_t abs_offset) const
+{
+    const double sample_delta =
+        static_cast<double>(abs_offset) - static_cast<double>(d_rx_time_tag_offset);
+    return static_cast<double>(d_rx_time_secs) + d_rx_time_frac +
+           sample_delta / d_cfg.samp_rate;
+}
+
+void prs_frame_detector_impl::reset_buffer(uint64_t abs_start)
+{
+    d_buffer.clear();
+    d_buffer_head = 0;
+    d_next_scan_index = 0;
+    d_buffer_abs_start = abs_start;
+}
+
 void prs_frame_detector_impl::drop_buffer_prefix(size_t count)
 {
     d_buffer_head += count;
@@ -131,6 +223,38 @@ void prs_frame_detector_impl::compact_buffer(size_t threshold)
         d_buffer.erase(d_buffer.begin(), d_buffer.begin() + d_buffer_head);
         d_buffer_head = 0;
     }
+}
+
+void prs_frame_detector_impl::process_samples(const gr_complex* samples,
+                                              size_t count,
+                                              uint64_t abs_start)
+{
+    if (count == 0) {
+        return;
+    }
+    if (buffered_size() == 0) {
+        reset_buffer(abs_start);
+    } else if (d_buffer_abs_start + buffered_size() != abs_start) {
+        reset_buffer(abs_start);
+    }
+
+    d_buffer.insert(d_buffer.end(), samples, samples + count);
+
+    size_t frame_start = 0;
+    size_t coarse = 0;
+    float preamble_metric = 0.0f;
+    float coarse_metric = 0.0f;
+    while (find_frame(frame_start, coarse, preamble_metric, coarse_metric)) {
+        publish_frame(frame_start, coarse, preamble_metric, coarse_metric);
+        const size_t drop = frame_start + static_cast<size_t>(frame_len(d_cfg));
+        drop_buffer_prefix(drop);
+    }
+
+    const size_t keep = static_cast<size_t>(frame_len(d_cfg) + d_cfg.coarse_sync_len);
+    if (buffered_size() > keep) {
+        drop_buffer_prefix(buffered_size() - keep);
+    }
+    compact_buffer(keep);
 }
 
 float prs_frame_detector_impl::coarse_sync_metric(size_t coarse_index) const
@@ -304,9 +428,7 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
     meta = pmt::dict_add(meta, pmt::mp("prs_start_rel"), pmt::from_long(prs_start_offset(d_cfg)));
     meta = pmt::dict_add(meta, pmt::mp("prs_len"), pmt::from_long(prs_len(d_cfg)));
     if (d_have_rx_time) {
-        const double rx_time =
-            static_cast<double>(d_rx_time_secs) + d_rx_time_frac +
-            static_cast<double>(abs_start - d_rx_time_tag_offset) / d_cfg.samp_rate;
+        const double rx_time = sample_time(abs_start);
         meta = pmt::dict_add(meta,
                              pmt::mp("rx_time"),
                              pmt::make_tuple(pmt::from_uint64(static_cast<uint64_t>(std::floor(rx_time))),
@@ -329,26 +451,70 @@ int prs_frame_detector_impl::general_work(int noutput_items,
     const auto in = static_cast<const gr_complex*>(input_items[0]);
     const int ninput = ninput_items[0];
     const uint64_t abs_start = nitems_read(0);
-    update_rx_time_tags(abs_start, abs_start + ninput);
-
-    d_buffer.insert(d_buffer.end(), in, in + ninput);
+    const uint64_t abs_stop = abs_start + static_cast<uint64_t>(ninput);
+    update_rx_time_tags(abs_start, abs_stop);
     d_total_seen += ninput;
 
-    size_t frame_start = 0;
-    size_t coarse = 0;
-    float preamble_metric = 0.0f;
-    float coarse_metric = 0.0f;
-    while (find_frame(frame_start, coarse, preamble_metric, coarse_metric)) {
-        publish_frame(frame_start, coarse, preamble_metric, coarse_metric);
-        const size_t drop = frame_start + static_cast<size_t>(frame_len(d_cfg));
-        drop_buffer_prefix(drop);
-    }
+    if (!d_time_gating) {
+        process_samples(in, static_cast<size_t>(ninput), abs_start);
+    } else if (!d_have_rx_time) {
+        reset_buffer(abs_stop);
+    } else {
+        const double chunk_start_time = sample_time(abs_start);
+        const double chunk_stop_time = sample_time(abs_stop);
+        std::vector<std::pair<uint64_t, uint64_t>> segments;
+        {
+            std::lock_guard<std::mutex> lock(d_window_mutex);
+            d_windows.erase(
+                std::remove_if(d_windows.begin(),
+                               d_windows.end(),
+                               [chunk_start_time](const correlation_window& window) {
+                                   return window.end <= chunk_start_time;
+                               }),
+                d_windows.end());
+            for (const auto& window : d_windows) {
+                if (window.start >= chunk_stop_time) {
+                    break;
+                }
+                if (window.end <= chunk_start_time) {
+                    continue;
+                }
+                const double start_offset =
+                    static_cast<double>(d_rx_time_tag_offset) +
+                    (window.start -
+                     (static_cast<double>(d_rx_time_secs) + d_rx_time_frac)) *
+                        d_cfg.samp_rate;
+                const double stop_offset =
+                    static_cast<double>(d_rx_time_tag_offset) +
+                    (window.end -
+                     (static_cast<double>(d_rx_time_secs) + d_rx_time_frac)) *
+                        d_cfg.samp_rate;
+                const uint64_t segment_start = std::max(
+                    abs_start,
+                    static_cast<uint64_t>(std::max(0.0, std::ceil(start_offset))));
+                const uint64_t segment_stop = std::min(
+                    abs_stop,
+                    static_cast<uint64_t>(std::max(0.0, std::ceil(stop_offset))));
+                if (segment_start < segment_stop) {
+                    segments.emplace_back(segment_start, segment_stop);
+                }
+            }
+        }
 
-    const size_t keep = static_cast<size_t>(frame_len(d_cfg) + d_cfg.coarse_sync_len);
-    if (buffered_size() > keep) {
-        drop_buffer_prefix(buffered_size() - keep);
+        uint64_t processed_until = abs_start;
+        for (const auto& segment : segments) {
+            if (segment.first != processed_until) {
+                reset_buffer(segment.first);
+            }
+            process_samples(in + (segment.first - abs_start),
+                            static_cast<size_t>(segment.second - segment.first),
+                            segment.first);
+            processed_until = segment.second;
+        }
+        if (processed_until != abs_stop) {
+            reset_buffer(abs_stop);
+        }
     }
-    compact_buffer(keep);
 
     consume_each(ninput);
     return 0;

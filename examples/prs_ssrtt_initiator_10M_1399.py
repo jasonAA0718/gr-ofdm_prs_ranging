@@ -37,7 +37,7 @@ class prs_ssrtt_initiator_10M_1399(gr.top_block):
         # Variables
         ##################################################
         self.zc_length = zc_length = 419
-        self.samp_rate = samp_rate = 30e6
+        self.samp_rate = samp_rate = 56e6
         self.premble_rep = premble_rep = 68
         self.premble_length = premble_length = 128
         self.center_freq = center_freq = 1060e6
@@ -91,7 +91,7 @@ class prs_ssrtt_initiator_10M_1399(gr.top_block):
             True, 25)
         self.prs_rx_timekeeper_0 = ofdm_prs_ranging.prs_rx_timekeeper(samp_rate, 0.6)
         self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 1024, 600, 1.0)
-        self.prs_frame_detector_0 = ofdm_prs_ranging.prs_frame_detector(samp_rate, 1024, 128, 600, 16, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 29, 1)
+        self.prs_frame_detector_0 = ofdm_prs_ranging.prs_frame_detector(samp_rate, 1024, 128, 600, 16, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 29, 1, True, 0.05, 0.0002, 0.002)
         self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 1024, 128, 600, 16)
         self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger("CSV/obs.csv", 1)
         self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 1024, 600, 16, 13990001)
@@ -109,6 +109,7 @@ class prs_ssrtt_initiator_10M_1399(gr.top_block):
         self.msg_connect((self.prs_frame_detector_0, 'frame_out'), (self.prs_fft_receiver_0, 'frame_in'))
         self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_ssrtt_solver_0, 'measurement_in'))
         self.msg_connect((self.prs_rx_timekeeper_0, 'timed_trigger_out'), (self.prs_source, 'trigger'))
+        self.msg_connect((self.prs_source, 'tx_time_out'), (self.prs_frame_detector_0, 'tx_time_in'))
         self.msg_connect((self.prs_source, 'tx_time_out'), (self.prs_ssrtt_solver_0, 'tx_time_in'))
         self.msg_connect((self.prs_ssrtt_solver_0, 'ssrtt_out'), (self.prs_csv_logger_0, 'measurement_in'))
         self.connect((self.prs_source, 0), (self.uhd_usrp_sink_0, 0))

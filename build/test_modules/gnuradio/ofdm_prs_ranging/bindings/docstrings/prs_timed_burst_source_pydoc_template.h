@@ -15,28 +15,32 @@
  */
 
 
-
- static const char *__doc_gr_ofdm_prs_ranging_prs_timed_burst_source = R"doc()doc";
-
-
- static const char *__doc_gr_ofdm_prs_ranging_prs_timed_burst_source_prs_timed_burst_source_0 = R"doc()doc";
+static const char* __doc_gr_ofdm_prs_ranging_prs_timed_burst_source = R"doc()doc";
 
 
- static const char *__doc_gr_ofdm_prs_ranging_prs_timed_burst_source_prs_timed_burst_source_1 = R"doc()doc";
+static const char*
+    __doc_gr_ofdm_prs_ranging_prs_timed_burst_source_prs_timed_burst_source_0 =
+        R"doc()doc";
 
 
- static const char *__doc_gr_ofdm_prs_ranging_prs_timed_burst_source_make = R"doc()doc";
+static const char*
+    __doc_gr_ofdm_prs_ranging_prs_timed_burst_source_prs_timed_burst_source_1 =
+        R"doc()doc";
 
 
- static const char *__doc_gr_ofdm_prs_ranging_prs_timed_burst_source_frame_len = R"doc()doc";
+static const char* __doc_gr_ofdm_prs_ranging_prs_timed_burst_source_make = R"doc()doc";
 
 
- static const char *__doc_gr_ofdm_prs_ranging_prs_timed_burst_source_prs_start = R"doc()doc";
+static const char* __doc_gr_ofdm_prs_ranging_prs_timed_burst_source_frame_len =
+    R"doc()doc";
 
 
- static const char *__doc_gr_ofdm_prs_ranging_prs_timed_burst_source_prs_len = R"doc()doc";
+static const char* __doc_gr_ofdm_prs_ranging_prs_timed_burst_source_prs_start =
+    R"doc()doc";
 
 
- static const char *__doc_gr_ofdm_prs_ranging_prs_timed_burst_source_frame_samples = R"doc()doc";
+static const char* __doc_gr_ofdm_prs_ranging_prs_timed_burst_source_prs_len = R"doc()doc";
 
-  
+
+static const char* __doc_gr_ofdm_prs_ranging_prs_timed_burst_source_frame_samples =
+    R"doc()doc";
