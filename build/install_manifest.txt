@@ -26,8 +26,10 @@
 /usr/local/share/gnuradio/examples/ofdm_prs_ranging/prs_ssrtt_responder_10M_1399.grc
 /usr/local/lib/python3.13/dist-packages/gnuradio/ofdm_prs_ranging/ofdm_prs_ranging_python.cpython-313-x86_64-linux-gnu.so
 /usr/local/lib/python3.13/dist-packages/gnuradio/ofdm_prs_ranging/__init__.py
+/usr/local/lib/python3.13/dist-packages/gnuradio/ofdm_prs_ranging/prs_text_ui.py
 /usr/local/share/gnuradio/grc/blocks/ofdm_prs_ranging_prs_acquisition_logger.block.yml
 /usr/local/share/gnuradio/grc/blocks/ofdm_prs_ranging_prs_rx_timekeeper.block.yml
+/usr/local/share/gnuradio/grc/blocks/ofdm_prs_ranging_prs_text_ui.block.yml
 /usr/local/share/gnuradio/grc/blocks/ofdm_prs_ranging_prs_timed_burst_source.block.yml
 /usr/local/share/gnuradio/grc/blocks/ofdm_prs_ranging_prs_frame_detector.block.yml
 /usr/local/share/gnuradio/grc/blocks/ofdm_prs_ranging_prs_fft_receiver.block.yml

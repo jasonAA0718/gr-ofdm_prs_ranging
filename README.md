@@ -243,8 +243,8 @@ The initiator connects `prs_timed_burst_source.tx_time_out` to both
 `prs_frame_detector.tx_time_in` and `prs_ssrtt_solver.tx_time_in`. Its current
 50 ms reply delay, 0.2 ms early margin, and 2 ms late window cover the expected
 response from a target below 100 km, including the complete configured frame.
-With a 2.5-second strobe period, correlation is active for about 2.2 ms, or
-approximately 0.09% of each cycle.
+With the current 500 ms strobe period, correlation is active for about 2.2 ms,
+or approximately 0.44% of each cycle.
 
 The responder remains in continuous correlation mode because it cannot predict
 the first poll without shared radio time or an established slot schedule.
@@ -263,6 +263,59 @@ examples/prs_ssrtt_initiator_10M_1399.py
 README.md
 ```
 
+### Initiator and Responder Text UI
+
+The message-only `prs_text_ui` block was added for compact live terminal
+status. It does not consume or copy the UHD sample stream.
+
+Initiator inputs:
+
+```text
+prs_timed_burst_source.tx_time_out -> prs_text_ui.tx_in
+prs_frame_detector.frame_out -> prs_text_ui.frame_in
+prs_ssrtt_solver.ssrtt_out -> prs_text_ui.measurement_in
+```
+
+Initiator display:
+
+```text
+[INITIATOR] RX RECEIVING | responses/polls 49/50 (98.0%) | loss 2.0% |
+pending 0 | SNR 22.4 dB | range 84.25 m
+```
+
+Responder inputs:
+
+```text
+prs_frame_detector.frame_out -> prs_text_ui.frame_in
+prs_phase_slope_estimator.measurement_out -> prs_text_ui.measurement_in
+prs_timed_burst_source.tx_time_out -> prs_text_ui.tx_in
+```
+
+Responder display:
+
+```text
+[RESPONDER] RX RECEIVING | replies/polls 50/50 (100.0%) | SNR 21.8 dB
+```
+
+Poll and response counts use unique `poll_frame_id` values. Initiator polls
+remain pending until a matched response arrives or `response_timeout_s`
+expires. `loss` counts only expired polls, while the response percentage uses
+all transmitted polls. RX status becomes `NO SIGNAL` after
+`stale_timeout_s` without a valid frame. SNR is the current channel-residual
+estimate, and range remains subject to the configured SSRTT calibration delay.
+
+The implementation and integration files are:
+
+```text
+python/ofdm_prs_ranging/prs_text_ui.py
+python/ofdm_prs_ranging/qa_prs_text_ui.py
+grc/ofdm_prs_ranging_prs_text_ui.block.yml
+examples/prs_ssrtt_initiator_10M_1399.grc
+examples/prs_ssrtt_initiator_10M_1399.py
+examples/prs_ssrtt_responder_10M_1399.grc
+examples/prs_ssrtt_responder_10M_1399.py
+```
+
 ### Validation
 
 ```text
@@ -270,6 +323,7 @@ Clean Release build: passed
 Initiator GRC validation and generation: passed
 Responder GRC validation and generation: passed
 Time-gating inside/outside-window test: passed
+Initiator/responder text UI tests: passed
 Timed burst and ZC focused tests: passed
 git diff --check: passed
 ```
@@ -524,6 +578,7 @@ Build passes.
 prs_timed tests pass.
 New coarse_zc_root/channel_id tests pass.
 New time-gated correlation test passes.
+New initiator/responder text UI tests pass.
 qa_prs_receiver still fails only at the older synthetic SS-RTT timestamp test.
 ```
 

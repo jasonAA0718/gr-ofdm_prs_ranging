@@ -78,6 +78,7 @@ class prs_ssrtt_responder_10M_1399(gr.top_block):
         self.uhd_usrp_sink_0.set_bandwidth(samp_rate, 0)
         self.uhd_usrp_sink_0.set_normalized_gain(0.9, 0)
         self.prs_ssrtt_responder_0 = ofdm_prs_ranging.prs_ssrtt_responder(samp_rate, reply_delay_samples)
+        self.prs_text_ui_0 = ofdm_prs_ranging.prs_text_ui("responder", 1.5, 1.0, 0.25, True)
         self.prs_source = ofdm_prs_ranging.prs_timed_burst_source(
             samp_rate, 1024, 128, 600, 16,
             premble_length, premble_rep, 839,
@@ -98,7 +99,10 @@ class prs_ssrtt_responder_10M_1399(gr.top_block):
         self.msg_connect((self.prs_fft_receiver_0, 'symbols_out'), (self.prs_channel_estimator_0, 'symbols_in'))
         self.msg_connect((self.prs_frame_detector_0, 'frame_out'), (self.prs_acquisition_logger_0, 'frame_in'))
         self.msg_connect((self.prs_frame_detector_0, 'frame_out'), (self.prs_fft_receiver_0, 'frame_in'))
+        self.msg_connect((self.prs_frame_detector_0, 'frame_out'), (self.prs_text_ui_0, 'frame_in'))
         self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_ssrtt_responder_0, 'measurement_in'))
+        self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_text_ui_0, 'measurement_in'))
+        self.msg_connect((self.prs_source, 'tx_time_out'), (self.prs_text_ui_0, 'tx_in'))
         self.msg_connect((self.prs_ssrtt_responder_0, 'trigger_out'), (self.prs_source, 'trigger'))
         self.connect((self.prs_source, 0), (self.uhd_usrp_sink_0, 0))
         self.connect((self.uhd_usrp_source_0_0, 0), (self.prs_frame_detector_0, 0))

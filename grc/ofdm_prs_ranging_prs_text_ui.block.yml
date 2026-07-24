@@ -1,0 +1,18 @@
+id: ofdm_prs_ranging_prs_text_ui
+label: PRS Text UI
+category: '[ofdm_prs_ranging]'
+templates:
+  imports: from gnuradio import ofdm_prs_ranging
+  make: ofdm_prs_ranging.prs_text_ui(${role}, ${stale_timeout_s}, ${response_timeout_s}, ${refresh_period_s}, ${use_ansi})
+parameters:
+- {id: role, label: Role, dtype: string, default: '"initiator"'}
+- {id: stale_timeout_s, label: Signal Timeout (s), dtype: real, default: '1.5'}
+- {id: response_timeout_s, label: Response Timeout (s), dtype: real, default: '1.0'}
+- {id: refresh_period_s, label: Refresh Period (s), dtype: real, default: '0.25'}
+- {id: use_ansi, label: Update One Line, dtype: bool, default: 'True'}
+inputs:
+- {label: tx_in, domain: message, optional: true}
+- {label: frame_in, domain: message, optional: true}
+- {label: measurement_in, domain: message, optional: true}
+outputs: []
+file_format: 1

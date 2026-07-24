@@ -46,6 +46,7 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/gnuradio/grc/blocks" TYPE FILE FILES
     "/home/cnsl/Desktop/gr-ofdm_prs_ranging/grc/ofdm_prs_ranging_prs_acquisition_logger.block.yml"
     "/home/cnsl/Desktop/gr-ofdm_prs_ranging/grc/ofdm_prs_ranging_prs_rx_timekeeper.block.yml"
+    "/home/cnsl/Desktop/gr-ofdm_prs_ranging/grc/ofdm_prs_ranging_prs_text_ui.block.yml"
     "/home/cnsl/Desktop/gr-ofdm_prs_ranging/grc/ofdm_prs_ranging_prs_timed_burst_source.block.yml"
     "/home/cnsl/Desktop/gr-ofdm_prs_ranging/grc/ofdm_prs_ranging_prs_frame_detector.block.yml"
     "/home/cnsl/Desktop/gr-ofdm_prs_ranging/grc/ofdm_prs_ranging_prs_fft_receiver.block.yml"

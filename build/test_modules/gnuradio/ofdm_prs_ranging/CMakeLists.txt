@@ -19,7 +19,11 @@ add_subdirectory(bindings)
 ########################################################################
 # Install python sources
 ########################################################################
-gr_python_install(FILES __init__.py DESTINATION ${GR_PYTHON_DIR}/gnuradio/ofdm_prs_ranging)
+gr_python_install(
+    FILES
+    __init__.py
+    prs_text_ui.py
+    DESTINATION ${GR_PYTHON_DIR}/gnuradio/ofdm_prs_ranging)
 
 ########################################################################
 # Handle the unit tests
@@ -36,5 +40,6 @@ add_custom_target(
             ${PROJECT_BINARY_DIR}/test_modules/gnuradio/ofdm_prs_ranging/)
 GR_ADD_TEST(qa_prs_timed_burst_source ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_prs_timed_burst_source.py)
 GR_ADD_TEST(qa_prs_receiver ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_prs_receiver.py)
+GR_ADD_TEST(qa_prs_text_ui ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_prs_text_ui.py)
 set_tests_properties(qa_prs_receiver
                      PROPERTIES ENVIRONMENT "HOME=/tmp;XDG_CACHE_HOME=/tmp")

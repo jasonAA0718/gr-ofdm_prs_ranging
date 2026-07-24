@@ -9,6 +9,7 @@
 install(FILES
     ofdm_prs_ranging_prs_acquisition_logger.block.yml
     ofdm_prs_ranging_prs_rx_timekeeper.block.yml
+    ofdm_prs_ranging_prs_text_ui.block.yml
     ofdm_prs_ranging_prs_timed_burst_source.block.yml
     ofdm_prs_ranging_prs_frame_detector.block.yml
     ofdm_prs_ranging_prs_fft_receiver.block.yml

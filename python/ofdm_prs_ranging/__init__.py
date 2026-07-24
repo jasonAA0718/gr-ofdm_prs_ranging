@@ -19,5 +19,5 @@ try:
 except ModuleNotFoundError:
     pass
 
-# import any pure python here
-#
+# import pure Python blocks
+from .prs_text_ui import prs_text_ui

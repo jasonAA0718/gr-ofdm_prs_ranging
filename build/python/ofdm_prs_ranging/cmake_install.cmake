@@ -48,7 +48,10 @@ if(NOT CMAKE_INSTALL_LOCAL_ONLY)
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/python3.13/dist-packages/gnuradio/ofdm_prs_ranging" TYPE FILE FILES "/home/cnsl/Desktop/gr-ofdm_prs_ranging/python/ofdm_prs_ranging/__init__.py")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/python3.13/dist-packages/gnuradio/ofdm_prs_ranging" TYPE FILE FILES
+    "/home/cnsl/Desktop/gr-ofdm_prs_ranging/python/ofdm_prs_ranging/__init__.py"
+    "/home/cnsl/Desktop/gr-ofdm_prs_ranging/python/ofdm_prs_ranging/prs_text_ui.py"
+    )
 endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT

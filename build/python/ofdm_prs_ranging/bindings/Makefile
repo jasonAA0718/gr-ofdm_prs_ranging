@@ -172,20 +172,6 @@ depend:
 .PHONY : depend
 
 # Convenience name for target.
-python/ofdm_prs_ranging/bindings/CMakeFiles/prs_timed_burst_source_python.cc_regen_bindings.dir/rule:
-	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 python/ofdm_prs_ranging/bindings/CMakeFiles/prs_timed_burst_source_python.cc_regen_bindings.dir/rule
-.PHONY : python/ofdm_prs_ranging/bindings/CMakeFiles/prs_timed_burst_source_python.cc_regen_bindings.dir/rule
-
-# Convenience name for target.
-prs_timed_burst_source_python.cc_regen_bindings: python/ofdm_prs_ranging/bindings/CMakeFiles/prs_timed_burst_source_python.cc_regen_bindings.dir/rule
-.PHONY : prs_timed_burst_source_python.cc_regen_bindings
-
-# fast build rule for target.
-prs_timed_burst_source_python.cc_regen_bindings/fast:
-	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build && $(MAKE) $(MAKESILENT) -f python/ofdm_prs_ranging/bindings/CMakeFiles/prs_timed_burst_source_python.cc_regen_bindings.dir/build.make python/ofdm_prs_ranging/bindings/CMakeFiles/prs_timed_burst_source_python.cc_regen_bindings.dir/build
-.PHONY : prs_timed_burst_source_python.cc_regen_bindings/fast
-
-# Convenience name for target.
 python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/rule:
 	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/rule
 .PHONY : python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/rule
@@ -587,7 +573,6 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... test"
 	@echo "... ofdm_prs_ranging_docstrings"
-	@echo "... prs_timed_burst_source_python.cc_regen_bindings"
 	@echo "... ofdm_prs_ranging_python"
 	@echo "... prs_acquisition_logger_python.o"
 	@echo "... prs_acquisition_logger_python.i"

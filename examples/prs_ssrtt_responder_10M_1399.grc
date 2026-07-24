@@ -210,6 +210,24 @@ blocks:
     coordinate: [1104, 408.0]
     rotation: 0
     state: enabled
+- name: prs_text_ui_0
+  id: ofdm_prs_ranging_prs_text_ui
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    refresh_period_s: '0.25'
+    response_timeout_s: '1.0'
+    role: '"responder"'
+    stale_timeout_s: '1.5'
+    use_ansi: 'True'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1120, 552.0]
+    rotation: 0
+    state: enabled
 - name: prs_source
   id: ofdm_prs_ranging_prs_timed_burst_source
   parameters:
@@ -978,8 +996,11 @@ connections:
 - [prs_fft_receiver_0, symbols_out, prs_channel_estimator_0, symbols_in]
 - [prs_frame_detector_0, frame_out, prs_acquisition_logger_0, frame_in]
 - [prs_frame_detector_0, frame_out, prs_fft_receiver_0, frame_in]
+- [prs_frame_detector_0, frame_out, prs_text_ui_0, frame_in]
 - [prs_phase_slope_estimator_0, measurement_out, prs_ssrtt_responder_0, measurement_in]
+- [prs_phase_slope_estimator_0, measurement_out, prs_text_ui_0, measurement_in]
 - [prs_source, '0', uhd_usrp_sink_0, '0']
+- [prs_source, tx_time_out, prs_text_ui_0, tx_in]
 - [prs_ssrtt_responder_0, trigger_out, prs_source, trigger]
 - [uhd_usrp_source_0_0, '0', prs_frame_detector_0, '0']
 
