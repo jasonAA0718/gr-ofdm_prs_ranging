@@ -1,0 +1,32 @@
+id: ofdm_prs_ranging_prs_rx_timekeeper
+label: PRS RX Timekeeper
+category: '[ofdm_prs_ranging]'
+
+templates:
+  imports: from gnuradio import ofdm_prs_ranging
+  make: ofdm_prs_ranging.prs_rx_timekeeper(${samp_rate}, ${tx_lead_time})
+
+parameters:
+- id: samp_rate
+  label: Sample Rate
+  dtype: real
+  default: 10e6
+- id: tx_lead_time
+  label: TX Lead Time
+  dtype: real
+  default: 0.5
+
+inputs:
+- label: in
+  domain: stream
+  dtype: complex
+- label: trigger_in
+  domain: message
+  optional: true
+
+outputs:
+- label: timed_trigger_out
+  domain: message
+  optional: true
+
+file_format: 1

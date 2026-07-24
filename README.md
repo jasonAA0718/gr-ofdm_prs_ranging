@@ -188,6 +188,36 @@ thresholds, frame geometry, metadata, phase-slope model, or SS-TWR range
 formula. Compare `O`/`L` counts, CPU load, valid frames per second, and
 measurement statistics before changing signal parameters.
 
+## Decoupled RX Timing
+
+The timed burst source no longer needs to consume the continuous UHD RX stream.
+This prevents a scheduled TX burst from temporarily backpressuring RX and
+causing an overflow at the trigger period.
+
+Initiator timing uses:
+
+```text
+UHD Source -> prs_frame_detector
+UHD Source -> prs_rx_timekeeper
+message_strobe -> prs_rx_timekeeper -> prs_timed_burst_source -> UHD Sink
+```
+
+`prs_rx_timekeeper` consumes its RX branch without copying samples. It tracks
+the latest UHD `rx_time` tag and absolute sample offset, then converts each
+strobe into a trigger containing explicit `tx_time_secs` and `tx_time_frac`.
+
+The responder already calculates an explicit response TX time from the detected
+POLL timestamp:
+
+```text
+UHD Source -> receiver chain -> prs_ssrtt_responder
+prs_ssrtt_responder -> prs_timed_burst_source -> UHD Sink
+```
+
+`prs_timed_burst_source` accepts zero or one stream input for compatibility with
+older flowgraphs. New SS-TWR flowgraphs must leave that stream input
+unconnected.
+
 ## Recent Coarse ZC Root / Channel Separation Support
 
 Coarse ZC root configurability has been added for pre-positioning channel

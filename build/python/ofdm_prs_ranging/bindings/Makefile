@@ -172,6 +172,20 @@ depend:
 .PHONY : depend
 
 # Convenience name for target.
+python/ofdm_prs_ranging/bindings/CMakeFiles/prs_timed_burst_source_python.cc_regen_bindings.dir/rule:
+	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 python/ofdm_prs_ranging/bindings/CMakeFiles/prs_timed_burst_source_python.cc_regen_bindings.dir/rule
+.PHONY : python/ofdm_prs_ranging/bindings/CMakeFiles/prs_timed_burst_source_python.cc_regen_bindings.dir/rule
+
+# Convenience name for target.
+prs_timed_burst_source_python.cc_regen_bindings: python/ofdm_prs_ranging/bindings/CMakeFiles/prs_timed_burst_source_python.cc_regen_bindings.dir/rule
+.PHONY : prs_timed_burst_source_python.cc_regen_bindings
+
+# fast build rule for target.
+prs_timed_burst_source_python.cc_regen_bindings/fast:
+	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build && $(MAKE) $(MAKESILENT) -f python/ofdm_prs_ranging/bindings/CMakeFiles/prs_timed_burst_source_python.cc_regen_bindings.dir/build.make python/ofdm_prs_ranging/bindings/CMakeFiles/prs_timed_burst_source_python.cc_regen_bindings.dir/build
+.PHONY : prs_timed_burst_source_python.cc_regen_bindings/fast
+
+# Convenience name for target.
 python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/rule:
 	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/rule
 .PHONY : python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/rule
@@ -342,6 +356,30 @@ prs_phase_slope_estimator_python.s: prs_phase_slope_estimator_python.cc.s
 prs_phase_slope_estimator_python.cc.s:
 	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build && $(MAKE) $(MAKESILENT) -f python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/build.make python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/prs_phase_slope_estimator_python.cc.s
 .PHONY : prs_phase_slope_estimator_python.cc.s
+
+prs_rx_timekeeper_python.o: prs_rx_timekeeper_python.cc.o
+.PHONY : prs_rx_timekeeper_python.o
+
+# target to build an object file
+prs_rx_timekeeper_python.cc.o:
+	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build && $(MAKE) $(MAKESILENT) -f python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/build.make python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/prs_rx_timekeeper_python.cc.o
+.PHONY : prs_rx_timekeeper_python.cc.o
+
+prs_rx_timekeeper_python.i: prs_rx_timekeeper_python.cc.i
+.PHONY : prs_rx_timekeeper_python.i
+
+# target to preprocess a source file
+prs_rx_timekeeper_python.cc.i:
+	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build && $(MAKE) $(MAKESILENT) -f python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/build.make python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/prs_rx_timekeeper_python.cc.i
+.PHONY : prs_rx_timekeeper_python.cc.i
+
+prs_rx_timekeeper_python.s: prs_rx_timekeeper_python.cc.s
+.PHONY : prs_rx_timekeeper_python.s
+
+# target to generate assembly for a file
+prs_rx_timekeeper_python.cc.s:
+	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build && $(MAKE) $(MAKESILENT) -f python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/build.make python/ofdm_prs_ranging/bindings/CMakeFiles/ofdm_prs_ranging_python.dir/prs_rx_timekeeper_python.cc.s
+.PHONY : prs_rx_timekeeper_python.cc.s
 
 prs_ssrtt_responder_python.o: prs_ssrtt_responder_python.cc.o
 .PHONY : prs_ssrtt_responder_python.o
@@ -549,6 +587,7 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... test"
 	@echo "... ofdm_prs_ranging_docstrings"
+	@echo "... prs_timed_burst_source_python.cc_regen_bindings"
 	@echo "... ofdm_prs_ranging_python"
 	@echo "... prs_acquisition_logger_python.o"
 	@echo "... prs_acquisition_logger_python.i"
@@ -568,6 +607,9 @@ help:
 	@echo "... prs_phase_slope_estimator_python.o"
 	@echo "... prs_phase_slope_estimator_python.i"
 	@echo "... prs_phase_slope_estimator_python.s"
+	@echo "... prs_rx_timekeeper_python.o"
+	@echo "... prs_rx_timekeeper_python.i"
+	@echo "... prs_rx_timekeeper_python.s"
 	@echo "... prs_ssrtt_responder_python.o"
 	@echo "... prs_ssrtt_responder_python.i"
 	@echo "... prs_ssrtt_responder_python.s"

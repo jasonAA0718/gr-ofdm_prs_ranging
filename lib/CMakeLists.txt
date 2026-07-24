@@ -22,6 +22,7 @@ list(APPEND ofdm_prs_ranging_sources
     prs_phase_slope_estimator_impl.cc
     prs_payload_codec.cc
     prs_receiver_utils.cc
+    prs_rx_timekeeper_impl.cc
     prs_ssrtt_responder_impl.cc
     prs_ssrtt_solver_impl.cc
     prs_timed_burst_source_impl.cc

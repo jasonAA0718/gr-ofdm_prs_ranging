@@ -26,6 +26,7 @@ namespace py = pybind11;
     void bind_prs_fft_receiver(py::module& m);
     void bind_prs_channel_estimator(py::module& m);
     void bind_prs_phase_slope_estimator(py::module& m);
+    void bind_prs_rx_timekeeper(py::module& m);
     void bind_prs_ssrtt_responder(py::module& m);
     void bind_prs_ssrtt_solver(py::module& m);
     void bind_prs_csv_logger(py::module& m);
@@ -67,6 +68,7 @@ PYBIND11_MODULE(ofdm_prs_ranging_python, m)
     bind_prs_fft_receiver(m);
     bind_prs_channel_estimator(m);
     bind_prs_phase_slope_estimator(m);
+    bind_prs_rx_timekeeper(m);
     bind_prs_ssrtt_responder(m);
     bind_prs_ssrtt_solver(m);
     bind_prs_csv_logger(m);

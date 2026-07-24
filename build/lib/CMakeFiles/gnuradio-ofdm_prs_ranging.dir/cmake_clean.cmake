@@ -21,6 +21,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/gnuradio-ofdm_prs_ranging.dir/prs_phase_slope_estimator_impl.cc.o.d"
   "CMakeFiles/gnuradio-ofdm_prs_ranging.dir/prs_receiver_utils.cc.o"
   "CMakeFiles/gnuradio-ofdm_prs_ranging.dir/prs_receiver_utils.cc.o.d"
+  "CMakeFiles/gnuradio-ofdm_prs_ranging.dir/prs_rx_timekeeper_impl.cc.o"
+  "CMakeFiles/gnuradio-ofdm_prs_ranging.dir/prs_rx_timekeeper_impl.cc.o.d"
   "CMakeFiles/gnuradio-ofdm_prs_ranging.dir/prs_ssrtt_responder_impl.cc.o"
   "CMakeFiles/gnuradio-ofdm_prs_ranging.dir/prs_ssrtt_responder_impl.cc.o.d"
   "CMakeFiles/gnuradio-ofdm_prs_ranging.dir/prs_ssrtt_solver_impl.cc.o"

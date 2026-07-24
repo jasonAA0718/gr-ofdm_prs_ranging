@@ -102,7 +102,6 @@ class prs_ssrtt_responder_10M_1399(gr.top_block):
         self.msg_connect((self.prs_ssrtt_responder_0, 'trigger_out'), (self.prs_source, 'trigger'))
         self.connect((self.prs_source, 0), (self.uhd_usrp_sink_0, 0))
         self.connect((self.uhd_usrp_source_0_0, 0), (self.prs_frame_detector_0, 0))
-        self.connect((self.uhd_usrp_source_0_0, 0), (self.prs_source, 0))
 
 
     def get_samp_rate(self):

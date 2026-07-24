@@ -12,6 +12,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/ofdm_prs_ranging_python.dir/prs_frame_detector_python.cc.o.d"
   "CMakeFiles/ofdm_prs_ranging_python.dir/prs_phase_slope_estimator_python.cc.o"
   "CMakeFiles/ofdm_prs_ranging_python.dir/prs_phase_slope_estimator_python.cc.o.d"
+  "CMakeFiles/ofdm_prs_ranging_python.dir/prs_rx_timekeeper_python.cc.o"
+  "CMakeFiles/ofdm_prs_ranging_python.dir/prs_rx_timekeeper_python.cc.o.d"
   "CMakeFiles/ofdm_prs_ranging_python.dir/prs_ssrtt_responder_python.cc.o"
   "CMakeFiles/ofdm_prs_ranging_python.dir/prs_ssrtt_responder_python.cc.o.d"
   "CMakeFiles/ofdm_prs_ranging_python.dir/prs_ssrtt_solver_python.cc.o"

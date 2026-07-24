@@ -982,7 +982,6 @@ connections:
 - [prs_source, '0', uhd_usrp_sink_0, '0']
 - [prs_ssrtt_responder_0, trigger_out, prs_source, trigger]
 - [uhd_usrp_source_0_0, '0', prs_frame_detector_0, '0']
-- [uhd_usrp_source_0_0, '0', prs_source, '0']
 
 metadata:
   file_format: 1

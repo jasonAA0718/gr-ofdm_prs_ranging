@@ -207,11 +207,16 @@ bool prs_frame_detector_impl::find_frame(size_t& frame_start_index,
         const int64_t abs_start = static_cast<int64_t>(d_buffer_abs_start + start);
         if (abs_start - d_last_frame_start < d_min_frame_gap) {
         } else {
-            const double denom = std::sqrt(std::max(0.0, first_power) *
-                                           std::max(0.0, second_power));
-            const float preamble_metric =
-                denom > 0.0 ? static_cast<float>(std::abs(preamble_corr) / denom) : 0.0f;
-            if (preamble_metric >= d_threshold) {
+            float corr_power = std::norm(preamble_corr);
+            double threshold_power =
+                d_threshold * d_threshold *
+                first_power *
+                second_power;
+
+            if (corr_power >= threshold_power) {
+                float denom = std::sqrt(first_power * second_power);
+                const float preamble_metric =
+                    denom > 0.0 ? static_cast<float>(std::sqrt(corr_power) / denom) : 0.0f;
                 const size_t c = start + static_cast<size_t>(coarse_rel);
                 const float m = coarse_sync_metric(c);
                 if (m >= d_threshold) {

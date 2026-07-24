@@ -19,6 +19,8 @@ namespace gr {
      * \brief Deterministic OFDM / PRS-like timed burst source.
      * \ingroup ofdm_prs_ranging
      *
+     * The optional stream input supports legacy RX-clock tracking. Triggers
+     * carrying explicit tx_time fields require no stream input.
      */
     class OFDM_PRS_RANGING_API prs_timed_burst_source : virtual public gr::block
     {

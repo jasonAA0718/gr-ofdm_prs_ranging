@@ -126,7 +126,7 @@ prs_timed_burst_source_impl::prs_timed_burst_source_impl(double samp_rate,
                                                          bool attach_tx_time,
                                                          int coarse_zc_root)
     : gr::block("prs_timed_burst_source",
-                gr::io_signature::make(1, 1, sizeof(gr_complex)),
+                gr::io_signature::make(0, 1, sizeof(gr_complex)),
                 gr::io_signature::make(1, 1, sizeof(gr_complex))),
       d_samp_rate(samp_rate),
       d_fft_len(fft_len),
@@ -238,6 +238,9 @@ void prs_timed_burst_source_impl::forecast(int noutput_items,
                                            gr_vector_int& ninput_items_required)
 {
     (void)noutput_items;
+    if (ninput_items_required.empty()) {
+        return;
+    }
     if (d_in_burst) {
         ninput_items_required[0] = 0;
         return;
@@ -385,21 +388,24 @@ int prs_timed_burst_source_impl::general_work(int noutput_items,
     auto out = static_cast<gr_complex*>(output_items[0]);
     (void)input_items;
 
-    const uint64_t abs_in_start = nitems_read(0);
-    std::vector<tag_t> tags;
-    get_tags_in_range(tags,
-                      0,
-                      abs_in_start,
-                      abs_in_start + static_cast<uint64_t>(ninput_items[0]),
-                      pmt::mp("rx_time"));
-    for (const auto& tag : tags) {
-        if (pmt::is_tuple(tag.value) && pmt::length(tag.value) >= 2) {
-            const pmt::pmt_t secs_pmt = pmt::tuple_ref(tag.value, 0);
-            const pmt::pmt_t frac_pmt = pmt::tuple_ref(tag.value, 1);
-            d_rx_time_abs_sample = tag.offset;
-            d_rx_time_value = static_cast<double>(pmt_to_uint64(secs_pmt)) +
-                              pmt::to_double(frac_pmt);
-            d_have_rx_time = true;
+    const bool have_stream_input = !ninput_items.empty();
+    if (have_stream_input) {
+        const uint64_t abs_in_start = nitems_read(0);
+        std::vector<tag_t> tags;
+        get_tags_in_range(tags,
+                          0,
+                          abs_in_start,
+                          abs_in_start + static_cast<uint64_t>(ninput_items[0]),
+                          pmt::mp("rx_time"));
+        for (const auto& tag : tags) {
+            if (pmt::is_tuple(tag.value) && pmt::length(tag.value) >= 2) {
+                const pmt::pmt_t secs_pmt = pmt::tuple_ref(tag.value, 0);
+                const pmt::pmt_t frac_pmt = pmt::tuple_ref(tag.value, 1);
+                d_rx_time_abs_sample = tag.offset;
+                d_rx_time_value = static_cast<double>(pmt_to_uint64(secs_pmt)) +
+                                  pmt::to_double(frac_pmt);
+                d_have_rx_time = true;
+            }
         }
     }
 
@@ -411,8 +417,8 @@ int prs_timed_burst_source_impl::general_work(int noutput_items,
             if (d_scheduler.empty()) {
                 break;
             }
-            if (d_attach_tx_time && !d_have_rx_time &&
-                !std::isfinite(d_scheduler.front().tx_time)) {
+            if (!std::isfinite(d_scheduler.front().tx_time) && !d_have_rx_time &&
+                !have_stream_input) {
                 break;
             }
             d_current_burst = d_scheduler.pop_front();

@@ -50,7 +50,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '256'
+    value: '128'
   states:
     bus_sink: false
     bus_source: false
@@ -62,7 +62,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '8'
+    value: '68'
   states:
     bus_sink: false
     bus_source: false
@@ -103,7 +103,7 @@ blocks:
     maxoutbuf: '0'
     minoutbuf: '0'
     msg: pmt.PMT_T
-    period: '1000'
+    period: '2500'
   states:
     bus_sink: false
     bus_source: false
@@ -144,7 +144,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [816, 520.0]
+    coordinate: [808, 520.0]
     rotation: 0
     state: enabled
 - name: prs_csv_logger_0
@@ -230,6 +230,23 @@ blocks:
     coordinate: [1080, 520.0]
     rotation: 0
     state: enabled
+- name: prs_rx_timekeeper_0
+  id: ofdm_prs_ranging_prs_rx_timekeeper
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: Stamp POLL triggers from the UHD RX hardware clock
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    samp_rate: samp_rate
+    tx_lead_time: '0.6'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [416, 312.0]
+    rotation: 0
+    state: enabled
 - name: prs_source
   id: ofdm_prs_ranging_prs_timed_burst_source
   parameters:
@@ -237,7 +254,7 @@ blocks:
     affinity: ''
     alias: ''
     attach_tx_time: 'True'
-    burst_period: '0.1'
+    burst_period: '0.2'
     coarse_sync_len: zc_length
     coarse_zc_root: '25'
     comment: ''
@@ -252,14 +269,14 @@ blocks:
     samp_rate: samp_rate
     seed: '13990001'
     tail_guard_len: '1000'
-    tx_amp: '0.2'
-    tx_lead_time: '0.8'
+    tx_amp: '0.4'
+    tx_lead_time: '0.6'
     zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [376, 176.0]
+    coordinate: [736, 136.0]
     rotation: 0
     state: enabled
 - name: prs_ssrtt_solver_0
@@ -521,7 +538,7 @@ blocks:
     lo_source8: internal
     lo_source9: internal
     maxoutbuf: '0'
-    minoutbuf: '0'
+    minoutbuf: '1048576'
     nchan: '1'
     num_mboards: '1'
     otw: ''
@@ -552,7 +569,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [816, 180.0]
+    coordinate: [1288, 172.0]
     rotation: 0
     state: enabled
 - name: uhd_usrp_source_0_0
@@ -925,7 +942,7 @@ blocks:
     lo_source8: internal
     lo_source9: internal
     maxoutbuf: '0'
-    minoutbuf: '0'
+    minoutbuf: '1048576'
     nchan: '1'
     num_mboards: '1'
     otw: ''
@@ -993,17 +1010,18 @@ blocks:
     state: enabled
 
 connections:
-- [blocks_message_strobe_0, strobe, prs_source, trigger]
+- [blocks_message_strobe_0, strobe, prs_rx_timekeeper_0, trigger_in]
 - [prs_channel_estimator_0, channel_out, prs_phase_slope_estimator_0, channel_in]
 - [prs_fft_receiver_0, symbols_out, prs_channel_estimator_0, symbols_in]
 - [prs_frame_detector_0, frame_out, prs_acquisition_logger_0, frame_in]
 - [prs_frame_detector_0, frame_out, prs_fft_receiver_0, frame_in]
 - [prs_phase_slope_estimator_0, measurement_out, prs_ssrtt_solver_0, measurement_in]
+- [prs_rx_timekeeper_0, timed_trigger_out, prs_source, trigger]
 - [prs_source, '0', uhd_usrp_sink_0, '0']
 - [prs_source, tx_time_out, prs_ssrtt_solver_0, tx_time_in]
 - [prs_ssrtt_solver_0, ssrtt_out, prs_csv_logger_0, measurement_in]
 - [uhd_usrp_source_0_0, '0', prs_frame_detector_0, '0']
-- [uhd_usrp_source_0_0, '0', prs_source, '0']
+- [uhd_usrp_source_0_0, '0', prs_rx_timekeeper_0, '0']
 
 metadata:
   file_format: 1

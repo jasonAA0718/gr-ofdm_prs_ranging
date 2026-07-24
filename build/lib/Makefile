@@ -470,6 +470,30 @@ prs_receiver_utils.cc.s:
 	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build && $(MAKE) $(MAKESILENT) -f lib/CMakeFiles/gnuradio-ofdm_prs_ranging.dir/build.make lib/CMakeFiles/gnuradio-ofdm_prs_ranging.dir/prs_receiver_utils.cc.s
 .PHONY : prs_receiver_utils.cc.s
 
+prs_rx_timekeeper_impl.o: prs_rx_timekeeper_impl.cc.o
+.PHONY : prs_rx_timekeeper_impl.o
+
+# target to build an object file
+prs_rx_timekeeper_impl.cc.o:
+	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build && $(MAKE) $(MAKESILENT) -f lib/CMakeFiles/gnuradio-ofdm_prs_ranging.dir/build.make lib/CMakeFiles/gnuradio-ofdm_prs_ranging.dir/prs_rx_timekeeper_impl.cc.o
+.PHONY : prs_rx_timekeeper_impl.cc.o
+
+prs_rx_timekeeper_impl.i: prs_rx_timekeeper_impl.cc.i
+.PHONY : prs_rx_timekeeper_impl.i
+
+# target to preprocess a source file
+prs_rx_timekeeper_impl.cc.i:
+	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build && $(MAKE) $(MAKESILENT) -f lib/CMakeFiles/gnuradio-ofdm_prs_ranging.dir/build.make lib/CMakeFiles/gnuradio-ofdm_prs_ranging.dir/prs_rx_timekeeper_impl.cc.i
+.PHONY : prs_rx_timekeeper_impl.cc.i
+
+prs_rx_timekeeper_impl.s: prs_rx_timekeeper_impl.cc.s
+.PHONY : prs_rx_timekeeper_impl.s
+
+# target to generate assembly for a file
+prs_rx_timekeeper_impl.cc.s:
+	cd /home/cnsl/Desktop/gr-ofdm_prs_ranging/build && $(MAKE) $(MAKESILENT) -f lib/CMakeFiles/gnuradio-ofdm_prs_ranging.dir/build.make lib/CMakeFiles/gnuradio-ofdm_prs_ranging.dir/prs_rx_timekeeper_impl.cc.s
+.PHONY : prs_rx_timekeeper_impl.cc.s
+
 prs_ssrtt_responder_impl.o: prs_ssrtt_responder_impl.cc.o
 .PHONY : prs_ssrtt_responder_impl.o
 
@@ -784,6 +808,9 @@ help:
 	@echo "... prs_receiver_utils.o"
 	@echo "... prs_receiver_utils.i"
 	@echo "... prs_receiver_utils.s"
+	@echo "... prs_rx_timekeeper_impl.o"
+	@echo "... prs_rx_timekeeper_impl.i"
+	@echo "... prs_rx_timekeeper_impl.s"
 	@echo "... prs_ssrtt_responder_impl.o"
 	@echo "... prs_ssrtt_responder_impl.i"
 	@echo "... prs_ssrtt_responder_impl.s"

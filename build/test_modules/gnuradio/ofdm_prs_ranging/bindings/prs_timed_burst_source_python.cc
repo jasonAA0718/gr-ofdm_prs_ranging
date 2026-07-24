@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(1)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(prs_timed_burst_source.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(91794d8ec402f06178833e7275e08315)                     */
+/* BINDTOOL_HEADER_FILE_HASH(cccc27f6bc1dc7c537936352f3b4df00)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>

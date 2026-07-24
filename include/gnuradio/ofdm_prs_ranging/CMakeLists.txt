@@ -11,6 +11,7 @@
 ########################################################################
 install(FILES api.h
     prs_acquisition_logger.h
+    prs_rx_timekeeper.h
     prs_timed_burst_source.h
     prs_frame_detector.h
     prs_fft_receiver.h

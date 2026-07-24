@@ -86,6 +86,7 @@ inputs:
 - label: in
   domain: stream
   dtype: complex
+  optional: true
 - label: trigger
   domain: message
   optional: true

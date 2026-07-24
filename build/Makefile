@@ -263,6 +263,19 @@ copy_module_for_tests/fast:
 .PHONY : copy_module_for_tests/fast
 
 #=============================================================================
+# Target rules for targets named prs_timed_burst_source_python.cc_regen_bindings
+
+# Build rule for target.
+prs_timed_burst_source_python.cc_regen_bindings: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 prs_timed_burst_source_python.cc_regen_bindings
+.PHONY : prs_timed_burst_source_python.cc_regen_bindings
+
+# fast build rule for target.
+prs_timed_burst_source_python.cc_regen_bindings/fast:
+	$(MAKE) $(MAKESILENT) -f python/ofdm_prs_ranging/bindings/CMakeFiles/prs_timed_burst_source_python.cc_regen_bindings.dir/build.make python/ofdm_prs_ranging/bindings/CMakeFiles/prs_timed_burst_source_python.cc_regen_bindings.dir/build
+.PHONY : prs_timed_burst_source_python.cc_regen_bindings/fast
+
+#=============================================================================
 # Target rules for targets named ofdm_prs_ranging_python
 
 # Build rule for target.
@@ -303,6 +316,7 @@ help:
 	@echo "... test"
 	@echo "... copy_module_for_tests"
 	@echo "... ofdm_prs_ranging_docstrings"
+	@echo "... prs_timed_burst_source_python.cc_regen_bindings"
 	@echo "... pygen_python_ofdm_prs_ranging_1098f5efdbc772a208c29dabc4c0a1ad"
 	@echo "... uninstall"
 	@echo "... gnuradio-ofdm_prs_ranging"
