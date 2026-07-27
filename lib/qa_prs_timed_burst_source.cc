@@ -48,12 +48,16 @@ BOOST_AUTO_TEST_CASE(test_prs_frame_id_payload_crc)
     payload[prs_frame_id_ref_symbols + prs_payload_repeat * 3] *= -1.0f;
     BOOST_CHECK(decode_frame_id_payload(
         payload.data(), static_cast<int>(payload.size()), frame_id, metric));
+    const float one_disputed_vote =
+        1.0f - (1.0f - 0.6f) / static_cast<float>(prs_payload_data_bits);
+    BOOST_CHECK_CLOSE(metric, one_disputed_vote, 0.001f);
 
     for (int r = 0; r < prs_payload_repeat; ++r) {
         payload[prs_frame_id_ref_symbols + prs_payload_repeat * 7 + r] *= -1.0f;
     }
     BOOST_CHECK(!decode_frame_id_payload(
         payload.data(), static_cast<int>(payload.size()), frame_id, metric));
+    BOOST_CHECK_CLOSE(metric, one_disputed_vote, 0.001f);
 }
 
 } /* namespace ofdm_prs_ranging */

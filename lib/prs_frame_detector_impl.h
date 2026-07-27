@@ -68,6 +68,12 @@ private:
     struct correlation_window {
         double start;
         double end;
+        uint64_t attempt_id;
+        bool saw_preamble;
+        bool saw_coarse;
+        bool completed;
+        float preamble_metric;
+        float coarse_metric;
     };
     std::mutex d_window_mutex;
     std::vector<correlation_window> d_windows;
@@ -85,6 +91,9 @@ private:
     void compact_buffer(size_t threshold);
     void process_samples(const gr_complex* samples, size_t count, uint64_t abs_start);
     float coarse_sync_metric(size_t coarse_index) const;
+    void record_candidate(uint64_t abs_start, float preamble_metric, float coarse_metric);
+    bool complete_attempt(double frame_time, uint64_t& attempt_id);
+    void publish_failed_attempt(const correlation_window& window);
     bool find_frame(size_t& frame_start_index,
                     size_t& coarse_index,
                     float& preamble_metric,

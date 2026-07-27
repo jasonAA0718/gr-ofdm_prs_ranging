@@ -118,6 +118,64 @@ Responder RESPONSE TX:   coarse_zc_root = 29
 Initiator RX detector:   coarse_zc_root = 29, channel_id = 1
 ```
 
+## Payload Metric
+
+The packet payload is BPSK. It starts with `Nref = 16` known reference symbols.
+The remaining `B = 120` data and CRC bits are each repeated `R = 5` times.
+
+For received reference samples `yref[i]` and expected real BPSK signs `a[i]`,
+the decoder calculates
+
+```math
+C_{\text{ref}} = \sum_{i=0}^{N_{\text{ref}}-1} y_{\text{ref}}[i]a[i]
+```
+
+```math
+M_{\text{ref}} =
+\min\left(
+1,
+\frac{|C_{\text{ref}}|}
+{\sqrt{N_{\text{ref}}\sum_i|y_{\text{ref}}[i]|^2}}
+\right)
+```
+
+It uses `conj(Cref) / |Cref|` to remove the common payload phase. For bit `b`,
+let `q[b]` be the number of its five corrected samples whose real part is
+nonnegative. The hard-decision vote margin is
+
+```math
+v[b] = \frac{|2q[b]-R|}{R}
+```
+
+For `R = 5`, one bit contributes:
+
+```text
+5-0 or 0-5 vote: 1.0
+4-1 or 1-4 vote: 0.6
+3-2 or 2-3 vote: 0.2
+```
+
+The average vote metric and reported payload metric are
+
+```math
+M_{\text{vote}} = \frac{1}{B}\sum_{b=0}^{B-1}v[b]
+```
+
+```math
+\text{payload_metric} = \min(M_{\text{ref}}, M_{\text{vote}})
+```
+
+`payload_metric` is in `[0, 1]` and measures reference correlation plus
+hard-vote consistency. It is not SNR, dBFS, or CRC probability. Payload
+validity is a separate condition:
+
+```text
+frame_id_valid = received CRC16 matches the CRC16 recomputed from decoded fields
+```
+
+There is no payload-metric acceptance threshold in the current decoder. A high
+`payload_metric` does not override a CRC failure.
+
 ## OFDM PRS-Like Symbol
 
 Let:

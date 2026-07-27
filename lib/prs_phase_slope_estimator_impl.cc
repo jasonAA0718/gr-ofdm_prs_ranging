@@ -92,8 +92,9 @@ void prs_phase_slope_estimator_impl::handle_channel(pmt::pmt_t msg)
     }
     const double residual_rms = std::sqrt(residual_power / d_cfg.active_bins);
     const double snr = dict_ref_double(meta, "snr", 0.0);
-    const double peak_metric = dict_ref_double(meta, "peak_metric", 0.0);
-    const double quality = std::max(0.0, peak_metric) *
+    const double coarse_metric =
+        dict_ref_double(meta, "coarse_metric", dict_ref_double(meta, "peak_metric", 0.0));
+    const double quality = std::max(0.0, coarse_metric) *
                            std::max(0.0, 1.0 - residual_rms / std::max(1e-6f, d_max_residual_rms)) *
                            std::max(0.0, std::min(1.0, (snr + 10.0) / 40.0));
 

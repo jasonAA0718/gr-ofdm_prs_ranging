@@ -24,7 +24,7 @@ prs_csv_logger_impl::prs_csv_logger_impl(const std::string& path, bool append)
       d_file(path, append ? std::ios::app : std::ios::trunc)
 {
     if (!append || d_file.tellp() == 0) {
-        d_file << "poll_frame_id,response_frame_id,t1_tx_time,t4_rx_time,reply_delay_samples,reply_delay_s,rtt_s,tof_s,range_m,frame_id_valid,peak_metric,payload_metric,phase_residual,snr,quality\n";
+        d_file << "poll_frame_id,response_frame_id,t1_tx_time,t4_rx_time,reply_delay_samples,reply_delay_s,rtt_s,tof_s,range_m,frame_id_valid,coarse_metric,payload_metric,phase_residual,snr,quality\n";
     }
     message_port_register_in(pmt::mp("measurement_in"));
     set_msg_handler(pmt::mp("measurement_in"),
@@ -55,7 +55,9 @@ void prs_csv_logger_impl::handle_measurement(pmt::pmt_t msg)
            << dict_ref_double(meta, "tof_s", 0.0) << ','
            << dict_ref_double(meta, "range_m", 0.0) << ','
            << (pmt::to_bool(pmt::dict_ref(meta, pmt::mp("frame_id_valid"), pmt::PMT_F)) ? 1 : 0) << ','
-           << dict_ref_double(meta, "peak_metric", 0.0) << ','
+           << dict_ref_double(
+                  meta, "coarse_metric", dict_ref_double(meta, "peak_metric", 0.0))
+           << ','
            << dict_ref_double(meta, "payload_metric", 0.0) << ','
            << dict_ref_double(meta, "phase_residual", 0.0) << ','
            << dict_ref_double(meta, "snr", 0.0) << ','

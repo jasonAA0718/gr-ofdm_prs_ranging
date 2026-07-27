@@ -7,7 +7,7 @@
 # GNU Radio Python Flow Graph
 # Title: PRS SS-RTT Responder 10M 1399
 # Description: Minimal OFDM PRS SS-RTT responder at 10 MHz and 1399 MHz
-# GNU Radio version: 3.10.12.0
+# GNU Radio version: 3.10.11.0
 
 from gnuradio import gr
 from gnuradio.filter import firdes
@@ -34,7 +34,8 @@ class prs_ssrtt_responder_10M_1399(gr.top_block):
         ##################################################
         # Variables
         ##################################################
-        self.samp_rate = samp_rate = 30e6
+        self.samp_rate = samp_rate = int(30e6)
+        self.zc_length = zc_length = 419
         self.reply_delay_samples = reply_delay_samples = int(0.05*samp_rate)
         self.premble_rep = premble_rep = 4
         self.premble_length = premble_length = 256
@@ -77,16 +78,16 @@ class prs_ssrtt_responder_10M_1399(gr.top_block):
         self.uhd_usrp_sink_0.set_antenna("TX/RX", 0)
         self.uhd_usrp_sink_0.set_bandwidth(samp_rate, 0)
         self.uhd_usrp_sink_0.set_normalized_gain(0.9, 0)
-        self.prs_ssrtt_responder_0 = ofdm_prs_ranging.prs_ssrtt_responder(samp_rate, reply_delay_samples)
         self.prs_text_ui_0 = ofdm_prs_ranging.prs_text_ui("responder", 1.5, 1.0, 0.25, True)
+        self.prs_ssrtt_responder_0 = ofdm_prs_ranging.prs_ssrtt_responder(samp_rate, reply_delay_samples)
         self.prs_source = ofdm_prs_ranging.prs_timed_burst_source(
             samp_rate, 1024, 128, 600, 16,
-            premble_length, premble_rep, 839,
+            premble_length, premble_rep, zc_length,
             1000, 1000, 0.5,
             0.1, 0.2, 13990001, 1,
             True, 29)
         self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 1024, 600, 1.0)
-        self.prs_frame_detector_0 = ofdm_prs_ranging.prs_frame_detector(samp_rate, 1024, 128, 600, 16, premble_length, premble_rep, 839, 1000, 1000, 0.35, 10000, 25, 0)
+        self.prs_frame_detector_0 = ofdm_prs_ranging.prs_frame_detector(samp_rate, 1024, 128, 600, 16, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 25, 0, False, 0.05, 0.0002, 0.002)
         self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 1024, 128, 600, 16)
         self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 1024, 600, 16, 13990001)
         self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/responder_acquisition.csv", "responder", 1)
@@ -97,7 +98,7 @@ class prs_ssrtt_responder_10M_1399(gr.top_block):
         ##################################################
         self.msg_connect((self.prs_channel_estimator_0, 'channel_out'), (self.prs_phase_slope_estimator_0, 'channel_in'))
         self.msg_connect((self.prs_fft_receiver_0, 'symbols_out'), (self.prs_channel_estimator_0, 'symbols_in'))
-        self.msg_connect((self.prs_frame_detector_0, 'frame_out'), (self.prs_acquisition_logger_0, 'frame_in'))
+        self.msg_connect((self.prs_frame_detector_0, 'event_out'), (self.prs_acquisition_logger_0, 'frame_in'))
         self.msg_connect((self.prs_frame_detector_0, 'frame_out'), (self.prs_fft_receiver_0, 'frame_in'))
         self.msg_connect((self.prs_frame_detector_0, 'frame_out'), (self.prs_text_ui_0, 'frame_in'))
         self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_ssrtt_responder_0, 'measurement_in'))
@@ -118,6 +119,12 @@ class prs_ssrtt_responder_10M_1399(gr.top_block):
         self.uhd_usrp_sink_0.set_bandwidth(self.samp_rate, 0)
         self.uhd_usrp_source_0_0.set_samp_rate(self.samp_rate)
         self.uhd_usrp_source_0_0.set_bandwidth(self.samp_rate, 0)
+
+    def get_zc_length(self):
+        return self.zc_length
+
+    def set_zc_length(self, zc_length):
+        self.zc_length = zc_length
 
     def get_reply_delay_samples(self):
         return self.reply_delay_samples

@@ -106,7 +106,7 @@ class prs_ssrtt_initiator_10M_1399(gr.top_block):
         self.msg_connect((self.blocks_message_strobe_0, 'strobe'), (self.prs_rx_timekeeper_0, 'trigger_in'))
         self.msg_connect((self.prs_channel_estimator_0, 'channel_out'), (self.prs_phase_slope_estimator_0, 'channel_in'))
         self.msg_connect((self.prs_fft_receiver_0, 'symbols_out'), (self.prs_channel_estimator_0, 'symbols_in'))
-        self.msg_connect((self.prs_frame_detector_0, 'frame_out'), (self.prs_acquisition_logger_0, 'frame_in'))
+        self.msg_connect((self.prs_frame_detector_0, 'event_out'), (self.prs_acquisition_logger_0, 'frame_in'))
         self.msg_connect((self.prs_frame_detector_0, 'frame_out'), (self.prs_fft_receiver_0, 'frame_in'))
         self.msg_connect((self.prs_frame_detector_0, 'frame_out'), (self.prs_text_ui_0, 'frame_in'))
         self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_ssrtt_solver_0, 'measurement_in'))

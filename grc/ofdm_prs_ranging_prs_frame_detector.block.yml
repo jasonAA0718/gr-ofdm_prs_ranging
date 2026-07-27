@@ -28,4 +28,5 @@ inputs:
 - {label: tx_time_in, domain: message, optional: true}
 outputs:
 - {label: frame_out, domain: message}
+- {label: event_out, domain: message, optional: true}
 file_format: 1

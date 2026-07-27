@@ -116,11 +116,13 @@ prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
     d_buffer.reserve(static_cast<size_t>(frame_len(d_cfg) + d_cfg.coarse_sync_len) * 2U);
     message_port_register_in(pmt::mp("tx_time_in"));
     message_port_register_out(pmt::mp("frame_out"));
+    message_port_register_out(pmt::mp("event_out"));
     set_msg_handler(pmt::mp("tx_time_in"),
                     [this](pmt::pmt_t msg) { handle_tx_time(msg); });
 }
 
-void prs_frame_detector_impl::forecast(int noutput_items, gr_vector_int& ninput_items_required)
+void prs_frame_detector_impl::forecast(int noutput_items,
+                                       gr_vector_int& ninput_items_required)
 {
     (void)noutput_items;
     ninput_items_required[0] = 1;
@@ -132,9 +134,9 @@ void prs_frame_detector_impl::handle_tx_time(const pmt::pmt_t& message)
         return;
     }
 
-    const pmt::pmt_t msg =
-        pmt::is_dict(message) ? message
-                              : (pmt::is_pair(message) ? pmt::car(message) : message);
+    const pmt::pmt_t msg = pmt::is_dict(message)
+                               ? message
+                               : (pmt::is_pair(message) ? pmt::car(message) : message);
     if (!pmt::is_dict(msg)) {
         return;
     }
@@ -142,8 +144,8 @@ void prs_frame_detector_impl::handle_tx_time(const pmt::pmt_t& message)
     double tx_time =
         dict_ref_double(msg, "tx_time", std::numeric_limits<double>::quiet_NaN());
     if (!std::isfinite(tx_time)) {
-        const double secs =
-            dict_ref_double(msg, "tx_time_secs", std::numeric_limits<double>::quiet_NaN());
+        const double secs = dict_ref_double(
+            msg, "tx_time_secs", std::numeric_limits<double>::quiet_NaN());
         const double frac = dict_ref_double(msg, "tx_time_frac", 0.0);
         if (std::isfinite(secs)) {
             tx_time = secs + frac;
@@ -153,8 +155,18 @@ void prs_frame_detector_impl::handle_tx_time(const pmt::pmt_t& message)
         return;
     }
 
+    const uint64_t attempt_id = dict_ref_uint64(
+        msg,
+        "attempt_id",
+        dict_ref_uint64(msg, "poll_frame_id", dict_ref_uint64(msg, "frame_id", 0)));
     correlation_window window{ tx_time + d_reply_delay_s - d_window_before_s,
-                               tx_time + d_reply_delay_s + d_window_after_s };
+                               tx_time + d_reply_delay_s + d_window_after_s,
+                               attempt_id,
+                               false,
+                               false,
+                               false,
+                               0.0f,
+                               0.0f };
     std::lock_guard<std::mutex> lock(d_window_mutex);
     d_windows.push_back(window);
     std::sort(d_windows.begin(),
@@ -162,16 +174,6 @@ void prs_frame_detector_impl::handle_tx_time(const pmt::pmt_t& message)
               [](const correlation_window& a, const correlation_window& b) {
                   return a.start < b.start;
               });
-    size_t merged = 0;
-    for (const auto& candidate : d_windows) {
-        if (merged == 0 || candidate.start > d_windows[merged - 1].end) {
-            d_windows[merged++] = candidate;
-        } else {
-            d_windows[merged - 1].end =
-                std::max(d_windows[merged - 1].end, candidate.end);
-        }
-    }
-    d_windows.resize(merged);
 }
 
 void prs_frame_detector_impl::update_rx_time_tags(uint64_t abs_start, uint64_t abs_stop)
@@ -183,8 +185,9 @@ void prs_frame_detector_impl::update_rx_time_tags(uint64_t abs_start, uint64_t a
             d_rx_time_tag_offset = tag.offset;
             const auto secs = pmt::tuple_ref(tag.value, 0);
             const auto frac = pmt::tuple_ref(tag.value, 1);
-            d_rx_time_secs = pmt::is_uint64(secs) ? pmt::to_uint64(secs)
-                                                  : static_cast<uint64_t>(pmt::to_long(secs));
+            d_rx_time_secs = pmt::is_uint64(secs)
+                                 ? pmt::to_uint64(secs)
+                                 : static_cast<uint64_t>(pmt::to_long(secs));
             d_rx_time_frac = pmt::to_double(frac);
             d_have_rx_time = true;
         }
@@ -270,13 +273,86 @@ float prs_frame_detector_impl::coarse_sync_metric(size_t coarse_index) const
     return denom > 0.0 ? static_cast<float>(std::abs(corr) / denom) : 0.0f;
 }
 
+void prs_frame_detector_impl::record_candidate(uint64_t abs_start,
+                                               float preamble_metric,
+                                               float coarse_metric)
+{
+    if (!d_time_gating || !d_have_rx_time) {
+        return;
+    }
+    const double candidate_time = sample_time(abs_start);
+    std::lock_guard<std::mutex> lock(d_window_mutex);
+    for (auto& window : d_windows) {
+        if (candidate_time < window.start) {
+            break;
+        }
+        if (candidate_time >= window.end || window.completed) {
+            continue;
+        }
+        window.saw_preamble = true;
+        window.preamble_metric = std::max(window.preamble_metric, preamble_metric);
+        window.coarse_metric = std::max(window.coarse_metric, coarse_metric);
+        window.saw_coarse = window.saw_coarse || coarse_metric >= d_threshold;
+        break;
+    }
+}
+
+bool prs_frame_detector_impl::complete_attempt(double frame_time, uint64_t& attempt_id)
+{
+    if (!d_time_gating || !std::isfinite(frame_time)) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(d_window_mutex);
+    for (auto& window : d_windows) {
+        if (frame_time < window.start) {
+            break;
+        }
+        if (frame_time >= window.end || window.completed) {
+            continue;
+        }
+        window.completed = true;
+        attempt_id = window.attempt_id;
+        return true;
+    }
+    return false;
+}
+
+void prs_frame_detector_impl::publish_failed_attempt(const correlation_window& window)
+{
+    const char* failure_reason = window.saw_coarse
+                                     ? "FRAME_BOUNDARY"
+                                     : (window.saw_preamble ? "ZC_SYNC" : "NO_PREAMBLE");
+    pmt::pmt_t meta = pmt::make_dict();
+    meta =
+        pmt::dict_add(meta, pmt::mp("attempt_id"), pmt::from_uint64(window.attempt_id));
+    meta = pmt::dict_add(meta, pmt::mp("failure_reason"), pmt::mp(failure_reason));
+    meta = pmt::dict_add(meta, pmt::mp("frame_id_valid"), pmt::PMT_F);
+    meta = pmt::dict_add(
+        meta, pmt::mp("preamble_metric"), pmt::from_double(window.preamble_metric));
+    meta = pmt::dict_add(
+        meta, pmt::mp("coarse_metric"), pmt::from_double(window.coarse_metric));
+    meta = pmt::dict_add(
+        meta, pmt::mp("coarse_zc_root"), pmt::from_long(d_cfg.coarse_zc_root));
+    meta = pmt::dict_add(meta, pmt::mp("channel_id"), pmt::from_long(d_cfg.channel_id));
+    meta = pmt::dict_add(meta, pmt::mp("samp_rate"), pmt::from_double(d_cfg.samp_rate));
+    meta = pmt::dict_add(meta, pmt::mp("fft_len"), pmt::from_long(d_cfg.fft_len));
+    meta = pmt::dict_add(meta, pmt::mp("cp_len"), pmt::from_long(d_cfg.cp_len));
+    meta = pmt::dict_add(meta, pmt::mp("active_bins"), pmt::from_long(d_cfg.active_bins));
+    meta = pmt::dict_add(meta, pmt::mp("prs_symbols"), pmt::from_long(d_cfg.prs_symbols));
+    meta = pmt::dict_add(
+        meta, pmt::mp("prs_start_rel"), pmt::from_long(prs_start_offset(d_cfg)));
+    meta = pmt::dict_add(meta, pmt::mp("prs_len"), pmt::from_long(prs_len(d_cfg)));
+    message_port_pub(pmt::mp("event_out"), pmt::cons(meta, pmt::PMT_NIL));
+}
+
 bool prs_frame_detector_impl::find_frame(size_t& frame_start_index,
                                          size_t& coarse_index,
                                          float& preamble_metric_out,
                                          float& coarse_metric_out)
 {
     const int flen = frame_len(d_cfg);
-    const int coarse_rel = d_cfg.zero_guard_len + d_cfg.preamble_len * d_cfg.preamble_repeats;
+    const int coarse_rel =
+        d_cfg.zero_guard_len + d_cfg.preamble_len * d_cfg.preamble_repeats;
     const int preamble_rel = d_cfg.zero_guard_len;
     if (buffered_size() < static_cast<size_t>(flen)) {
         return false;
@@ -286,8 +362,8 @@ bool prs_frame_detector_impl::find_frame(size_t& frame_start_index,
     if (d_next_scan_index < first_preamble) {
         d_next_scan_index = first_preamble;
     }
-    const size_t max_preamble = buffered_size() - static_cast<size_t>(flen) +
-                                static_cast<size_t>(preamble_rel);
+    const size_t max_preamble =
+        buffered_size() - static_cast<size_t>(flen) + static_cast<size_t>(preamble_rel);
     if (d_next_scan_index > max_preamble) {
         return false;
     }
@@ -333,16 +409,16 @@ bool prs_frame_detector_impl::find_frame(size_t& frame_start_index,
         } else {
             float corr_power = std::norm(preamble_corr);
             double threshold_power =
-                d_threshold * d_threshold *
-                first_power *
-                second_power;
+                d_threshold * d_threshold * first_power * second_power;
 
             if (corr_power >= threshold_power) {
                 float denom = std::sqrt(first_power * second_power);
                 const float preamble_metric =
-                    denom > 0.0 ? static_cast<float>(std::sqrt(corr_power) / denom) : 0.0f;
+                    denom > 0.0 ? static_cast<float>(std::sqrt(corr_power) / denom)
+                                : 0.0f;
                 const size_t c = start + static_cast<size_t>(coarse_rel);
                 const float m = coarse_sync_metric(c);
+                record_candidate(static_cast<uint64_t>(abs_start), preamble_metric, m);
                 if (m >= d_threshold) {
                     d_next_scan_index = p + static_cast<size_t>(d_min_frame_gap);
                     frame_start_index = start;
@@ -356,10 +432,8 @@ bool prs_frame_detector_impl::find_frame(size_t& frame_start_index,
 
         if (p < max_preamble) {
             remove_pair(p, preamble_corr, first_power, second_power);
-            add_pair(p + static_cast<size_t>(span),
-                     preamble_corr,
-                     first_power,
-                     second_power);
+            add_pair(
+                p + static_cast<size_t>(span), preamble_corr, first_power, second_power);
         }
     }
 
@@ -379,17 +453,15 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
     std::vector<gr_complex> frame(frame_begin, frame_begin + flen);
     prs_payload_info payload_info;
     float payload_metric = 0.0f;
-    const int payload_start =
-        d_cfg.zero_guard_len + d_cfg.preamble_len * d_cfg.preamble_repeats +
-        d_cfg.coarse_sync_len;
-    const bool frame_id_valid =
-        decode_packet_payload(frame.data() + payload_start,
-                              d_cfg.payload_len,
-                              payload_info,
-                              payload_metric);
-    const uint64_t tx_frame_id =
-        payload_info.packet_type == prs_packet_type_response ? payload_info.response_frame_id
-                                                             : payload_info.poll_frame_id;
+    const int payload_start = d_cfg.zero_guard_len +
+                              d_cfg.preamble_len * d_cfg.preamble_repeats +
+                              d_cfg.coarse_sync_len;
+    const bool frame_id_valid = decode_packet_payload(
+        frame.data() + payload_start, d_cfg.payload_len, payload_info, payload_metric);
+    const uint64_t tx_frame_id = payload_info.packet_type == prs_packet_type_response
+                                     ? payload_info.response_frame_id
+                                     : payload_info.poll_frame_id;
+    const uint64_t recv_id = d_next_frame_id++;
     gr_complex cfo_corr(0.0f, 0.0f);
     const int preamble_start = d_cfg.zero_guard_len;
     const int preamble_span = d_cfg.preamble_len * (d_cfg.preamble_repeats - 1);
@@ -397,27 +469,36 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
         cfo_corr += std::conj(frame[preamble_start + i]) *
                     frame[preamble_start + i + d_cfg.preamble_len];
     }
-    const double cfo_hz = std::atan2(cfo_corr.imag(), cfo_corr.real()) *
-                          d_cfg.samp_rate /
-                          (2.0 * 3.141592653589793238462643383279502884 *
-                           d_cfg.preamble_len);
+    const double cfo_hz =
+        std::atan2(cfo_corr.imag(), cfo_corr.real()) * d_cfg.samp_rate /
+        (2.0 * 3.141592653589793238462643383279502884 * d_cfg.preamble_len);
 
     pmt::pmt_t meta = pmt::make_dict();
-    meta = pmt::dict_add(meta, pmt::mp("recv_id"), pmt::from_uint64(d_next_frame_id++));
+    meta = pmt::dict_add(meta, pmt::mp("recv_id"), pmt::from_uint64(recv_id));
     meta = pmt::dict_add(meta, pmt::mp("frame_id"), pmt::from_uint64(tx_frame_id));
-    meta = pmt::dict_add(meta, pmt::mp("packet_type"), pmt::from_long(payload_info.packet_type));
-    meta = pmt::dict_add(meta, pmt::mp("poll_frame_id"), pmt::from_uint64(payload_info.poll_frame_id));
-    meta = pmt::dict_add(meta, pmt::mp("response_frame_id"), pmt::from_uint64(payload_info.response_frame_id));
-    meta = pmt::dict_add(meta, pmt::mp("reply_delay_samples"), pmt::from_uint64(payload_info.reply_delay_samples));
-    meta = pmt::dict_add(meta, pmt::mp("frame_id_valid"), frame_id_valid ? pmt::PMT_T : pmt::PMT_F);
-    meta = pmt::dict_add(meta, pmt::mp("payload_metric"), pmt::from_double(payload_metric));
-    meta = pmt::dict_add(meta, pmt::mp("absolute_sample_index"), pmt::from_uint64(abs_start));
+    meta = pmt::dict_add(
+        meta, pmt::mp("packet_type"), pmt::from_long(payload_info.packet_type));
+    meta = pmt::dict_add(
+        meta, pmt::mp("poll_frame_id"), pmt::from_uint64(payload_info.poll_frame_id));
+    meta = pmt::dict_add(meta,
+                         pmt::mp("response_frame_id"),
+                         pmt::from_uint64(payload_info.response_frame_id));
+    meta = pmt::dict_add(meta,
+                         pmt::mp("reply_delay_samples"),
+                         pmt::from_uint64(payload_info.reply_delay_samples));
+    meta = pmt::dict_add(
+        meta, pmt::mp("frame_id_valid"), frame_id_valid ? pmt::PMT_T : pmt::PMT_F);
+    meta =
+        pmt::dict_add(meta, pmt::mp("payload_metric"), pmt::from_double(payload_metric));
+    meta = pmt::dict_add(
+        meta, pmt::mp("absolute_sample_index"), pmt::from_uint64(abs_start));
     meta = pmt::dict_add(meta, pmt::mp("frame_start"), pmt::from_uint64(abs_start));
     meta = pmt::dict_add(meta, pmt::mp("coarse_peak"), pmt::from_uint64(coarse_abs));
-    meta = pmt::dict_add(meta, pmt::mp("peak_metric"), pmt::from_double(coarse_metric));
-    meta = pmt::dict_add(meta, pmt::mp("preamble_metric"), pmt::from_double(preamble_metric));
+    meta = pmt::dict_add(
+        meta, pmt::mp("preamble_metric"), pmt::from_double(preamble_metric));
     meta = pmt::dict_add(meta, pmt::mp("coarse_metric"), pmt::from_double(coarse_metric));
-    meta = pmt::dict_add(meta, pmt::mp("coarse_zc_root"), pmt::from_long(d_cfg.coarse_zc_root));
+    meta = pmt::dict_add(
+        meta, pmt::mp("coarse_zc_root"), pmt::from_long(d_cfg.coarse_zc_root));
     meta = pmt::dict_add(meta, pmt::mp("channel_id"), pmt::from_long(d_cfg.channel_id));
     meta = pmt::dict_add(meta, pmt::mp("cfo"), pmt::from_double(cfo_hz));
     meta = pmt::dict_add(meta, pmt::mp("samp_rate"), pmt::from_double(d_cfg.samp_rate));
@@ -425,19 +506,37 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
     meta = pmt::dict_add(meta, pmt::mp("cp_len"), pmt::from_long(d_cfg.cp_len));
     meta = pmt::dict_add(meta, pmt::mp("active_bins"), pmt::from_long(d_cfg.active_bins));
     meta = pmt::dict_add(meta, pmt::mp("prs_symbols"), pmt::from_long(d_cfg.prs_symbols));
-    meta = pmt::dict_add(meta, pmt::mp("prs_start_rel"), pmt::from_long(prs_start_offset(d_cfg)));
+    meta = pmt::dict_add(
+        meta, pmt::mp("prs_start_rel"), pmt::from_long(prs_start_offset(d_cfg)));
     meta = pmt::dict_add(meta, pmt::mp("prs_len"), pmt::from_long(prs_len(d_cfg)));
+    const double frame_time = d_have_rx_time ? sample_time(abs_start)
+                                             : std::numeric_limits<double>::quiet_NaN();
+    uint64_t attempt_id = 0;
+    const bool have_gated_attempt = complete_attempt(frame_time, attempt_id);
+    if (!have_gated_attempt && frame_id_valid) {
+        attempt_id = payload_info.poll_frame_id;
+    }
+    if (have_gated_attempt || frame_id_valid) {
+        meta = pmt::dict_add(meta, pmt::mp("attempt_id"), pmt::from_uint64(attempt_id));
+    }
+    meta = pmt::dict_add(meta,
+                         pmt::mp("failure_reason"),
+                         pmt::mp(frame_id_valid ? "NONE" : "PAYLOAD_CRC"));
     if (d_have_rx_time) {
-        const double rx_time = sample_time(abs_start);
-        meta = pmt::dict_add(meta,
-                             pmt::mp("rx_time"),
-                             pmt::make_tuple(pmt::from_uint64(static_cast<uint64_t>(std::floor(rx_time))),
-                                             pmt::from_double(rx_time - std::floor(rx_time))));
-        meta = pmt::dict_add(meta, pmt::mp("rx_time_tag_offset"), pmt::from_uint64(d_rx_time_tag_offset));
+        const double rx_time = frame_time;
+        meta = pmt::dict_add(
+            meta,
+            pmt::mp("rx_time"),
+            pmt::make_tuple(pmt::from_uint64(static_cast<uint64_t>(std::floor(rx_time))),
+                            pmt::from_double(rx_time - std::floor(rx_time))));
+        meta = pmt::dict_add(
+            meta, pmt::mp("rx_time_tag_offset"), pmt::from_uint64(d_rx_time_tag_offset));
     }
 
-    message_port_pub(pmt::mp("frame_out"),
-                     pmt::cons(meta, pmt::init_c32vector(frame.size(), frame)));
+    const auto data = pmt::init_c32vector(frame.size(), frame);
+    const auto pdu = pmt::cons(meta, data);
+    message_port_pub(pmt::mp("event_out"), pdu);
+    message_port_pub(pmt::mp("frame_out"), pdu);
     d_last_frame_start = static_cast<int64_t>(abs_start);
 }
 
@@ -463,8 +562,14 @@ int prs_frame_detector_impl::general_work(int noutput_items,
         const double chunk_start_time = sample_time(abs_start);
         const double chunk_stop_time = sample_time(abs_stop);
         std::vector<std::pair<uint64_t, uint64_t>> segments;
+        std::vector<correlation_window> expired_windows;
         {
             std::lock_guard<std::mutex> lock(d_window_mutex);
+            for (const auto& window : d_windows) {
+                if (window.end <= chunk_start_time && !window.completed) {
+                    expired_windows.push_back(window);
+                }
+            }
             d_windows.erase(
                 std::remove_if(d_windows.begin(),
                                d_windows.end(),
@@ -499,6 +604,9 @@ int prs_frame_detector_impl::general_work(int noutput_items,
                     segments.emplace_back(segment_start, segment_stop);
                 }
             }
+        }
+        for (const auto& window : expired_windows) {
+            publish_failed_attempt(window);
         }
 
         uint64_t processed_until = abs_start;

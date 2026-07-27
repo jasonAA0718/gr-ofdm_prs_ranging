@@ -763,7 +763,7 @@ responder_id
 anchor_position
 range_m
 quality
-peak_metric
+coarse_metric
 payload_metric
 phase_residual
 snr
@@ -860,3 +860,60 @@ Delete or rotate old acquisition CSV files before testing new channel metadata:
 rm -f gr-ofdm_prs_ranging/examples/CSV/initiator_acquisition.csv
 rm -f gr-ofdm_prs_ranging/examples/CSV/responder_acquisition.csv
 ```
+
+## 2026-07-27 Acquisition Attempt Logging
+
+The acquisition CSV now begins with:
+
+```text
+log_time_unix,node,attempt_id,failure_reason,...
+```
+
+`prs_timed_burst_source` publishes `attempt_id` with the TX tags and
+`tx_time_out` metadata. For SS-TWR, the attempt ID is the poll frame ID, so the
+initiator poll and its received response share one identifier.
+
+`prs_frame_detector` has a separate optional `event_out` message port. The
+initiator and responder acquisition loggers use this port; `frame_out` remains
+the successful detector output used by the FFT, channel estimator, UI, and
+ranging blocks. This prevents a failed acquisition event from entering the DSP
+chain.
+
+The current `failure_reason` values are:
+
+```text
+NONE            frame detected and payload CRC valid
+PAYLOAD_CRC     repeated preamble and ZC passed, payload CRC invalid
+NO_PREAMBLE     gated attempt expired without crossing the repeated-preamble threshold
+ZC_SYNC         repeated preamble crossed threshold but ZC confirmation did not
+FRAME_BOUNDARY  ZC passed but a complete frame was not published before window expiry
+UNKNOWN         logger received metadata without a detector failure reason
+```
+
+`NO_PREAMBLE` does not prove that RF samples were absent. It combines RF below
+the usable level, wrong timing/window, and repeated-preamble threshold failure.
+The detector cannot observe UHD overflow state, so it does not emit a distinct
+UHD failure code.
+
+The initiator can emit one timeout result for every scheduled poll because its
+detector receives the poll `tx_time_out` message. The responder has no knowledge
+of remote polls that produce no detector candidate, so it cannot assign an
+attempt ID to a completely missed remote poll. For a decoded poll it uses the
+payload poll frame ID; a payload-CRC failure without a gating window leaves
+`attempt_id` empty.
+
+The CSV schema changed. Delete or rotate existing acquisition CSV files before
+running the updated flowgraphs, otherwise append mode will retain the old
+header.
+
+## Metric Naming
+
+`coarse_metric` is the canonical name for the normalized ZC confirmation
+correlation. The former PRS metadata field `peak_metric` contained exactly the
+same value and is no longer emitted or written as a separate CSV column.
+Downstream C++ blocks retain read-only fallback support for old metadata that
+contains `peak_metric`.
+
+The exact `payload_metric` reference-correlation and repeated-bit vote equations
+are documented in `signal.md`. CRC validity remains separate in
+`frame_id_valid`.

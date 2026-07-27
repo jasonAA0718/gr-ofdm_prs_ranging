@@ -61,7 +61,9 @@ class qa_prs_receiver(gr_unittest.TestCase):
         self.assertEqual(pmt.to_long(pmt.dict_ref(meta, pmt.intern("channel_id"), pmt.PMT_NIL)), 0)
         self.assertEqual(pmt.to_uint64(pmt.dict_ref(meta, pmt.intern("frame_start"), pmt.PMT_NIL)), 300)
         self.assertLess(abs(pmt.to_double(pmt.dict_ref(meta, pmt.intern("fine_delay_samples"), pmt.PMT_NIL))), 0.25)
-        self.assertGreater(pmt.to_double(pmt.dict_ref(meta, pmt.intern("peak_metric"), pmt.PMT_NIL)), 0.9)
+        self.assertGreater(pmt.to_double(pmt.dict_ref(meta, pmt.intern("coarse_metric"), pmt.PMT_NIL)), 0.9)
+        self.assertTrue(pmt.is_null(
+            pmt.dict_ref(meta, pmt.intern("peak_metric"), pmt.PMT_NIL)))
         self.assertTrue(pmt.to_bool(pmt.dict_ref(meta, pmt.intern("valid"), pmt.PMT_F)))
 
     def test_coarse_zc_root_29_detects_and_labels_channel(self):
@@ -122,8 +124,11 @@ class qa_prs_receiver(gr_unittest.TestCase):
             window_before_s=0.001,
             window_after_s=0.030)
         debug = blocks.message_debug()
+        event_debug = blocks.message_debug()
 
         tx_meta = pmt.make_dict()
+        tx_meta = pmt.dict_add(
+            tx_meta, pmt.intern("attempt_id"), pmt.from_uint64(314))
         tx_meta = pmt.dict_add(
             tx_meta, pmt.intern("tx_time_secs"), pmt.from_uint64(100))
         tx_meta = pmt.dict_add(
@@ -131,6 +136,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
 
         self.tb.connect(timing, throttle, detector)
         self.tb.msg_connect((detector, "frame_out"), (debug, "store"))
+        self.tb.msg_connect((detector, "event_out"), (event_debug, "store"))
         self.tb.start()
         detector.to_basic_block()._post(pmt.intern("tx_time_in"), tx_meta)
         time.sleep(0.15)
@@ -138,12 +144,164 @@ class qa_prs_receiver(gr_unittest.TestCase):
         self.tb.wait()
 
         self.assertEqual(debug.num_messages(), 1)
+        self.assertEqual(event_debug.num_messages(), 1)
         meta = pmt.car(debug.get_message(0))
         self.assertEqual(
             pmt.to_uint64(
                 pmt.dict_ref(
                     meta, pmt.intern("frame_start"), pmt.PMT_NIL)),
             target_start)
+        self.assertEqual(
+            pmt.to_uint64(
+                pmt.dict_ref(
+                    meta, pmt.intern("attempt_id"), pmt.PMT_NIL)),
+            314)
+        self.assertEqual(
+            pmt.symbol_to_string(
+                pmt.dict_ref(
+                    meta, pmt.intern("failure_reason"), pmt.PMT_NIL)),
+            "NONE")
+
+    def test_time_gating_logs_no_preamble_attempt(self):
+        samp_rate = 1e6
+        data = [0j] * 50000
+        rx_time = pmt.make_tuple(
+            pmt.from_uint64(100), pmt.from_double(0.0))
+        tags = [gr.tag_utils.python_to_tag(
+            (0, pmt.intern("rx_time"), rx_time, pmt.intern("qa")))]
+        timing = blocks.vector_source_c(data, False, 1, tags)
+        throttle = blocks.throttle(gr.sizeof_gr_complex, samp_rate)
+        detector = ofdm_prs_ranging.prs_frame_detector(
+            samp_rate=samp_rate,
+            threshold=0.30,
+            time_gating=True,
+            reply_delay_s=0.0,
+            window_before_s=0.001,
+            window_after_s=0.010)
+        event_debug = blocks.message_debug()
+
+        tx_meta = pmt.make_dict()
+        for key, value in (
+            ("attempt_id", pmt.from_uint64(2718)),
+            ("tx_time_secs", pmt.from_uint64(100)),
+            ("tx_time_frac", pmt.from_double(0.020)),
+        ):
+            tx_meta = pmt.dict_add(tx_meta, pmt.intern(key), value)
+
+        self.tb.connect(timing, throttle, detector)
+        self.tb.msg_connect((detector, "event_out"), (event_debug, "store"))
+        self.tb.start()
+        detector.to_basic_block()._post(pmt.intern("tx_time_in"), tx_meta)
+        time.sleep(0.10)
+        self.tb.stop()
+        self.tb.wait()
+
+        self.assertEqual(event_debug.num_messages(), 1)
+        meta = pmt.car(event_debug.get_message(0))
+        self.assertEqual(
+            pmt.to_uint64(
+                pmt.dict_ref(
+                    meta, pmt.intern("attempt_id"), pmt.PMT_NIL)),
+            2718)
+        self.assertEqual(
+            pmt.symbol_to_string(
+                pmt.dict_ref(
+                    meta, pmt.intern("failure_reason"), pmt.PMT_NIL)),
+            "NO_PREAMBLE")
+
+    def test_time_gating_logs_zc_sync_failure(self):
+        samp_rate = 1e6
+        tx = ofdm_prs_ranging.prs_timed_burst_source(
+            samp_rate=samp_rate,
+            attach_tx_time=False,
+            coarse_zc_root=29)
+        frame = list(tx.frame_samples())
+        target_start = 20000
+        data = [0j] * 70000
+        data[target_start:target_start + len(frame)] = frame
+        rx_time = pmt.make_tuple(
+            pmt.from_uint64(100), pmt.from_double(0.0))
+        tags = [gr.tag_utils.python_to_tag(
+            (0, pmt.intern("rx_time"), rx_time, pmt.intern("qa")))]
+        timing = blocks.vector_source_c(data, False, 1, tags)
+        throttle = blocks.throttle(gr.sizeof_gr_complex, samp_rate)
+        detector = ofdm_prs_ranging.prs_frame_detector(
+            samp_rate=samp_rate,
+            threshold=0.30,
+            coarse_zc_root=25,
+            time_gating=True,
+            reply_delay_s=0.0,
+            window_before_s=0.001,
+            window_after_s=0.030)
+        event_debug = blocks.message_debug()
+
+        tx_meta = pmt.make_dict()
+        for key, value in (
+            ("attempt_id", pmt.from_uint64(1618)),
+            ("tx_time_secs", pmt.from_uint64(100)),
+            ("tx_time_frac", pmt.from_double(0.020)),
+        ):
+            tx_meta = pmt.dict_add(tx_meta, pmt.intern(key), value)
+
+        self.tb.connect(timing, throttle, detector)
+        self.tb.msg_connect((detector, "event_out"), (event_debug, "store"))
+        self.tb.start()
+        detector.to_basic_block()._post(pmt.intern("tx_time_in"), tx_meta)
+        time.sleep(0.12)
+        self.tb.stop()
+        self.tb.wait()
+
+        self.assertEqual(event_debug.num_messages(), 1)
+        meta = pmt.car(event_debug.get_message(0))
+        self.assertEqual(
+            pmt.to_uint64(
+                pmt.dict_ref(
+                    meta, pmt.intern("attempt_id"), pmt.PMT_NIL)),
+            1618)
+        self.assertEqual(
+            pmt.symbol_to_string(
+                pmt.dict_ref(
+                    meta, pmt.intern("failure_reason"), pmt.PMT_NIL)),
+            "ZC_SYNC")
+
+    def test_acquisition_logger_writes_attempt_failure_columns(self):
+        fd, path = tempfile.mkstemp(prefix="prs_acq_", suffix=".csv")
+        os.close(fd)
+        try:
+            logger = ofdm_prs_ranging.prs_acquisition_logger(
+                path, "initiator", False)
+            meta = pmt.make_dict()
+            for key, value in (
+                ("attempt_id", pmt.from_uint64(55)),
+                ("failure_reason", pmt.intern("ZC_SYNC")),
+                ("channel_id", pmt.from_long(1)),
+                ("coarse_zc_root", pmt.from_long(29)),
+                ("frame_id_valid", pmt.PMT_F),
+            ):
+                meta = pmt.dict_add(meta, pmt.intern(key), value)
+            strobe = blocks.message_strobe(
+                pmt.cons(meta, pmt.PMT_NIL), 50)
+            self.tb.msg_connect(
+                (strobe, "strobe"), (logger, "frame_in"))
+            self.tb.start()
+            time.sleep(0.12)
+            self.tb.stop()
+            self.tb.wait()
+
+            with open(path, "r", encoding="utf-8") as f:
+                lines = [line.strip() for line in f.readlines()]
+            header = lines[0].split(",")
+            fields = lines[1].split(",")
+            self.assertEqual(header[2], "attempt_id")
+            self.assertEqual(header[3], "failure_reason")
+            self.assertNotIn("peak_metric", header)
+            self.assertIn("coarse_metric", header)
+            self.assertEqual(fields[1], "initiator")
+            self.assertEqual(fields[2], "55")
+            self.assertEqual(fields[3], "ZC_SYNC")
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
 
     def test_csv_logger_writes_measurement_row(self):
         fd, path = tempfile.mkstemp(prefix="prs_meas_", suffix=".csv")
@@ -162,7 +320,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
                 ("tof_s", pmt.from_double(3.0e-6)),
                 ("range_m", pmt.from_double(899.377374)),
                 ("frame_id_valid", pmt.PMT_T),
-                ("peak_metric", pmt.from_double(0.95)),
+                ("coarse_metric", pmt.from_double(0.95)),
                 ("payload_metric", pmt.from_double(0.98)),
                 ("phase_residual", pmt.from_double(0.01)),
                 ("snr", pmt.from_double(30.0)),
@@ -178,7 +336,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
 
             with open(path, "r", encoding="utf-8") as f:
                 lines = [line.strip() for line in f.readlines()]
-            self.assertEqual(lines[0], "poll_frame_id,response_frame_id,t1_tx_time,t4_rx_time,reply_delay_samples,reply_delay_s,rtt_s,tof_s,range_m,frame_id_valid,peak_metric,payload_metric,phase_residual,snr,quality")
+            self.assertEqual(lines[0], "poll_frame_id,response_frame_id,t1_tx_time,t4_rx_time,reply_delay_samples,reply_delay_s,rtt_s,tof_s,range_m,frame_id_valid,coarse_metric,payload_metric,phase_residual,snr,quality")
             fields = lines[1].split(",")
             self.assertEqual(fields[0], "7")
             self.assertEqual(fields[1], "9")
@@ -241,7 +399,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
             ("response_frame_id", pmt.from_uint64(77)),
             ("reply_delay_samples", pmt.from_uint64(50000)),
             ("rx_time", pmt.make_tuple(pmt.from_uint64(100), pmt.from_double(0.005002))),
-            ("peak_metric", pmt.from_double(0.9)),
+            ("coarse_metric", pmt.from_double(0.9)),
             ("payload_metric", pmt.from_double(1.0)),
             ("phase_residual", pmt.from_double(0.01)),
             ("snr", pmt.from_double(20.0)),
