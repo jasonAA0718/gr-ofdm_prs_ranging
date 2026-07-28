@@ -22,7 +22,7 @@ constexpr int prs_payload_packet_type_bits = 8;
 constexpr int prs_payload_frame_id_bits = 32;
 constexpr int prs_payload_reply_delay_bits = 32;
 constexpr int prs_payload_crc_bits = 16;
-constexpr int prs_payload_repeat = 5;
+constexpr int prs_payload_repeat = 280;
 constexpr int prs_payload_data_bits = prs_payload_packet_type_bits +
                                       prs_payload_frame_id_bits +
                                       prs_payload_frame_id_bits +
@@ -45,7 +45,8 @@ void encode_packet_payload(const prs_payload_info& info,
 bool decode_packet_payload(const gr_complex* payload,
                            int payload_len,
                            prs_payload_info& info,
-                           float& metric);
+                           float& metric,
+                           double phase_increment_rad = 0.0);
 void encode_frame_id_payload(uint64_t frame_id,
                              float amplitude,
                              std::vector<gr_complex>::iterator out);

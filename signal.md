@@ -24,7 +24,7 @@ zero_guard_len    = 1000 samples
 preamble_len      = 128 samples
 preamble_repeats  = 16
 coarse_sync_len   = 839 samples
-payload_len       = 616 samples
+payload_len       = 33616 samples
 fft_len           = 1024
 cp_len            = 128
 active_bins       = 1024
@@ -124,11 +124,11 @@ Both POLL and RESPONSE frames contain the complete fixed-length BPSK payload:
 
 ```text
 [16 reference samples]
-[8-bit packet type, repeated 5 samples/bit]
-[32-bit poll frame ID, repeated 5 samples/bit]
-[32-bit response frame ID, repeated 5 samples/bit]
-[32-bit reply delay, repeated 5 samples/bit]
-[16-bit CRC, repeated 5 samples/bit]
+[8-bit packet type, repeated 280 samples/bit]
+[32-bit poll frame ID, repeated 280 samples/bit]
+[32-bit response frame ID, repeated 280 samples/bit]
+[32-bit reply delay, repeated 280 samples/bit]
+[16-bit CRC, repeated 280 samples/bit]
 ```
 
 The payload geometry is:
@@ -136,22 +136,22 @@ The payload geometry is:
 | Part | Information bits | Samples per bit | Payload samples | Sample offsets |
 |---|---:|---:|---:|---:|
 | Known BPSK reference | N/A | 1 per reference sign | 16 | 0-15 |
-| Packet type | 8 | 5 | 40 | 16-55 |
-| Poll frame ID | 32 | 5 | 160 | 56-215 |
-| Response frame ID | 32 | 5 | 160 | 216-375 |
-| Reply delay samples | 32 | 5 | 160 | 376-535 |
-| CRC16 | 16 | 5 | 80 | 536-615 |
-| **Total** | **120 protected bits** |  | **616 samples** | **0-615** |
+| Packet type | 8 | 280 | 2240 | 16-2255 |
+| Poll frame ID | 32 | 280 | 8960 | 2256-11215 |
+| Response frame ID | 32 | 280 | 8960 | 11216-20175 |
+| Reply delay samples | 32 | 280 | 8960 | 20176-29135 |
+| CRC16 | 16 | 280 | 4480 | 29136-33615 |
+| **Total** | **120 protected bits** |  | **33616 samples** | **0-33615** |
 
 At `Fs = 30 MS/s`:
 
 ```text
 one BPSK sample                    = 33.333 ns
-one repeated information bit      = 5 samples = 166.667 ns
+one repeated information bit      = 280 samples = 9.333 us
 16-sample reference duration      = 0.533 us
-600 repeated data/CRC samples     = 20.000 us
-complete 616-sample payload       = 20.533 us
-uncoded information-bit rate      = 30 MS/s / 5 = 6 Mbit/s
+33600 repeated data/CRC samples   = 1120.000 us
+complete 33616-sample payload     = 1120.533 us
+uncoded information-bit rate      = 30 MS/s / 280 = 107.143 kbit/s
 ```
 
 There is no separate pulse-shaping stage inside the payload encoder. One real
@@ -162,9 +162,10 @@ bit 0 -> -amplitude + j0
 bit 1 -> +amplitude + j0
 ```
 
-Every information bit is encoded as five identical consecutive samples. The
-decoder makes a hard majority decision; at least three of the five signs
-determine the decoded bit.
+Every information bit is encoded as 280 identical consecutive samples. After
+CFO and common-phase correction, the decoder sums the real values of all 280
+samples and decides the bit from the sign of that coherent sum. Sample
+magnitude is retained instead of being discarded by hard voting.
 
 The 16 known reference signs are:
 
@@ -188,7 +189,7 @@ first.
 
 ### POLL and RESPONSE Content
 
-Both packet types occupy all 616 samples. An unused field is transmitted as
+Both packet types occupy all 33616 samples. An unused field is transmitted as
 zero; it is not physically omitted.
 
 | Payload field | Initiator POLL | Responder RESPONSE |
@@ -215,9 +216,15 @@ RESPONSE payload CRC failure at initiator
 ### Payload Metric
 
 The packet payload starts with `Nref = 16` known reference symbols. The
-remaining `B = 120` data and CRC bits are each repeated `R = 5` times.
+remaining `B = 120` data and CRC bits are each repeated `R = 280` times.
+The repeated-preamble CFO estimate is converted to phase increment
+`\hat{\omega}=2\pi\hat{f}_e/F_s` and applied to every payload sample:
 
-For received reference samples `yref[i]` and expected real BPSK signs `a[i]`,
+```math
+\tilde{y}[i] = y[i]\exp(-j\hat{\omega}i)
+```
+
+For derotated reference samples `yref[i]` and expected real BPSK signs `a[i]`,
 the decoder calculates
 
 ```math
@@ -233,34 +240,34 @@ M_{\text{ref}} =
 \right)
 ```
 
-It uses `conj(Cref) / |Cref|` to remove the common payload phase. For bit `b`,
-let `q[b]` be the number of its five corrected samples whose real part is
-nonnegative. The hard-decision vote margin is
+It uses `conj(Cref) / |Cref|` to remove the remaining common payload phase.
+Let `z[b,r]` be corrected sample `r` of bit `b`. The coherent decision is
 
 ```math
-v[b] = \frac{|2q[b]-R|}{R}
+S[b] = \sum_{r=0}^{R-1}\Re\{z[b,r]\}
 ```
 
-For `R = 5`, one bit contributes:
-
-```text
-5-0 or 0-5 vote: 1.0
-4-1 or 1-4 vote: 0.6
-3-2 or 2-3 vote: 0.2
-```
-
-The average vote metric and reported payload metric are
+The decoded bit is one when `S[b] >= 0` and zero otherwise. Its normalized
+decision margin is
 
 ```math
-M_{\text{vote}} = \frac{1}{B}\sum_{b=0}^{B-1}v[b]
+m[b] =
+\frac{|S[b]|}
+{\sum_{r=0}^{R-1}|\Re\{z[b,r]\}|}
+```
+
+The average decision metric and reported payload metric are
+
+```math
+M_{\text{decision}} = \frac{1}{B}\sum_{b=0}^{B-1}m[b]
 ```
 
 ```math
-\text{payload_metric} = \min(M_{\text{ref}}, M_{\text{vote}})
+\text{payload_metric} = \min(M_{\text{ref}}, M_{\text{decision}})
 ```
 
 `payload_metric` is in `[0, 1]` and measures reference correlation plus
-hard-vote consistency. It is not SNR, dBFS, or CRC probability. Payload
+coherent-decision consistency. It is not SNR, dBFS, or CRC probability. Payload
 validity is a separate condition:
 
 ```text
@@ -270,10 +277,9 @@ frame_id_valid = received CRC16 matches the CRC16 recomputed from decoded fields
 There is no payload-metric acceptance threshold in the current decoder. A high
 `payload_metric` does not override a CRC failure.
 
-The vote metric measures decision agreement, not correctness. Five consistently
-wrong samples produce a unanimous `5-0` vote and contribute `1.0`. The decoder
-also discards sample magnitude after common-phase correction; it counts positive
-and negative real parts instead of soft-combining their amplitudes.
+The decision metric measures consistency, not correctness. A coherently
+combined bit can still have a high margin and the wrong sign; CRC remains the
+validity check.
 
 ### Attenuation Result Interpretation
 
@@ -286,8 +292,18 @@ The reported attenuation experiment produced approximately:
 
 This ordering is consistent with the implementation. Acquisition integrates a
 768-pair repeated-preamble correlation and then a 419-sample coherent ZC
-correlation. Each payload bit has only a five-sample hard-decision majority
-vote, and CRC detects errors across 120 decoded bits.
+correlation. The payload now coherently combines 280 samples per bit, and CRC
+detects errors across 120 decoded bits.
+
+At unchanged per-sample amplitude, increasing from 5 to 280 samples per bit
+transmits 56 times as much energy per information bit:
+
+```math
+10\log_{10}(280/5) = 17.48\ \text{dB}
+```
+
+This is additional transmitted energy and airtime, not coding gain at fixed
+`Eb/N0`.
 
 The attenuation result was recorded before section RMS equalization. The
 current transmitter now applies:
@@ -312,7 +328,7 @@ failure rate across 120 bits corresponds approximately to:
 P_b \simeq 1 - (1 - 0.5)^{1/120} \simeq 0.00576
 ```
 
-Thus only about `0.58%` post-majority decoded-bit error probability can already
+Thus only about `0.58%` post-combining decoded-bit error probability can already
 produce `50%` packet failure. This estimate is illustrative: burst errors,
 phase-estimation errors, clipping, and correlated interference violate the
 independent-error assumption.

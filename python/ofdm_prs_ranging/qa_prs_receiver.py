@@ -192,7 +192,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
             time_gating=True,
             reply_delay_s=0.0,
             window_before_s=0.001,
-            window_after_s=0.030)
+            window_after_s=0.080)
         debug = blocks.message_debug()
         event_debug = blocks.message_debug()
 
@@ -287,7 +287,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
             coarse_zc_root=29)
         frame = list(tx.frame_samples())
         target_start = 20000
-        data = [0j] * 70000
+        data = [0j] * 120000
         data[target_start:target_start + len(frame)] = frame
         rx_time = pmt.make_tuple(
             pmt.from_uint64(100), pmt.from_double(0.0))
@@ -302,7 +302,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
             time_gating=True,
             reply_delay_s=0.0,
             window_before_s=0.001,
-            window_after_s=0.030)
+            window_after_s=0.080)
         event_debug = blocks.message_debug()
 
         tx_meta = pmt.make_dict()
@@ -317,7 +317,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
         self.tb.msg_connect((detector, "event_out"), (event_debug, "store"))
         self.tb.start()
         detector.to_basic_block()._post(pmt.intern("tx_time_in"), tx_meta)
-        time.sleep(0.12)
+        time.sleep(0.25)
         self.tb.stop()
         self.tb.wait()
 

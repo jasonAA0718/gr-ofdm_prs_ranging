@@ -6,6 +6,7 @@
  */
 
 #include "golay_prs_table.h"
+#include "prs_payload_codec.h"
 #include <gnuradio/fft/fft.h>
 #include <gnuradio/ofdm_prs_ranging/prs_timed_burst_source.h>
 #include <boost/test/unit_test.hpp>
@@ -175,11 +176,13 @@ BOOST_AUTO_TEST_CASE(test_golay_papr_and_section_levels)
     const size_t preamble_start = 1000;
     const size_t preamble_length = 128 * 16;
     const size_t coarse_start = preamble_start + preamble_length;
-    const size_t payload_start = static_cast<size_t>(source->prs_start() - 616);
+    const size_t payload_start = static_cast<size_t>(
+        source->prs_start() - prs_frame_id_payload_symbols);
     const size_t prs_start = static_cast<size_t>(source->prs_start());
     const double preamble_rms = rms(frame, preamble_start, preamble_length);
     const double coarse_rms = rms(frame, coarse_start, 839);
-    const double payload_rms = rms(frame, payload_start, 616);
+    const double payload_rms =
+        rms(frame, payload_start, prs_frame_id_payload_symbols);
     const double ofdm_rms = rms(frame, prs_start, fft_len + cp_len);
     const auto peak = std::max_element(
         frame.begin(), frame.end(), [](const auto& a, const auto& b) {

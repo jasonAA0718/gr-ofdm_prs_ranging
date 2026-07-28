@@ -72,7 +72,7 @@ Default/reference frame geometry:
 zero guard:          1000 samples
 short preamble:      preamble_len * preamble_repeats
 coarse ZC sync:      coarse_sync_len samples, historically 839
-BPSK payload:        616 samples
+BPSK payload:        33616 samples
 OFDM PRS block:      prs_symbols * (fft_len + cp_len)
 tail guard:          1000 samples
 ```
@@ -229,7 +229,7 @@ backward-compatible parameters:
 time_gating=False
 reply_delay_s=0.05
 window_before_s=0.0002
-window_after_s=0.002
+window_after_s=0.004
 ```
 
 When gating is enabled, a transmit-time message schedules:
@@ -918,14 +918,14 @@ same value and is no longer emitted or written as a separate CSV column.
 Downstream C++ blocks retain read-only fallback support for old metadata that
 contains `peak_metric`.
 
-The exact `payload_metric` reference-correlation and repeated-bit vote equations
+The exact `payload_metric` reference-correlation and coherent-combining equations
 are documented in `signal.md`. CRC validity remains separate in
 `frame_id_valid`.
 
 ## 2026-07-28 BPSK Payload Documentation
 
-`signal.md` now documents the complete 616-sample BPSK payload, its 16-sample
-reference, five samples per information bit, all field offsets, bit order, CRC
+`signal.md` now documents the complete 33616-sample BPSK payload, its 16-sample
+reference, 280 samples per information bit, all field offsets, bit order, CRC
 coverage, and the different POLL/RESPONSE field meanings.
 
 The attenuation observation is recorded as:
@@ -936,8 +936,9 @@ about 95 dB: acquisition failure
 ```
 
 This identifies payload decode as the first observed digital failure stage.
-The payload uses hard five-sample majority votes. Section scaling has since
-been changed so this experiment should be repeated with the equalized waveform.
+The payload now uses CFO-corrected coherent combining over 280 samples per bit.
+Section scaling has also changed, so this experiment should be repeated with
+the updated waveform.
 
 ## 2026-07-28 Golay PRS and Section Scaling
 

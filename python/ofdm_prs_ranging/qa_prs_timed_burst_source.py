@@ -33,8 +33,11 @@ class qa_prs_timed_burst_source(gr_unittest.TestCase):
 
     def test_waveform_length_and_offsets(self):
         src = prs_timed_burst_source()
-        self.assertEqual(src.frame_len(), 23935)
-        self.assertEqual(src.prs_start(), 1000 + 128 * 16 + 839 + 616)
+        payload_len = 16 + 120 * 280
+        expected_prs_start = 1000 + 128 * 16 + 839 + payload_len
+        self.assertEqual(
+            src.frame_len(), expected_prs_start + 16 * (1024 + 128) + 1000)
+        self.assertEqual(src.prs_start(), expected_prs_start)
         self.assertEqual(src.prs_len(), 16 * (1024 + 128))
 
     def test_active_subcarrier_mapping(self):
@@ -57,11 +60,11 @@ class qa_prs_timed_burst_source(gr_unittest.TestCase):
         self.assertGreater(rms, 0.0)
 
     def test_trigger_emits_burst_tags(self):
-        nitems = 26000
+        src = prs_timed_burst_source(tx_lead_time=0.5)
+        nitems = src.frame_len() + 1000
         rx_time = pmt.make_tuple(pmt.from_uint64(123), pmt.from_double(0.25))
         tags = [gr.tag_utils.python_to_tag((0, pmt.intern("rx_time"), rx_time, pmt.intern("qa")))]
         timing = blocks.vector_source_c([0j] * nitems, False, 1, tags)
-        src = prs_timed_burst_source(tx_lead_time=0.5)
         head = blocks.head(gr.sizeof_gr_complex, src.frame_len())
         sink = blocks.vector_sink_c()
 
@@ -92,14 +95,15 @@ class qa_prs_timed_burst_source(gr_unittest.TestCase):
         tx_time = tags_by_key["tx_time"].value
         self.assertEqual(pmt.to_uint64(pmt.tuple_ref(tx_time, 0)), 123)
         self.assertAlmostEqual(pmt.to_double(pmt.tuple_ref(tx_time, 1)), 0.75)
-        self.assertEqual(pmt.to_long(tags_by_key["burst_len"].value), 23935)
+        self.assertEqual(
+            pmt.to_long(tags_by_key["burst_len"].value), src.frame_len())
         self.assertEqual(tags_by_key["tx_eob"].offset, src.frame_len() - 1)
 
     def test_attach_tx_time_false_omits_tx_time_tag(self):
         tb = gr.top_block()
-        nitems = 26000
-        timing = blocks.vector_source_c([0j] * nitems)
         src = prs_timed_burst_source(attach_tx_time=False)
+        nitems = src.frame_len() + 1000
+        timing = blocks.vector_source_c([0j] * nitems)
         head = blocks.head(gr.sizeof_gr_complex, src.frame_len())
         sink = blocks.vector_sink_c()
 

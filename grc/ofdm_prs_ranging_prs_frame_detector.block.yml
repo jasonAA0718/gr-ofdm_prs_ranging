@@ -22,7 +22,7 @@ parameters:
 - {id: time_gating, label: Time Gating, dtype: bool, default: 'False'}
 - {id: reply_delay_s, label: Reply Delay (s), dtype: real, default: '0.05'}
 - {id: window_before_s, label: Window Before (s), dtype: real, default: '0.0002'}
-- {id: window_after_s, label: Window After (s), dtype: real, default: '0.002'}
+- {id: window_after_s, label: Window After (s), dtype: real, default: '0.004'}
 inputs:
 - {label: in, domain: stream, dtype: complex}
 - {label: tx_time_in, domain: message, optional: true}

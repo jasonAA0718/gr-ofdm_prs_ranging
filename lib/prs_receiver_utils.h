@@ -8,6 +8,7 @@
 #ifndef INCLUDED_OFDM_PRS_RANGING_PRS_RECEIVER_UTILS_H
 #define INCLUDED_OFDM_PRS_RANGING_PRS_RECEIVER_UTILS_H
 
+#include "prs_payload_codec.h"
 #include <gnuradio/gr_complex.h>
 #include <pmt/pmt.h>
 #include <cstdint>
@@ -26,7 +27,7 @@ struct prs_rx_config {
     int preamble_len = 128;
     int preamble_repeats = 16;
     int coarse_sync_len = 839;
-    int payload_len = 616;
+    int payload_len = prs_frame_id_payload_symbols;
     int zero_guard_len = 1000;
     int tail_guard_len = 1000;
     uint32_t seed = 13990001;

@@ -102,7 +102,8 @@ void encode_frame_id_payload(uint64_t frame_id,
 bool decode_packet_payload(const gr_complex* payload,
                            int payload_len,
                            prs_payload_info& info,
-                           float& metric)
+                           float& metric,
+                           double phase_increment_rad)
 {
     info = prs_payload_info{};
     metric = 0.0f;
@@ -110,12 +111,18 @@ bool decode_packet_payload(const gr_complex* payload,
         return false;
     }
 
+    const gr_complex phase_step(
+        static_cast<float>(std::cos(-phase_increment_rad)),
+        static_cast<float>(std::sin(-phase_increment_rad)));
+    gr_complex phase_rotation(1.0f, 0.0f);
     gr_complex ref_corr(0.0f, 0.0f);
     double ref_power = 0.0;
     for (int i = 0; i < prs_frame_id_ref_symbols; ++i) {
         const auto expected = gr_complex(ref_sign(i), 0.0f);
-        ref_corr += payload[i] * expected;
-        ref_power += std::norm(payload[i]);
+        const gr_complex derotated = payload[i] * phase_rotation;
+        ref_corr += derotated * expected;
+        ref_power += std::norm(derotated);
+        phase_rotation *= phase_step;
     }
 
     const float ref_mag = std::abs(ref_corr);
@@ -132,20 +139,23 @@ bool decode_packet_payload(const gr_complex* payload,
     uint32_t response_frame_id = 0;
     uint32_t reply_delay_samples = 0;
     uint16_t rx_crc = 0;
-    double vote_margin_sum = 0.0;
+    double decision_margin_sum = 0.0;
     for (int bit = 0; bit < prs_payload_data_bits; ++bit) {
-        int positive = 0;
+        double decision_sum = 0.0;
+        double magnitude_sum = 0.0;
         for (int r = 0; r < prs_payload_repeat; ++r) {
             const int index = prs_frame_id_ref_symbols + bit * prs_payload_repeat + r;
-            const gr_complex corrected = payload[index] * correction;
-            if (corrected.real() >= 0.0f) {
-                ++positive;
-            }
+            const gr_complex corrected =
+                payload[index] * phase_rotation * correction;
+            decision_sum += corrected.real();
+            magnitude_sum += std::abs(corrected.real());
+            phase_rotation *= phase_step;
         }
-        const bool one = positive >= ((prs_payload_repeat / 2) + 1);
-        vote_margin_sum +=
-            static_cast<double>(std::abs(2 * positive - prs_payload_repeat)) /
-            static_cast<double>(prs_payload_repeat);
+        const bool one = decision_sum >= 0.0;
+        if (magnitude_sum > 0.0) {
+            decision_margin_sum +=
+                std::min(1.0, std::abs(decision_sum) / magnitude_sum);
+        }
 
         int field_bit = bit;
         if (field_bit < prs_payload_packet_type_bits) {
@@ -185,9 +195,9 @@ bool decode_packet_payload(const gr_complex* payload,
     info.poll_frame_id = poll_frame_id;
     info.response_frame_id = response_frame_id;
     info.reply_delay_samples = reply_delay_samples;
-    const float vote_metric =
-        static_cast<float>(vote_margin_sum / static_cast<double>(prs_payload_data_bits));
-    metric = std::min(ref_metric, vote_metric);
+    const float decision_metric = static_cast<float>(
+        decision_margin_sum / static_cast<double>(prs_payload_data_bits));
+    metric = std::min(ref_metric, decision_metric);
     return rx_crc == crc16_ccitt(info);
 }
 

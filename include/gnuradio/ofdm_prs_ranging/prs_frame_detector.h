@@ -35,7 +35,7 @@ public:
                      bool time_gating = false,
                      double reply_delay_s = 0.05,
                      double window_before_s = 0.0002,
-                     double window_after_s = 0.002);
+                     double window_after_s = 0.004);
 };
 
 } // namespace ofdm_prs_ranging

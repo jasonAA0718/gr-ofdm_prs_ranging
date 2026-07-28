@@ -451,17 +451,6 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
     const uint64_t coarse_abs = d_buffer_abs_start + coarse_index;
     const auto frame_begin = d_buffer.begin() + d_buffer_head + frame_start_index;
     std::vector<gr_complex> frame(frame_begin, frame_begin + flen);
-    prs_payload_info payload_info;
-    float payload_metric = 0.0f;
-    const int payload_start = d_cfg.zero_guard_len +
-                              d_cfg.preamble_len * d_cfg.preamble_repeats +
-                              d_cfg.coarse_sync_len;
-    const bool frame_id_valid = decode_packet_payload(
-        frame.data() + payload_start, d_cfg.payload_len, payload_info, payload_metric);
-    const uint64_t tx_frame_id = payload_info.packet_type == prs_packet_type_response
-                                     ? payload_info.response_frame_id
-                                     : payload_info.poll_frame_id;
-    const uint64_t recv_id = d_next_frame_id++;
     gr_complex cfo_corr(0.0f, 0.0f);
     const int preamble_start = d_cfg.zero_guard_len;
     const int preamble_span = d_cfg.preamble_len * (d_cfg.preamble_repeats - 1);
@@ -469,10 +458,28 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
         cfo_corr += std::conj(frame[preamble_start + i]) *
                     frame[preamble_start + i + d_cfg.preamble_len];
     }
+    const double cfo_phase_increment =
+        std::atan2(cfo_corr.imag(), cfo_corr.real()) /
+        static_cast<double>(d_cfg.preamble_len);
     const double cfo_hz =
-        std::atan2(cfo_corr.imag(), cfo_corr.real()) * d_cfg.samp_rate /
-        (2.0 * 3.141592653589793238462643383279502884 * d_cfg.preamble_len);
+        cfo_phase_increment * d_cfg.samp_rate /
+        (2.0 * 3.141592653589793238462643383279502884);
 
+    prs_payload_info payload_info;
+    float payload_metric = 0.0f;
+    const int payload_start = d_cfg.zero_guard_len +
+                              d_cfg.preamble_len * d_cfg.preamble_repeats +
+                              d_cfg.coarse_sync_len;
+    const bool frame_id_valid = decode_packet_payload(
+        frame.data() + payload_start,
+        d_cfg.payload_len,
+        payload_info,
+        payload_metric,
+        cfo_phase_increment);
+    const uint64_t tx_frame_id = payload_info.packet_type == prs_packet_type_response
+                                     ? payload_info.response_frame_id
+                                     : payload_info.poll_frame_id;
+    const uint64_t recv_id = d_next_frame_id++;
     pmt::pmt_t meta = pmt::make_dict();
     meta = pmt::dict_add(meta, pmt::mp("recv_id"), pmt::from_uint64(recv_id));
     meta = pmt::dict_add(meta, pmt::mp("frame_id"), pmt::from_uint64(tx_frame_id));
