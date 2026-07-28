@@ -917,3 +917,22 @@ contains `peak_metric`.
 The exact `payload_metric` reference-correlation and repeated-bit vote equations
 are documented in `signal.md`. CRC validity remains separate in
 `frame_id_valid`.
+
+## 2026-07-28 BPSK Payload Documentation
+
+`signal.md` now documents the complete 616-sample BPSK payload, its 16-sample
+reference, five samples per information bit, all field offsets, bit order, CRC
+coverage, and the different POLL/RESPONSE field meanings.
+
+The attenuation observation is recorded as:
+
+```text
+about 75 dB: 50% packet/CRC failure
+about 95 dB: acquisition failure
+```
+
+This identifies payload decode as the first observed digital failure stage.
+The separation is not purely processing gain: the payload uses hard
+five-sample majority votes, and timed burst generation overwrites payload
+samples with `d_tx_amp` after frame-wide normalization. Current POLL and
+RESPONSE payload amplitudes are `0.4` and `0.2`, respectively.

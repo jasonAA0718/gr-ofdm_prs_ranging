@@ -118,10 +118,104 @@ Responder RESPONSE TX:   coarse_zc_root = 29
 Initiator RX detector:   coarse_zc_root = 29, channel_id = 1
 ```
 
-## Payload Metric
+## BPSK Packet Payload
 
-The packet payload is BPSK. It starts with `Nref = 16` known reference symbols.
-The remaining `B = 120` data and CRC bits are each repeated `R = 5` times.
+Both POLL and RESPONSE frames contain the complete fixed-length BPSK payload:
+
+```text
+[16 reference samples]
+[8-bit packet type, repeated 5 samples/bit]
+[32-bit poll frame ID, repeated 5 samples/bit]
+[32-bit response frame ID, repeated 5 samples/bit]
+[32-bit reply delay, repeated 5 samples/bit]
+[16-bit CRC, repeated 5 samples/bit]
+```
+
+The payload geometry is:
+
+| Part | Information bits | Samples per bit | Payload samples | Sample offsets |
+|---|---:|---:|---:|---:|
+| Known BPSK reference | N/A | 1 per reference sign | 16 | 0-15 |
+| Packet type | 8 | 5 | 40 | 16-55 |
+| Poll frame ID | 32 | 5 | 160 | 56-215 |
+| Response frame ID | 32 | 5 | 160 | 216-375 |
+| Reply delay samples | 32 | 5 | 160 | 376-535 |
+| CRC16 | 16 | 5 | 80 | 536-615 |
+| **Total** | **120 protected bits** |  | **616 samples** | **0-615** |
+
+At `Fs = 30 MS/s`:
+
+```text
+one BPSK sample                    = 33.333 ns
+one repeated information bit      = 5 samples = 166.667 ns
+16-sample reference duration      = 0.533 us
+600 repeated data/CRC samples     = 20.000 us
+complete 616-sample payload       = 20.533 us
+uncoded information-bit rate      = 30 MS/s / 5 = 6 Mbit/s
+```
+
+There is no separate pulse-shaping stage inside the payload encoder. One real
+BPSK value is written into each complex baseband sample:
+
+```text
+bit 0 -> -amplitude + j0
+bit 1 -> +amplitude + j0
+```
+
+Every information bit is encoded as five identical consecutive samples. The
+decoder makes a hard majority decision; at least three of the five signs
+determine the decoded bit.
+
+The 16 known reference signs are:
+
+```text
++ + + - - + - + - - - + - + + -
+```
+
+They estimate one common payload phase. All integer fields, including the
+transmitted CRC value, are serialized least-significant bit first. CRC16 uses
+initial value `0xffff` and polynomial `0x1021`. It covers these decoded fields:
+
+```text
+packet_type
+poll_frame_id
+response_frame_id
+reply_delay_samples
+```
+
+The three 32-bit fields enter the CRC one byte at a time, least-significant byte
+first.
+
+### POLL and RESPONSE Content
+
+Both packet types occupy all 616 samples. An unused field is transmitted as
+zero; it is not physically omitted.
+
+| Payload field | Initiator POLL | Responder RESPONSE |
+|---|---|---|
+| `packet_type` | `1` (`POLL`), enabled | `2` (`RESPONSE`), enabled |
+| `poll_frame_id` | New initiator poll ID, enabled | Echo of the decoded POLL ID, enabled |
+| `response_frame_id` | `0`, **not used for POLL** | New responder response ID, enabled |
+| `reply_delay_samples` | `0`, **not used for POLL** | Configured responder delay, enabled |
+| `CRC16` | Enabled; covers type, poll ID and the two zero fields | Enabled; covers all four populated fields |
+
+The responder only schedules a RESPONSE after the received POLL payload passes
+CRC and has `packet_type = POLL`. Therefore:
+
+```text
+POLL payload CRC failure at responder
+    -> responder sends no RESPONSE
+    -> initiator can later report NO_PREAMBLE for that attempt
+
+RESPONSE payload CRC failure at initiator
+    -> initiator reports PAYLOAD_CRC
+    -> no valid SS-TWR result is produced
+```
+
+### Payload Metric
+
+The packet payload starts with `Nref = 16` known reference symbols. The
+remaining `B = 120` data and CRC bits are each repeated `R = 5` times.
 
 For received reference samples `yref[i]` and expected real BPSK signs `a[i]`,
 the decoder calculates
@@ -175,6 +269,57 @@ frame_id_valid = received CRC16 matches the CRC16 recomputed from decoded fields
 
 There is no payload-metric acceptance threshold in the current decoder. A high
 `payload_metric` does not override a CRC failure.
+
+The vote metric measures decision agreement, not correctness. Five consistently
+wrong samples produce a unanimous `5-0` vote and contribute `1.0`. The decoder
+also discards sample magnitude after common-phase correction; it counts positive
+and negative real parts instead of soft-combining their amplitudes.
+
+### Attenuation Result Interpretation
+
+The reported attenuation experiment produced approximately:
+
+```text
+75 dB attenuation: payload CRC failure reaches about 50% packet failure
+95 dB attenuation: repeated-preamble/ZC acquisition begins to fail
+```
+
+This ordering is consistent with the implementation. Acquisition integrates a
+768-pair repeated-preamble correlation and then a 419-sample coherent ZC
+correlation. Each payload bit has only a five-sample hard-decision majority
+vote, and CRC detects errors across 120 decoded bits.
+
+The current transmit scaling is also not equal between sections. The frame
+builder first applies frame-wide RMS normalization and peak limiting, but the
+timed burst source later overwrites the payload with raw `d_tx_amp` BPSK
+samples. In the current GRC files:
+
+```text
+initiator POLL payload amplitude       = 0.4
+responder RESPONSE payload amplitude   = 0.2
+```
+
+The preamble and ZC retain the earlier frame-builder scaling. Consequently, the
+measured acquisition-to-payload attenuation gap combines correlation/coding
+gain with unequal transmitted section dBFS; it must not be interpreted as
+coding gain alone.
+
+Assuming independent decoded-bit errors and that CRC detects them, a 50% packet
+failure rate across 120 bits corresponds approximately to:
+
+```math
+P_b \simeq 1 - (1 - 0.5)^{1/120} \simeq 0.00576
+```
+
+Thus only about `0.58%` post-majority decoded-bit error probability can already
+produce `50%` packet failure. This estimate is illustrative: burst errors,
+phase-estimation errors, clipping, and correlated interference violate the
+independent-error assumption.
+
+The measured `20 dB` separation is an experimental relative attenuation result,
+not an absolute receiver sensitivity or calibrated link-budget value. It does,
+however, identify the current BPSK payload/CRC stage as the first observed
+digital failure layer before acquisition loss.
 
 ## OFDM PRS-Like Symbol
 
