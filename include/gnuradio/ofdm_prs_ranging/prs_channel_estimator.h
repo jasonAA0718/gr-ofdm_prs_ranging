@@ -20,7 +20,7 @@ public:
     typedef std::shared_ptr<prs_channel_estimator> sptr;
     static sptr make(double samp_rate = 10e6,
                      int fft_len = 1024,
-                     int active_bins = 600,
+                     int active_bins = 1024,
                      int prs_symbols = 16,
                      uint32_t seed = 13990001);
 };

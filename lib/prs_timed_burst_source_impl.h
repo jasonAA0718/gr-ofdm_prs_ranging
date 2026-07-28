@@ -9,6 +9,7 @@
 #define INCLUDED_OFDM_PRS_RANGING_PRS_TIMED_BURST_SOURCE_IMPL_H
 
 #include "prs_burst_scheduler.h"
+#include "prs_frame_builder.h"
 #include <gnuradio/ofdm_prs_ranging/prs_timed_burst_source.h>
 #include <pmt/pmt.h>
 #include <vector>
@@ -53,6 +54,7 @@ namespace gr {
       double d_rx_time_value;
 
       void validate_parameters() const;
+      prs_frame_config frame_config() const;
       void build_frame();
       void prepare_burst_frame(uint64_t frame_id);
       void handle_trigger(pmt::pmt_t msg);

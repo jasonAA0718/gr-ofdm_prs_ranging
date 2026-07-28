@@ -21,7 +21,7 @@ struct prs_rx_config {
     double samp_rate = 10e6;
     int fft_len = 1024;
     int cp_len = 128;
-    int active_bins = 600;
+    int active_bins = 1024;
     int prs_symbols = 16;
     int preamble_len = 128;
     int preamble_repeats = 16;
@@ -38,7 +38,7 @@ int prs_start_offset(const prs_rx_config& cfg);
 int prs_len(const prs_rx_config& cfg);
 int frame_len(const prs_rx_config& cfg);
 std::vector<gr_complex> coarse_sync_sequence(int len, int root = 25);
-std::vector<gr_complex> qpsk_pilots(const prs_rx_config& cfg);
+std::vector<gr_complex> prs_pilots(const prs_rx_config& cfg);
 std::vector<float> active_frequencies(const prs_rx_config& cfg);
 std::vector<float> unwrap_phase(const std::vector<gr_complex>& samples);
 std::vector<float> unwrap_phase(const gr_complex* samples, size_t size);

@@ -7,7 +7,7 @@ templates:
 parameters:
 - {id: samp_rate, label: Sample Rate, dtype: real, default: 10e6}
 - {id: fft_len, label: FFT Length, dtype: int, default: 1024}
-- {id: active_bins, label: Active Bins, dtype: int, default: 600}
+- {id: active_bins, label: Active Bins, dtype: int, default: 1024}
 - {id: max_residual_rms, label: Max Residual RMS, dtype: real, default: 1.0}
 inputs:
 - {label: channel_in, domain: message}

@@ -44,6 +44,12 @@ class prs_frame_builder
 {
 public:
     static prs_frame build(const prs_frame_config& cfg);
+    static void normalize_sections(std::vector<gr_complex>& samples,
+                                   const prs_frame_config& cfg,
+                                   int payload_start,
+                                   int payload_len,
+                                   int prs_start,
+                                   int prs_len);
 };
 
 } // namespace ofdm_prs_ranging

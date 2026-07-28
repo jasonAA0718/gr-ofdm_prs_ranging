@@ -100,6 +100,76 @@ class qa_prs_receiver(gr_unittest.TestCase):
 
         self.assertEqual(debug.num_messages(), 0)
 
+    def test_golay_channel_estimator_unity_channel(self):
+        csv_path = os.path.abspath(os.path.join(
+            os.path.dirname(__file__), "..", "..", "lib",
+            "golay_ofdm_1024x16.csv"))
+        rows = numpy.loadtxt(csv_path, delimiter=",", skiprows=1)
+        native = (rows[:, 3] + 1j * rows[:, 4]).reshape(16, 1024)
+        signed_order = numpy.concatenate(
+            (native[:, 512:], native[:, :512]), axis=1).reshape(-1)
+
+        estimator = ofdm_prs_ranging.prs_channel_estimator(
+            10e6, 1024, 1024, 16, 13990001)
+        debug = blocks.message_debug()
+        symbols = pmt.init_c32vector(
+            len(signed_order), [complex(value) for value in signed_order])
+        strobe = blocks.message_strobe(
+            pmt.cons(pmt.make_dict(), symbols), 50)
+        self.tb.msg_connect(
+            (strobe, "strobe"), (estimator, "symbols_in"))
+        self.tb.msg_connect(
+            (estimator, "channel_out"), (debug, "store"))
+        self.tb.start()
+        time.sleep(0.12)
+        self.tb.stop()
+        self.tb.wait()
+
+        self.assertGreaterEqual(debug.num_messages(), 1)
+        channel = numpy.asarray(
+            pmt.c32vector_elements(pmt.cdr(debug.get_message(0))))
+        self.assertEqual(channel.size, 1024)
+        numpy.testing.assert_allclose(
+            channel, numpy.ones(1024), rtol=1e-6, atol=1e-6)
+
+    def test_phase_slope_known_fractional_delay_full_band(self):
+        samp_rate = 10e6
+        delay_samples = 0.25
+        signed_bins = numpy.arange(-512, 512, dtype=numpy.float64)
+        frequencies = signed_bins * samp_rate / 1024.0
+        channel = numpy.exp(
+            -1j * 2.0 * numpy.pi * frequencies *
+            (delay_samples / samp_rate))
+
+        estimator = ofdm_prs_ranging.prs_phase_slope_estimator(
+            samp_rate, 1024, 1024, 1.0)
+        debug = blocks.message_debug()
+        meta = pmt.make_dict()
+        meta = pmt.dict_add(
+            meta, pmt.intern("snr"), pmt.from_double(30.0))
+        meta = pmt.dict_add(
+            meta, pmt.intern("coarse_metric"), pmt.from_double(1.0))
+        vector = pmt.init_c32vector(
+            len(channel), [complex(value) for value in channel])
+        strobe = blocks.message_strobe(pmt.cons(meta, vector), 50)
+        self.tb.msg_connect(
+            (strobe, "strobe"), (estimator, "channel_in"))
+        self.tb.msg_connect(
+            (estimator, "measurement_out"), (debug, "store"))
+        self.tb.start()
+        time.sleep(0.12)
+        self.tb.stop()
+        self.tb.wait()
+
+        self.assertGreaterEqual(debug.num_messages(), 1)
+        result = pmt.car(debug.get_message(0))
+        estimate = pmt.to_double(pmt.dict_ref(
+            result, pmt.intern("fine_delay_samples"), pmt.PMT_NIL))
+        residual = pmt.to_double(pmt.dict_ref(
+            result, pmt.intern("phase_residual"), pmt.PMT_NIL))
+        self.assertAlmostEqual(estimate, delay_samples, places=5)
+        self.assertLess(residual, 1e-5)
+
     def test_time_gating_only_detects_frame_inside_scheduled_window(self):
         samp_rate = 1e6
         tx = ofdm_prs_ranging.prs_timed_burst_source(

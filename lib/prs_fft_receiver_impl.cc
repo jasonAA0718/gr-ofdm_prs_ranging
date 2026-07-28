@@ -59,7 +59,6 @@ void prs_fft_receiver_impl::handle_frame(pmt::pmt_t msg)
         return;
     }
 
-    const int half_active = d_cfg.active_bins / 2;
     size_t active_index = 0;
     for (int sym = 0; sym < d_cfg.prs_symbols; ++sym) {
         const int sym_start = start + sym * (d_cfg.fft_len + d_cfg.cp_len) + d_cfg.cp_len;
@@ -68,6 +67,18 @@ void prs_fft_receiver_impl::handle_frame(pmt::pmt_t msg)
                   d_fft->get_inbuf());
         d_fft->execute();
         const gr_complex* freq = d_fft->get_outbuf();
+        if (d_cfg.active_bins == d_cfg.fft_len) {
+            for (int fft_bin = d_cfg.fft_len / 2; fft_bin < d_cfg.fft_len;
+                 ++fft_bin) {
+                d_active[active_index++] = freq[fft_bin];
+            }
+            for (int fft_bin = 0; fft_bin < d_cfg.fft_len / 2; ++fft_bin) {
+                d_active[active_index++] = freq[fft_bin];
+            }
+            continue;
+        }
+
+        const int half_active = d_cfg.active_bins / 2;
         for (int b = -half_active; b < 0; ++b) {
             d_active[active_index++] = freq[b + d_cfg.fft_len];
         }

@@ -30,7 +30,7 @@ BOOST_AUTO_TEST_CASE(test_prs_timed_burst_source_amplitude_limit)
         return std::abs(a) < std::abs(b);
     });
     BOOST_REQUIRE(peak != frame.end());
-    BOOST_CHECK_LE(std::abs(*peak), 0.800001f);
+    BOOST_CHECK_LE(std::abs(*peak), 0.900001f);
 }
 
 BOOST_AUTO_TEST_CASE(test_prs_frame_id_payload_crc)

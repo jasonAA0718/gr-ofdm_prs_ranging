@@ -82,17 +82,21 @@ Default OFDM parameters:
 ```text
 fft_len      = 1024
 cp_len       = 128
-active_bins  = 600
+active_bins  = 1024
 prs_symbols  = 16
-pilot seed   = 13990001
+pilot table  = lib/golay_prs_table.h
 ```
 
-The active OFDM carriers exclude DC and use:
+All native FFT bins are occupied:
 
 ```text
-negative bins: -active_bins/2 ... -1
-positive bins: +1 ... +active_bins/2
+fft_bin 0 ... 1023
+signed bins -512 ... +511
 ```
+
+The fixed table is generated from `lib/golay_ofdm_1024x16.csv`. Even-numbered
+symbols use Golay A and odd-numbered symbols use Golay B. The `seed` parameter
+is retained for the repeated QPSK acquisition preamble, not for OFDM PRS.
 
 The repeated acquisition preamble is deterministic QPSK and should remain
 unchanged unless explicitly requested. It is the cheap first-stage detector.
@@ -370,7 +374,7 @@ interfaces unchanged while avoiding avoidable work in the hot path:
 PMT complex-vector inputs are read through const views instead of copied.
 The frame-detector buffer drops samples logically and compacts in batches.
 FFT and channel-estimation output buffers are reused between messages.
-QPSK pilot reciprocals are precomputed once.
+Golay pilot reciprocals are precomputed once.
 Channel residual energy is computed from first- and second-order sums.
 TX PRS symbols use GNU Radio's FFT backend instead of a quadratic reference DFT.
 ```
@@ -932,7 +936,48 @@ about 95 dB: acquisition failure
 ```
 
 This identifies payload decode as the first observed digital failure stage.
-The separation is not purely processing gain: the payload uses hard
-five-sample majority votes, and timed burst generation overwrites payload
-samples with `d_tx_amp` after frame-wide normalization. Current POLL and
-RESPONSE payload amplitudes are `0.4` and `0.2`, respectively.
+The payload uses hard five-sample majority votes. Section scaling has since
+been changed so this experiment should be repeated with the equalized waveform.
+
+## 2026-07-28 Golay PRS and Section Scaling
+
+The production OFDM PRS pilots now come only from the compiled table generated
+from:
+
+```text
+lib/golay_ofdm_1024x16.csv
+```
+
+The table occupies all `1024` native FFT bins for all `16` symbols. TX writes
+CSV `fft_bin` directly into the IFFT input without fftshift. RX extracts full
+band in monotonic signed-frequency order (`512...1023`, then `0...511`) and
+uses the same native-bin table entries for channel division.
+
+Random-QPSK MT19937 generation remains only for the repeated acquisition
+preamble. The channel-estimator seed argument is retained for API compatibility
+but is unused.
+
+Transmit scaling now uses:
+
+```text
+Payload RMS:      tx_amp
+OFDM-symbol RMS:  tx_amp
+Preamble RMS:     tx_amp + 3 dB
+ZC RMS:           tx_amp + 3 dB
+Final burst peak: <= 0.9 through one common scale
+```
+
+Dynamic BPSK payload contents are written at unit amplitude before section
+normalization, so payload insertion can no longer undo the amplitude policy.
+Both SS-TWR examples now use `tx_amp = 0.6`.
+
+The QA measurement over the useful 1024-sample IFFT portion (before CP) is:
+
+```text
+Pilot                         Minimum PAPR   Mean PAPR   Maximum PAPR
+Golay A/B, 1024 active bins      3.0062 dB    3.0062 dB      3.0062 dB
+Old Random-QPSK, 600 bins        7.4209 dB    8.9281 dB     10.4139 dB
+```
+
+The Random-QPSK implementation used for this comparison exists only in
+`lib/qa_golay_prs.cc`; production OFDM PRS generation does not use it.

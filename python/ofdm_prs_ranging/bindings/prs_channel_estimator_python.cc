@@ -9,7 +9,7 @@ void bind_prs_channel_estimator(py::module& m)
         .def(py::init(&block::make),
              py::arg("samp_rate") = 10e6,
              py::arg("fft_len") = 1024,
-             py::arg("active_bins") = 600,
+             py::arg("active_bins") = 1024,
              py::arg("prs_symbols") = 16,
              py::arg("seed") = 13990001);
 }

@@ -28,7 +28,7 @@ parameters:
 - id: active_bins
   label: Active Bins
   dtype: int
-  default: 600
+  default: 1024
 - id: prs_symbols
   label: PRS Symbols
   dtype: int
@@ -66,11 +66,11 @@ parameters:
   dtype: real
   default: 0.1
 - id: tx_amp
-  label: TX Amplitude
+  label: Payload/OFDM RMS
   dtype: real
-  default: 0.2
+  default: 0.6
 - id: seed
-  label: Pilot Seed
+  label: Preamble Seed
   dtype: int
   default: 13990001
 - id: pings_per_trigger

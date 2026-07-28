@@ -7,12 +7,12 @@ options:
     comment: Minimal SS-RTT initiator topology. Add/configure UHD Sink and UHD Source
       for hardware.
     copyright: ''
-    description: Minimal OFDM PRS SS-RTT initiator at 10 MHz and 1399 MHz
+    description: 'OFDM PRS SS-RTT initiator '
     gen_cmake: 'On'
     gen_linking: dynamic
     generate_options: no_gui
     hier_block_src_path: '.:'
-    id: prs_ssrtt_initiator_10M_1399
+    id: prs_ssrtt_initiator
     max_nouts: '0'
     output_language: python
     placement: (0,0)
@@ -23,7 +23,7 @@ options:
     run_options: prompt
     sizing_mode: fixed
     thread_safe_setters: ''
-    title: PRS SS-RTT Initiator 10M 1399
+    title: PRS SS-RTT Initiator
     window_size: (1200,800)
   states:
     bus_sink: false
@@ -130,7 +130,7 @@ blocks:
 - name: prs_channel_estimator_0
   id: ofdm_prs_ranging_prs_channel_estimator
   parameters:
-    active_bins: '600'
+    active_bins: '1024'
     affinity: ''
     alias: ''
     comment: ''
@@ -165,7 +165,7 @@ blocks:
 - name: prs_fft_receiver_0
   id: ofdm_prs_ranging_prs_fft_receiver
   parameters:
-    active_bins: '600'
+    active_bins: '1024'
     affinity: ''
     alias: ''
     comment: ''
@@ -185,7 +185,7 @@ blocks:
 - name: prs_frame_detector_0
   id: ofdm_prs_ranging_prs_frame_detector
   parameters:
-    active_bins: '600'
+    active_bins: '1024'
     affinity: ''
     alias: ''
     channel_id: '1'
@@ -218,7 +218,7 @@ blocks:
 - name: prs_phase_slope_estimator_0
   id: ofdm_prs_ranging_prs_phase_slope_estimator
   parameters:
-    active_bins: '600'
+    active_bins: '1024'
     affinity: ''
     alias: ''
     comment: ''
@@ -254,7 +254,7 @@ blocks:
 - name: prs_source
   id: ofdm_prs_ranging_prs_timed_burst_source
   parameters:
-    active_bins: '600'
+    active_bins: '1024'
     affinity: ''
     alias: ''
     attach_tx_time: 'True'
@@ -273,7 +273,7 @@ blocks:
     samp_rate: samp_rate
     seed: '13990001'
     tail_guard_len: '1000'
-    tx_amp: '0.4'
+    tx_amp: '0.7'
     tx_lead_time: '0.6'
     zero_guard_len: '1000'
   states:

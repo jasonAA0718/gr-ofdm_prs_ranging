@@ -6,22 +6,16 @@
  */
 
 #include "prs_receiver_utils.h"
+#include "golay_prs_table.h"
 #include <algorithm>
 #include <cmath>
-#include <random>
+#include <stdexcept>
 
 namespace gr {
 namespace ofdm_prs_ranging {
 
 namespace {
 constexpr double pi = 3.141592653589793238462643383279502884;
-
-gr_complex deterministic_qpsk(std::mt19937& gen)
-{
-    const uint32_t bits = gen();
-    const float scale = static_cast<float>(1.0 / std::sqrt(2.0));
-    return gr_complex((bits & 0x1U) ? scale : -scale, (bits & 0x2U) ? scale : -scale);
-}
 } // namespace
 
 int prs_start_offset(const prs_rx_config& cfg)
@@ -53,20 +47,27 @@ std::vector<gr_complex> coarse_sync_sequence(int len, int root)
     return seq;
 }
 
-std::vector<gr_complex> qpsk_pilots(const prs_rx_config& cfg)
+std::vector<gr_complex> prs_pilots(const prs_rx_config& cfg)
 {
-    std::mt19937 gen(cfg.seed);
+    if (cfg.fft_len != static_cast<int>(golay_prs_fft_len) ||
+        cfg.active_bins != static_cast<int>(golay_prs_fft_len) ||
+        cfg.prs_symbols != static_cast<int>(golay_prs_symbol_count)) {
+        throw std::invalid_argument(
+            "Golay PRS requires fft_len=1024, active_bins=1024, prs_symbols=16");
+    }
+
     std::vector<gr_complex> pilots;
     pilots.reserve(static_cast<size_t>(cfg.prs_symbols * cfg.active_bins));
-    const int half_active = cfg.active_bins / 2;
     for (int sym = 0; sym < cfg.prs_symbols; ++sym) {
-        for (int b = -half_active; b < 0; ++b) {
-            (void)b;
-            pilots.push_back(deterministic_qpsk(gen));
+        for (int fft_bin = cfg.fft_len / 2; fft_bin < cfg.fft_len; ++fft_bin) {
+            const auto& pilot =
+                golay_prs_at(static_cast<size_t>(sym), static_cast<size_t>(fft_bin));
+            pilots.emplace_back(pilot.real, pilot.imag);
         }
-        for (int b = 1; b <= half_active; ++b) {
-            (void)b;
-            pilots.push_back(deterministic_qpsk(gen));
+        for (int fft_bin = 0; fft_bin < cfg.fft_len / 2; ++fft_bin) {
+            const auto& pilot =
+                golay_prs_at(static_cast<size_t>(sym), static_cast<size_t>(fft_bin));
+            pilots.emplace_back(pilot.real, pilot.imag);
         }
     }
     return pilots;
@@ -76,8 +77,15 @@ std::vector<float> active_frequencies(const prs_rx_config& cfg)
 {
     std::vector<float> freq;
     freq.reserve(cfg.active_bins);
-    const int half_active = cfg.active_bins / 2;
     const double spacing = cfg.samp_rate / static_cast<double>(cfg.fft_len);
+    if (cfg.active_bins == cfg.fft_len) {
+        for (int b = -cfg.fft_len / 2; b < cfg.fft_len / 2; ++b) {
+            freq.push_back(static_cast<float>(b * spacing));
+        }
+        return freq;
+    }
+
+    const int half_active = cfg.active_bins / 2;
     for (int b = -half_active; b < 0; ++b) {
         freq.push_back(static_cast<float>(b * spacing));
     }

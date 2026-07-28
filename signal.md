@@ -27,7 +27,7 @@ coarse_sync_len   = 839 samples
 payload_len       = 616 samples
 fft_len           = 1024
 cp_len            = 128
-active_bins       = 600
+active_bins       = 1024
 prs_symbols       = 16
 ```
 
@@ -289,20 +289,21 @@ This ordering is consistent with the implementation. Acquisition integrates a
 correlation. Each payload bit has only a five-sample hard-decision majority
 vote, and CRC detects errors across 120 decoded bits.
 
-The current transmit scaling is also not equal between sections. The frame
-builder first applies frame-wide RMS normalization and peak limiting, but the
-timed burst source later overwrites the payload with raw `d_tx_amp` BPSK
-samples. In the current GRC files:
+The attenuation result was recorded before section RMS equalization. The
+current transmitter now applies:
 
 ```text
-initiator POLL payload amplitude       = 0.4
-responder RESPONSE payload amplitude   = 0.2
+Payload RMS      = tx_amp
+OFDM-symbol RMS  = tx_amp
+Preamble RMS     = tx_amp + 3 dB
+ZC RMS           = tx_amp + 3 dB
+Final peak       <= 0.9
 ```
 
-The preamble and ZC retain the earlier frame-builder scaling. Consequently, the
-measured acquisition-to-payload attenuation gap combines correlation/coding
-gain with unequal transmitted section dBFS; it must not be interpreted as
-coding gain alone.
+The dynamic payload is written before this normalization and one common final
+peak scale is applied to the complete burst. Both current examples use
+`tx_amp = 0.6`. The attenuation experiment must therefore be repeated before
+attributing the earlier 20 dB separation to the updated waveform.
 
 Assuming independent decoded-bit errors and that CRC detects them, a 50% packet
 failure rate across 120 bits corresponds approximately to:
@@ -328,35 +329,60 @@ Let:
 ```text
 N      = fft_len
 Ncp    = cp_len
-K      = active_bins
+K      = active_bins = N
 M      = prs_symbols
 Fs     = sample rate
 Deltaf = Fs / N
 ```
 
-The active bins exclude DC and are split equally around DC:
+Every native FFT bin is occupied. The CSV uses the exact native indexing passed
+to the IFFT:
 
-```math
-\mathcal{K} =
-\left\{-\frac{K}{2}, \ldots, -1\right\}
-\cup
-\left\{1, \ldots, \frac{K}{2}\right\}
+```text
+fft_bin 0 ... 511    -> signed bins 0 ... +511
+fft_bin 512 ... 1023 -> signed bins -512 ... -1
 ```
 
-For OFDM symbol index `m`, deterministic QPSK pilots are generated:
+Measured over each useful 1024-sample IFFT output before CP, the 16 fixed Golay
+symbols have minimum/mean/maximum PAPR of
+`3.0062 / 3.0062 / 3.0062 dB`. The former 600-bin Random-QPSK construction,
+retained only in QA for comparison, measures
+`7.4209 / 8.9281 / 10.4139 dB`.
 
-```math
-X_m[k] \in
-\left\{\frac{1+j}{\sqrt{2}}, \frac{1-j}{\sqrt{2}},
-\frac{-1+j}{\sqrt{2}}, \frac{-1-j}{\sqrt{2}}\right\},
-\quad k \in \mathcal{K}
+The exact frequency-domain source of truth is:
+
+```text
+lib/golay_ofdm_1024x16.csv
 ```
 
-Inactive bins and DC are zero:
+It is converted offline into the compile-time table:
 
-```math
-X_m[0] = 0,\quad X_m[k] = 0 \quad k \notin \mathcal{K}
+```text
+lib/golay_prs_table.h
 ```
+
+No CSV is read at GNU Radio runtime. The current entries are real BPSK
+`+1+j0` or `-1+j0`, but both real and imaginary components are retained in the
+compiled representation.
+
+The table contains the recursively generated length-1024 Golay pair:
+
+```text
+A0 = [1]
+B0 = [1]
+A_next = [A, B]
+B_next = [A, -B]
+```
+
+and assigns:
+
+```text
+symbols 0,2,4,...,14 -> A
+symbols 1,3,5,...,15 -> B
+```
+
+TX uses `X_m[k] = table[m][k]` directly for native `k=0...1023`; there is no
+fftshift and no PRS MT19937 generation.
 
 The time-domain OFDM symbol before cyclic prefix is
 
@@ -378,12 +404,18 @@ s_m[n - N_{\text{CP}}], & N_{\text{CP}} \le n < N + N_{\text{CP}}
 \end{cases}
 ```
 
-The receiver removes the CP, computes an FFT, and extracts active bins in this
-order:
+The receiver removes the CP and computes the native FFT. For phase-slope
+processing it flattens bins in monotonic signed-frequency order:
 
 ```text
-negative active bins, then positive active bins
+native 512 ... 1023, then native 0 ... 511
+signed -512 ... -1, then signed 0 ... +511
 ```
+
+The channel estimator fetches Golay references in this same flattened order,
+while each reference is still indexed from the native table. TX and RX
+therefore use identical `(symbol, fft_bin)` entries without reordering the IFFT
+input.
 
 ## Channel Estimation
 
@@ -552,11 +584,11 @@ active bandwidth approximately
 B \approx K\Delta f = K\frac{F_s}{N}
 ```
 
-the default `K=600`, `N=1024` gives:
+the full-band Golay configuration `K=N=1024` gives:
 
 ```text
-Fs = 10 MHz: B ≈ 5.86 MHz
-Fs = 30 MHz: B ≈ 17.58 MHz
+Fs = 10 MHz: B ≈ 10 MHz
+Fs = 30 MHz: B ≈ 30 MHz
 ```
 
 The rough delay discrimination scale is on the order of `1/B`, which corresponds

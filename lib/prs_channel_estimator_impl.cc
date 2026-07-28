@@ -35,8 +35,8 @@ prs_channel_estimator_impl::prs_channel_estimator_impl(double samp_rate,
     d_cfg.fft_len = fft_len;
     d_cfg.active_bins = active_bins;
     d_cfg.prs_symbols = prs_symbols;
-    d_cfg.seed = seed;
-    d_pilot_reciprocals = qpsk_pilots(d_cfg);
+    (void)seed; // Retained in the public constructor for compatibility.
+    d_pilot_reciprocals = prs_pilots(d_cfg);
     for (auto& pilot : d_pilot_reciprocals) {
         pilot = gr_complex(1.0f, 0.0f) / pilot;
     }

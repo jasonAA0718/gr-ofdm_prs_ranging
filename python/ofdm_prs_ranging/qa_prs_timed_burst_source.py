@@ -44,19 +44,15 @@ class qa_prs_timed_burst_source(gr_unittest.TestCase):
         freq = numpy.fft.fft(prs0)
         mag = numpy.abs(freq)
 
-        active = numpy.r_[numpy.arange(1, 301), numpy.arange(1024 - 300, 1024)]
-        inactive = numpy.ones(1024, dtype=bool)
-        inactive[active] = False
-        inactive[0] = False
-
-        self.assertEqual(numpy.count_nonzero(mag[active] > 1e-6), 600)
-        self.assertLess(mag[0], 1e-6)
-        self.assertLess(numpy.max(mag[inactive]), 1e-6)
+        self.assertEqual(numpy.count_nonzero(mag > 1e-6), 1024)
+        self.assertGreater(mag[0], 1e-6)
+        numpy.testing.assert_allclose(
+            mag, numpy.full(1024, mag[0]), rtol=1e-5, atol=1e-5)
 
     def test_amplitude_limit(self):
         src = prs_timed_burst_source()
         frame = numpy.asarray(src.frame_samples(), dtype=numpy.complex64)
-        self.assertLessEqual(float(numpy.max(numpy.abs(frame))), 0.800001)
+        self.assertLessEqual(float(numpy.max(numpy.abs(frame))), 0.900001)
         rms = math.sqrt(float(numpy.mean(numpy.abs(frame) ** 2)))
         self.assertGreater(rms, 0.0)
 

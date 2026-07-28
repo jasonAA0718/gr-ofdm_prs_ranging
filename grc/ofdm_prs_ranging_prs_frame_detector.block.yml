@@ -8,7 +8,7 @@ parameters:
 - {id: samp_rate, label: Sample Rate, dtype: real, default: 10e6}
 - {id: fft_len, label: FFT Length, dtype: int, default: 1024}
 - {id: cp_len, label: CP Length, dtype: int, default: 128}
-- {id: active_bins, label: Active Bins, dtype: int, default: 600}
+- {id: active_bins, label: Active Bins, dtype: int, default: 1024}
 - {id: prs_symbols, label: PRS Symbols, dtype: int, default: 16}
 - {id: preamble_len, label: Preamble Length, dtype: int, default: 128}
 - {id: preamble_repeats, label: Preamble Repeats, dtype: int, default: 16}

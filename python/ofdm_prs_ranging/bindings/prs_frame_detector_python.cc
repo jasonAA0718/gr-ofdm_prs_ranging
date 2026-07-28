@@ -10,7 +10,7 @@ void bind_prs_frame_detector(py::module& m)
              py::arg("samp_rate") = 10e6,
              py::arg("fft_len") = 1024,
              py::arg("cp_len") = 128,
-             py::arg("active_bins") = 600,
+             py::arg("active_bins") = 1024,
              py::arg("prs_symbols") = 16,
              py::arg("preamble_len") = 128,
              py::arg("preamble_repeats") = 16,

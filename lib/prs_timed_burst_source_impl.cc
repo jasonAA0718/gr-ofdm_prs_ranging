@@ -173,9 +173,11 @@ void prs_timed_burst_source_impl::validate_parameters() const
     if (d_fft_len <= 0 || d_cp_len < 0 || d_cp_len > d_fft_len) {
         throw std::invalid_argument("invalid fft_len/cp_len");
     }
-    if (d_active_bins <= 0 || (d_active_bins % 2) != 0 || d_active_bins >= d_fft_len) {
+    if (d_fft_len != 1024 || d_active_bins != 1024 || d_prs_symbols != 16 ||
+        d_cp_len != 128) {
         throw std::invalid_argument(
-            "active_bins must be positive, even, and less than fft_len");
+            "Golay PRS requires fft_len=1024, active_bins=1024, "
+            "prs_symbols=16, cp_len=128");
     }
     if (d_prs_symbols <= 0 || d_preamble_len <= 0 || d_preamble_repeats <= 0 ||
         d_coarse_sync_len <= 0 || d_zero_guard_len < 0 || d_tail_guard_len < 0) {
@@ -189,22 +191,27 @@ void prs_timed_burst_source_impl::validate_parameters() const
     }
 }
 
+prs_frame_config prs_timed_burst_source_impl::frame_config() const
+{
+    return prs_frame_config{ d_samp_rate,
+                             d_fft_len,
+                             d_cp_len,
+                             d_active_bins,
+                             d_prs_symbols,
+                             d_preamble_len,
+                             d_preamble_repeats,
+                             d_coarse_sync_len,
+                             prs_frame_id_payload_symbols,
+                             d_zero_guard_len,
+                             d_tail_guard_len,
+                             d_tx_amp,
+                             d_seed,
+                             d_coarse_zc_root };
+}
+
 void prs_timed_burst_source_impl::build_frame()
 {
-    const prs_frame_config cfg{ d_samp_rate,
-                                d_fft_len,
-                                d_cp_len,
-                                d_active_bins,
-                                d_prs_symbols,
-                                d_preamble_len,
-                                d_preamble_repeats,
-                                d_coarse_sync_len,
-                                prs_frame_id_payload_symbols,
-                                d_zero_guard_len,
-                                d_tail_guard_len,
-                                d_tx_amp,
-                                d_seed,
-                                d_coarse_zc_root };
+    const auto cfg = frame_config();
     const auto frame = prs_frame_builder::build(cfg);
     d_frame = frame.samples;
     d_burst_frame = d_frame;
@@ -229,7 +236,13 @@ void prs_timed_burst_source_impl::prepare_burst_frame(uint64_t frame_id)
         info.poll_frame_id = d_current_burst.poll_frame_id;
         info.response_frame_id = d_current_burst.response_frame_id;
         info.reply_delay_samples = d_current_burst.reply_delay_samples;
-        encode_packet_payload(info, d_tx_amp, d_burst_frame.begin() + d_payload_start);
+        encode_packet_payload(info, 1.0f, d_burst_frame.begin() + d_payload_start);
+        prs_frame_builder::normalize_sections(d_burst_frame,
+                                              frame_config(),
+                                              d_payload_start,
+                                              d_payload_len,
+                                              d_prs_start,
+                                              d_prs_len);
     }
 }
 

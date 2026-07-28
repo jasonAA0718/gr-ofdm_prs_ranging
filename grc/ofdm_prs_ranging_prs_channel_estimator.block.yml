@@ -7,9 +7,9 @@ templates:
 parameters:
 - {id: samp_rate, label: Sample Rate, dtype: real, default: 10e6}
 - {id: fft_len, label: FFT Length, dtype: int, default: 1024}
-- {id: active_bins, label: Active Bins, dtype: int, default: 600}
+- {id: active_bins, label: Active Bins, dtype: int, default: 1024}
 - {id: prs_symbols, label: PRS Symbols, dtype: int, default: 16}
-- {id: seed, label: Pilot Seed, dtype: int, default: 13990001}
+- {id: seed, label: Legacy Pilot Seed (Unused), dtype: int, default: 13990001}
 inputs:
 - {label: symbols_in, domain: message}
 outputs:

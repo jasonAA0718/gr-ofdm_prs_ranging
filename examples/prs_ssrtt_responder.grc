@@ -7,12 +7,12 @@ options:
     comment: Minimal SS-RTT responder topology. Add/configure UHD Source and Sink
       for hardware.
     copyright: ''
-    description: Minimal OFDM PRS SS-RTT responder at 10 MHz and 1399 MHz
+    description: OFDM PRS SS-RTT responder
     gen_cmake: 'On'
     gen_linking: dynamic
     generate_options: no_gui
     hier_block_src_path: '.:'
-    id: prs_ssrtt_responder_10M_1399
+    id: prs_ssrtt_responder
     max_nouts: '0'
     output_language: python
     placement: (0,0)
@@ -23,7 +23,7 @@ options:
     run_options: prompt
     sizing_mode: fixed
     thread_safe_setters: ''
-    title: PRS SS-RTT Responder 10M 1399
+    title: PRS SS-RTT Responder
     window_size: (1200,800)
   states:
     bus_sink: false
@@ -119,13 +119,13 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [576, 680.0]
+    coordinate: [672, 760.0]
     rotation: 0
     state: enabled
 - name: prs_channel_estimator_0
   id: ofdm_prs_ranging_prs_channel_estimator
   parameters:
-    active_bins: '600'
+    active_bins: '1024'
     affinity: ''
     alias: ''
     comment: ''
@@ -139,13 +139,13 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [832, 456.0]
+    coordinate: [920, 504.0]
     rotation: 0
     state: enabled
 - name: prs_fft_receiver_0
   id: ofdm_prs_ranging_prs_fft_receiver
   parameters:
-    active_bins: '600'
+    active_bins: '1024'
     affinity: ''
     alias: ''
     comment: ''
@@ -159,13 +159,13 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [576, 552.0]
+    coordinate: [624, 504.0]
     rotation: 0
     state: enabled
 - name: prs_frame_detector_0
   id: ofdm_prs_ranging_prs_frame_detector
   parameters:
-    active_bins: '600'
+    active_bins: '1024'
     affinity: ''
     alias: ''
     channel_id: '0'
@@ -180,9 +180,13 @@ blocks:
     preamble_len: premble_length
     preamble_repeats: premble_rep
     prs_symbols: '16'
+    reply_delay_s: '0.05'
     samp_rate: samp_rate
     tail_guard_len: '1000'
     threshold: '0.35'
+    time_gating: 'False'
+    window_after_s: '0.002'
+    window_before_s: '0.0002'
     zero_guard_len: '1000'
   states:
     bus_sink: false
@@ -194,7 +198,7 @@ blocks:
 - name: prs_phase_slope_estimator_0
   id: ofdm_prs_ranging_prs_phase_slope_estimator
   parameters:
-    active_bins: '600'
+    active_bins: '1024'
     affinity: ''
     alias: ''
     comment: ''
@@ -207,31 +211,13 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1104, 408.0]
-    rotation: 0
-    state: enabled
-- name: prs_text_ui_0
-  id: ofdm_prs_ranging_prs_text_ui
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: ''
-    refresh_period_s: '0.25'
-    response_timeout_s: '1.0'
-    role: '"responder"'
-    stale_timeout_s: '1.5'
-    use_ansi: 'True'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [1120, 552.0]
+    coordinate: [1224, 512.0]
     rotation: 0
     state: enabled
 - name: prs_source
   id: ofdm_prs_ranging_prs_timed_burst_source
   parameters:
-    active_bins: '600'
+    active_bins: '1024'
     affinity: ''
     alias: ''
     attach_tx_time: 'True'
@@ -250,14 +236,14 @@ blocks:
     samp_rate: samp_rate
     seed: '13990001'
     tail_guard_len: '1000'
-    tx_amp: '0.2'
+    tx_amp: '0.7'
     tx_lead_time: '0.5'
     zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [416, 176.0]
+    coordinate: [312, 200.0]
     rotation: 0
     state: enabled
 - name: prs_ssrtt_responder_0
@@ -274,7 +260,25 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1416, 384.0]
+    coordinate: [1648, 528.0]
+    rotation: 0
+    state: enabled
+- name: prs_text_ui_0
+  id: ofdm_prs_ranging_prs_text_ui
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    refresh_period_s: '0.25'
+    response_timeout_s: '1.0'
+    role: '"responder"'
+    stale_timeout_s: '1.5'
+    use_ansi: 'True'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1720, 664.0]
     rotation: 0
     state: enabled
 - name: uhd_usrp_sink_0
@@ -551,7 +555,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1024, 180.0]
+    coordinate: [888, 236.0]
     rotation: 0
     state: enabled
 - name: uhd_usrp_source_0_0
@@ -987,7 +991,59 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [24, 252.0]
+    coordinate: [8, 604.0]
+    rotation: 0
+    state: enabled
+- name: virtual_sink_0
+  id: virtual_sink
+  parameters:
+    alias: ''
+    comment: ''
+    stream_id: trigger_out
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1944, 536.0]
+    rotation: 0
+    state: enabled
+- name: virtual_sink_0_0
+  id: virtual_sink
+  parameters:
+    alias: ''
+    comment: ''
+    stream_id: tx_time_out
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [632, 352.0]
+    rotation: 0
+    state: enabled
+- name: virtual_source_0
+  id: virtual_source
+  parameters:
+    alias: ''
+    comment: ''
+    stream_id: trigger_out
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [88, 352.0]
+    rotation: 0
+    state: enabled
+- name: virtual_source_1
+  id: virtual_source
+  parameters:
+    alias: ''
+    comment: ''
+    stream_id: tx_time_out
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1344, 640.0]
     rotation: 0
     state: enabled
 
@@ -1000,9 +1056,11 @@ connections:
 - [prs_phase_slope_estimator_0, measurement_out, prs_ssrtt_responder_0, measurement_in]
 - [prs_phase_slope_estimator_0, measurement_out, prs_text_ui_0, measurement_in]
 - [prs_source, '0', uhd_usrp_sink_0, '0']
-- [prs_source, tx_time_out, prs_text_ui_0, tx_in]
-- [prs_ssrtt_responder_0, trigger_out, prs_source, trigger]
+- [prs_source, tx_time_out, virtual_sink_0_0, '0']
+- [prs_ssrtt_responder_0, trigger_out, virtual_sink_0, '0']
 - [uhd_usrp_source_0_0, '0', prs_frame_detector_0, '0']
+- [virtual_source_0, '0', prs_source, trigger]
+- [virtual_source_1, '0', prs_text_ui_0, tx_in]
 
 metadata:
   file_format: 1

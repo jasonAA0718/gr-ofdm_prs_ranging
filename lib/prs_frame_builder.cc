@@ -6,12 +6,14 @@
  */
 
 #include "prs_frame_builder.h"
+#include "golay_prs_table.h"
 #include "prs_payload_codec.h"
 #include "prs_receiver_utils.h"
 #include <gnuradio/fft/fft.h>
 #include <algorithm>
 #include <cmath>
 #include <random>
+#include <stdexcept>
 
 namespace gr {
 namespace ofdm_prs_ranging {
@@ -47,20 +49,21 @@ void append_coarse_sync(std::vector<gr_complex>& frame, const prs_frame_config& 
 
 void append_prs_symbols(std::vector<gr_complex>& frame, const prs_frame_config& cfg)
 {
-    std::mt19937 gen(cfg.seed);
-    const int half_active = cfg.active_bins / 2;
+    if (cfg.fft_len != static_cast<int>(golay_prs_fft_len) ||
+        cfg.active_bins != static_cast<int>(golay_prs_fft_len) ||
+        cfg.prs_symbols != static_cast<int>(golay_prs_symbol_count)) {
+        throw std::invalid_argument(
+            "Golay PRS requires fft_len=1024, active_bins=1024, prs_symbols=16");
+    }
+
     gr::fft::fft_complex_rev ifft(cfg.fft_len, 1);
     const float scale = 1.0f / static_cast<float>(cfg.fft_len);
     for (int sym = 0; sym < cfg.prs_symbols; ++sym) {
         auto* freq = ifft.get_inbuf();
-        std::fill(freq, freq + cfg.fft_len, gr_complex(0.0f, 0.0f));
-
-        for (int b = -half_active; b < 0; ++b) {
-            const int index = (b + cfg.fft_len) % cfg.fft_len;
-            freq[index] = deterministic_qpsk(gen);
-        }
-        for (int b = 1; b <= half_active; ++b) {
-            freq[b] = deterministic_qpsk(gen);
+        for (int fft_bin = 0; fft_bin < cfg.fft_len; ++fft_bin) {
+            const auto& pilot =
+                golay_prs_at(static_cast<size_t>(sym), static_cast<size_t>(fft_bin));
+            freq[fft_bin] = gr_complex(pilot.real, pilot.imag);
         }
 
         ifft.execute();
@@ -74,6 +77,69 @@ void append_prs_symbols(std::vector<gr_complex>& frame, const prs_frame_config& 
     }
 }
 } // namespace
+
+void prs_frame_builder::normalize_sections(std::vector<gr_complex>& samples,
+                                           const prs_frame_config& cfg,
+                                           int payload_start,
+                                           int payload_len,
+                                           int prs_start,
+                                           int prs_len)
+{
+    constexpr float acquisition_boost = 1.4125375446f; // 3 dB in amplitude.
+    constexpr float peak_limit = 0.9f;
+
+    const auto scale_range = [&samples](size_t start, size_t length, float target_rms) {
+        if (length == 0 || start + length > samples.size()) {
+            return;
+        }
+        double power = 0.0;
+        for (size_t i = start; i < start + length; ++i) {
+            power += std::norm(samples[i]);
+        }
+        const double rms = std::sqrt(power / static_cast<double>(length));
+        if (rms <= 0.0) {
+            return;
+        }
+        const float scale = target_rms / static_cast<float>(rms);
+        for (size_t i = start; i < start + length; ++i) {
+            samples[i] *= scale;
+        }
+    };
+
+    const size_t preamble_start = static_cast<size_t>(cfg.zero_guard_len);
+    const size_t preamble_length =
+        static_cast<size_t>(cfg.preamble_len * cfg.preamble_repeats);
+    const size_t coarse_start = preamble_start + preamble_length;
+    scale_range(
+        preamble_start, preamble_length, cfg.tx_amp * acquisition_boost);
+    scale_range(coarse_start,
+                static_cast<size_t>(cfg.coarse_sync_len),
+                cfg.tx_amp * acquisition_boost);
+    scale_range(static_cast<size_t>(payload_start),
+                static_cast<size_t>(payload_len),
+                cfg.tx_amp);
+
+    const size_t ofdm_symbol_len = static_cast<size_t>(cfg.fft_len + cfg.cp_len);
+    if (prs_len == cfg.prs_symbols * static_cast<int>(ofdm_symbol_len)) {
+        for (int sym = 0; sym < cfg.prs_symbols; ++sym) {
+            scale_range(static_cast<size_t>(prs_start) +
+                            static_cast<size_t>(sym) * ofdm_symbol_len,
+                        ofdm_symbol_len,
+                        cfg.tx_amp);
+        }
+    }
+
+    float peak = 0.0f;
+    for (const auto& sample : samples) {
+        peak = std::max(peak, std::abs(sample));
+    }
+    if (peak > peak_limit) {
+        const float scale = peak_limit / peak;
+        for (auto& sample : samples) {
+            sample *= scale;
+        }
+    }
+}
 
 prs_frame prs_frame_builder::build(const prs_frame_config& cfg)
 {
@@ -97,31 +163,12 @@ prs_frame prs_frame_builder::build(const prs_frame_config& cfg)
     result.prs_len = static_cast<int>(frame.size()) - result.prs_start;
     frame.insert(frame.end(), cfg.tail_guard_len, gr_complex(0.0f, 0.0f));
 
-    double power = 0.0;
-    float peak = 0.0f;
-    for (const auto& sample : frame) {
-        const float mag = std::abs(sample);
-        power += static_cast<double>(mag) * static_cast<double>(mag);
-        peak = std::max(peak, mag);
-    }
-    const double rms = std::sqrt(power / static_cast<double>(frame.size()));
-    if (rms > 0.0) {
-        const float scale = cfg.tx_amp / static_cast<float>(rms);
-        for (auto& sample : frame) {
-            sample *= scale;
-        }
-    }
-
-    peak = 0.0f;
-    for (const auto& sample : frame) {
-        peak = std::max(peak, std::abs(sample));
-    }
-    if (peak > 0.8f) {
-        const float scale = 0.8f / peak;
-        for (auto& sample : frame) {
-            sample *= scale;
-        }
-    }
+    normalize_sections(frame,
+                       cfg,
+                       result.payload_start,
+                       result.payload_len,
+                       result.prs_start,
+                       result.prs_len);
 
     return result;
 }

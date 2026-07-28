@@ -20,7 +20,7 @@ public:
     typedef std::shared_ptr<prs_phase_slope_estimator> sptr;
     static sptr make(double samp_rate = 10e6,
                      int fft_len = 1024,
-                     int active_bins = 600,
+                     int active_bins = 1024,
                      float max_residual_rms = 1.0f);
 };
 

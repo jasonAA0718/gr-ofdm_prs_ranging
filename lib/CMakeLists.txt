@@ -81,6 +81,7 @@ include(GrTest)
 # List all files that contain Boost.UTF unit tests here
 
 list(APPEND test_ofdm_prs_ranging_sources
+    qa_golay_prs.cc
     qa_prs_timed_burst_source.cc
     qa_zc_packet_utils.cc
     qa_zc_peak_detector.cc
