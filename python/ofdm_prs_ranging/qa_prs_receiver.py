@@ -346,6 +346,14 @@ class qa_prs_receiver(gr_unittest.TestCase):
                 ("failure_reason", pmt.intern("ZC_SYNC")),
                 ("channel_id", pmt.from_long(1)),
                 ("coarse_zc_root", pmt.from_long(29)),
+                ("recv_id", pmt.from_uint64(77)),
+                ("frame_id", pmt.from_uint64(88)),
+                ("poll_frame_id", pmt.from_uint64(55)),
+                ("response_frame_id", pmt.from_uint64(66)),
+                ("rx_time_tag_offset", pmt.from_uint64(1000)),
+                ("absolute_sample_index", pmt.from_uint64(2000)),
+                ("frame_start", pmt.from_uint64(2000)),
+                ("coarse_peak", pmt.from_uint64(5048)),
                 ("frame_id_valid", pmt.PMT_F),
             ):
                 meta = pmt.dict_add(meta, pmt.intern(key), value)
@@ -362,13 +370,41 @@ class qa_prs_receiver(gr_unittest.TestCase):
                 lines = [line.strip() for line in f.readlines()]
             header = lines[0].split(",")
             fields = lines[1].split(",")
+            self.assertEqual(header, [
+                "log_time_unix", "node", "attempt_id", "failure_reason",
+                "channel_id", "coarse_zc_root", "packet_type",
+                "poll_frame_id", "response_frame_id", "reply_delay_samples",
+                "frame_id_valid", "rx_time", "preamble_metric",
+                "coarse_metric", "payload_metric", "cfo", "samp_rate",
+                "fft_len", "cp_len", "active_bins", "prs_symbols",
+                "prs_start_rel", "prs_len", "pdu_len",
+            ])
             self.assertEqual(header[2], "attempt_id")
             self.assertEqual(header[3], "failure_reason")
             self.assertNotIn("peak_metric", header)
             self.assertIn("coarse_metric", header)
+            for removed in (
+                "rx_time_tag_offset",
+                "absolute_sample_index",
+                "frame_start",
+                "coarse_peak",
+                "coarse_offset_samples",
+                "recv_id",
+                "frame_id",
+            ):
+                self.assertNotIn(removed, header)
+            for retained in (
+                "attempt_id",
+                "poll_frame_id",
+                "response_frame_id",
+            ):
+                self.assertIn(retained, header)
+            self.assertEqual(len(header), len(fields))
             self.assertEqual(fields[1], "initiator")
             self.assertEqual(fields[2], "55")
             self.assertEqual(fields[3], "ZC_SYNC")
+            self.assertEqual(fields[7], "55")
+            self.assertEqual(fields[8], "66")
         finally:
             if os.path.exists(path):
                 os.unlink(path)

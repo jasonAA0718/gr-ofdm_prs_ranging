@@ -64,10 +64,9 @@ prs_acquisition_logger_impl::prs_acquisition_logger_impl(const std::string& path
 {
     if (!append || d_file.tellp() == 0) {
         d_file << "log_time_unix,node,attempt_id,failure_reason,channel_id,coarse_zc_"
-                  "root,recv_id,packet_type,frame_id,poll_frame_id,"
+                  "root,packet_type,poll_frame_id,"
                   "response_frame_id,reply_delay_samples,frame_id_valid,rx_time,"
-                  "rx_time_tag_offset,absolute_sample_index,frame_start,coarse_peak,"
-                  "coarse_offset_samples,preamble_metric,coarse_metric,"
+                  "preamble_metric,coarse_metric,"
                   "payload_metric,cfo,samp_rate,fft_len,cp_len,active_bins,prs_symbols,"
                   "prs_start_rel,prs_len,pdu_len\n";
     }
@@ -89,10 +88,6 @@ void prs_acquisition_logger_impl::handle_frame(pmt::pmt_t msg)
     }
 
     const auto meta = pmt::car(msg);
-    const uint64_t frame_start = dict_ref_uint64(meta, "frame_start", 0);
-    const uint64_t coarse_peak = dict_ref_uint64(meta, "coarse_peak", 0);
-    const int64_t coarse_offset =
-        static_cast<int64_t>(coarse_peak) - static_cast<int64_t>(frame_start);
     const auto now = std::chrono::system_clock::now().time_since_epoch();
     const double now_s =
         std::chrono::duration_cast<std::chrono::duration<double>>(now).count();
@@ -107,9 +102,7 @@ void prs_acquisition_logger_impl::handle_frame(pmt::pmt_t msg)
     d_file << ',' << dict_ref_symbol_local(meta, "failure_reason", "UNKNOWN") << ','
            << dict_ref_uint64(meta, "channel_id", 0) << ','
            << dict_ref_uint64(meta, "coarse_zc_root", 25) << ','
-           << dict_ref_uint64(meta, "recv_id", 0) << ','
            << dict_ref_uint64(meta, "packet_type", 0) << ','
-           << dict_ref_uint64(meta, "frame_id", 0) << ','
            << dict_ref_uint64(meta, "poll_frame_id", 0) << ','
            << dict_ref_uint64(meta, "response_frame_id", 0) << ','
            << dict_ref_uint64(meta, "reply_delay_samples", 0) << ','
@@ -117,9 +110,6 @@ void prs_acquisition_logger_impl::handle_frame(pmt::pmt_t msg)
                    ? 1
                    : 0)
            << ',' << dict_ref_time_tuple_local(meta, "rx_time", NAN) << ','
-           << dict_ref_uint64(meta, "rx_time_tag_offset", 0) << ','
-           << dict_ref_uint64(meta, "absolute_sample_index", 0) << ',' << frame_start
-           << ',' << coarse_peak << ',' << coarse_offset << ','
            << dict_ref_double(meta, "preamble_metric", 0.0) << ','
            << dict_ref_double(meta, "coarse_metric", 0.0) << ','
            << dict_ref_double(meta, "payload_metric", 0.0) << ','

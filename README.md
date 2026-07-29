@@ -1,8 +1,8 @@
 # Project Memory: OFDM PRS / SS-TWR Ranging
 
 This file is a handoff note for future AI agents and developers working on
-`/home/cnsl/gnuradio-zc-twr`. It records the current project architecture,
-recent implementation state, known problems, and recommended future work.
+`/home/cnsl/Desktop/gr-ofdm_prs_ranging`. 
+It records the current project architecture, recent implementation state, known problems, and recommended future work.
 
 ## Project Goal
 
@@ -22,37 +22,6 @@ Initiator
   -> computes pseudorange/range per responder
   -> later feeds least-squares or Kalman positioning
 ```
-
-Do not implement positioning filters until the multi-responder range streams are
-stable.
-
-## Repository Layout
-
-Main OFDM PRS OOT:
-
-```text
-gr-ofdm_prs_ranging/
-```
-
-Important examples:
-
-```text
-gr-ofdm_prs_ranging/examples/prs_ssrtt_initiator_10M_1399.py
-gr-ofdm_prs_ranging/examples/prs_ssrtt_responder_10M_1399.py
-gr-ofdm_prs_ranging/examples/prs_ssrtt_initiator_10M_1399.grc
-gr-ofdm_prs_ranging/examples/prs_ssrtt_responder_10M_1399.grc
-```
-
-Legacy ZC/BPSK TW-RTT system:
-
-```text
-tx/
-rx/
-common/
-```
-
-Do not break or rewrite the legacy ZC/BPSK flowgraphs when working on OFDM PRS.
-
 ## Current OFDM PRS Burst
 
 The current burst is a custom OFDM/PRS-like signal:
@@ -196,29 +165,6 @@ trigger. `prs_timed_burst_source` now accepts zero or one stream input, so it
 does not need to consume the RX stream when the trigger already contains
 `tx_time_secs` and `tx_time_frac`.
 
-The updated initiator topology is:
-
-```text
-UHD Source -> prs_frame_detector
-UHD Source -> prs_rx_timekeeper
-message_strobe -> prs_rx_timekeeper -> prs_timed_burst_source -> UHD Sink
-```
-
-The updated responder topology is:
-
-```text
-UHD Source -> prs_frame_detector
-prs_frame_detector -> prs_ssrtt_responder
-prs_ssrtt_responder -> prs_timed_burst_source -> UHD Sink
-```
-
-The direct `UHD Source -> prs_timed_burst_source` connection was removed from
-both SSRTT flowgraphs. This prevents timed transmission from backpressuring the
-RX stream at the strobe or response period.
-
-The scheduling change also updated the timed burst source implementation,
-public header, Python binding, GRC definition, CMake registration, initiator
-flowgraph, responder flowgraph, and timing QA tests.
 
 ### Scheduled Correlation Windows
 
@@ -253,46 +199,18 @@ or approximately 0.44% of each cycle.
 The responder remains in continuous correlation mode because it cannot predict
 the first poll without shared radio time or an established slot schedule.
 
-Correlation gating updated:
-
-```text
-include/gnuradio/ofdm_prs_ranging/prs_frame_detector.h
-lib/prs_frame_detector_impl.h
-lib/prs_frame_detector_impl.cc
-python/ofdm_prs_ranging/bindings/prs_frame_detector_python.cc
-python/ofdm_prs_ranging/qa_prs_receiver.py
-grc/ofdm_prs_ranging_prs_frame_detector.block.yml
-examples/prs_ssrtt_initiator_10M_1399.grc
-examples/prs_ssrtt_initiator_10M_1399.py
-README.md
-```
 
 ### Initiator and Responder Text UI
 
 The message-only `prs_text_ui` block was added for compact live terminal
 status. It does not consume or copy the UHD sample stream.
 
-Initiator inputs:
-
-```text
-prs_timed_burst_source.tx_time_out -> prs_text_ui.tx_in
-prs_frame_detector.frame_out -> prs_text_ui.frame_in
-prs_ssrtt_solver.ssrtt_out -> prs_text_ui.measurement_in
-```
 
 Initiator display:
 
 ```text
 [INITIATOR] RX RECEIVING | responses/polls 49/50 (98.0%) | loss 2.0% |
 pending 0 | SNR 22.4 dB | range 84.25 m
-```
-
-Responder inputs:
-
-```text
-prs_frame_detector.frame_out -> prs_text_ui.frame_in
-prs_phase_slope_estimator.measurement_out -> prs_text_ui.measurement_in
-prs_timed_burst_source.tx_time_out -> prs_text_ui.tx_in
 ```
 
 Responder display:
@@ -313,30 +231,8 @@ The implementation and integration files are:
 ```text
 python/ofdm_prs_ranging/prs_text_ui.py
 python/ofdm_prs_ranging/qa_prs_text_ui.py
-grc/ofdm_prs_ranging_prs_text_ui.block.yml
-examples/prs_ssrtt_initiator_10M_1399.grc
-examples/prs_ssrtt_initiator_10M_1399.py
-examples/prs_ssrtt_responder_10M_1399.grc
-examples/prs_ssrtt_responder_10M_1399.py
 ```
 
-### Validation
-
-```text
-Clean Release build: passed
-Initiator GRC validation and generation: passed
-Responder GRC validation and generation: passed
-Time-gating inside/outside-window test: passed
-Initiator/responder text UI tests: passed
-Timed burst and ZC focused tests: passed
-git diff --check: passed
-```
-
-`qa_prs_receiver` passes six of seven cases. Its older synthetic SSRTT timestamp
-case still fails because of the existing hard-coded calibration delay; the
-failure is unrelated to the scheduling and correlation-window changes.
-Hardware overflow and CPU measurements must still be repeated after installing
-the updated OOT module.
 
 ## Current Receiver Chain
 
@@ -434,25 +330,6 @@ or an established slot schedule.
 
 ## Recent Coarse ZC Root / Channel Separation Support
 
-Coarse ZC root configurability has been added for pre-positioning channel
-separation.
-
-Added parameters:
-
-```text
-prs_timed_burst_source(..., coarse_zc_root=25)
-prs_frame_detector(..., coarse_zc_root=25, channel_id=0)
-```
-
-Behavior:
-
-```text
-TX coarse ZC root is set by prs_timed_burst_source coarse_zc_root.
-RX coarse ZC correlation reference is set by prs_frame_detector coarse_zc_root.
-Detector metadata includes coarse_zc_root and channel_id.
-Acquisition CSV includes channel_id and coarse_zc_root.
-```
-
 The repeated QPSK preamble was not changed.
 
 Current one-channel separation plan:
@@ -497,36 +374,6 @@ The main operational problem is measurement update rate and SDR stability:
 O = RX overflow
 L = TX late command
 ```
-
-At 30 MS/s full duplex, both initiator and responder can overload the GNU Radio
-scheduler. When RX processing stalls, UHD source overflows; when timed TX
-packets arrive late, UHD reports `L`.
-
-Current examples have been tuned during experiments and may use:
-
-```text
-samp_rate = 30e6
-preamble_len = 256
-preamble_repeats = 4 or 8 depending on side/test
-center_freq = 1060e6 in recent examples
-```
-
-Always verify initiator and responder use matching frame geometry:
-
-```text
-samp_rate
-fft_len
-cp_len
-active_bins
-prs_symbols
-preamble_len
-preamble_repeats
-coarse_sync_len
-payload_len
-zero/tail guard
-```
-
-If these do not match, acquisition or payload decode will fail.
 
 ## Phase-Slope Estimator Status
 
@@ -612,70 +459,8 @@ Check import:
 python3 -c "from gnuradio import ofdm_prs_ranging; print('OOT import OK')"
 ```
 
-## Future Work 1: Reduce Coarse ZC Length
 
-Motivation:
-
-The current acquisition is two-stage. Since the repeated preamble gates the
-coarse ZC correlation, the long ZC sequence is not the main continuous
-long-range detector. It is mainly for:
-
-```text
-frame confirmation
-coarse timing anchor
-channel/root separation
-false-alarm rejection
-quality metric
-```
-
-Therefore `coarse_sync_len` may be reducible.
-
-Recommended experiment order:
-
-```text
-839  current/reference
-419  first reduction candidate
-257  second candidate
-127  probably too short for robust multi-responder outdoor use
-```
-
-Use prime lengths where possible because ZC root properties are cleaner.
-
-Important:
-
-If `coarse_sync_len` changes, both TX and RX examples must change together:
-
-```text
-prs_timed_burst_source coarse_sync_len
-prs_frame_detector coarse_sync_len
-```
-
-Also confirm the payload and PRS offsets still propagate correctly through
-metadata:
-
-```text
-payload_start = zero_guard + preamble_total + coarse_sync_len
-prs_start_rel = zero_guard + preamble_total + coarse_sync_len + payload_len
-```
-
-Metrics to compare:
-
-```text
-O count
-L count
-detected frames/sec
-valid payload frames/sec
-preamble_metric
-coarse_metric
-payload_metric
-wrong channel detections
-range_m mean/std
-CPU load
-```
-
-Do not reduce below 257 until root/channel separation is proven stable.
-
-## Future Work 2: Long-Distance Positioning Preparation
+## Future Work 1: Long-Distance Positioning Preparation
 
 Before implementing positioning:
 
@@ -686,28 +471,8 @@ Before implementing positioning:
 5. Confirm `range_m` bias and standard deviation over many samples.
 6. Record responder anchor position and initiator ground truth position.
 
-Recommended logging for each long-distance run:
 
-```text
-measurement CSV
-initiator acquisition CSV
-responder acquisition CSV
-USRP serials
-sample rate
-center frequency
-TX/RX gains
-preamble_len
-preamble_repeats
-coarse_sync_len
-coarse_zc_root mapping
-reply_delay_samples
-ground truth distance
-environment notes
-```
-
-Use LOS tests first. Multipath tests should come later.
-
-## Future Work 3: Multiple Responders
+## Future Work 2: Multiple Responders
 
 Recommended multi-responder architecture:
 
@@ -756,7 +521,7 @@ heavier receiver load from multiple detector branches.
 
 Start with staggered reply delays.
 
-## Future Work 4: Positioning Algorithms
+## Future Work 3: Positioning Algorithms
 
 Positioning should consume stable range measurements:
 
@@ -813,7 +578,6 @@ range outlier rejection
 
 ## Engineering Rules for Future Agents
 
-- Do not modify the legacy ZC/BPSK TW-RTT flowgraphs unless explicitly asked.
 - Do not modify the repeated QPSK acquisition preamble unless explicitly asked.
 - Keep constructor changes backward-compatible by appending parameters with
   defaults.
@@ -831,51 +595,18 @@ QA tests
 
 - Build after each meaningful change.
 - Run focused tests after changing receiver/transmitter behavior.
-- If changing `.grc`, either also update generated `.py` or explicitly state
-  that GRC regeneration is required.
-- If acquisition CSV schema changes, warn that old appended CSV files have stale
-  headers.
-
-## Current Practical Advice
-
-For SDR stability:
-
-```text
-Start at 10 MS/s when debugging.
-Use 30 MS/s only after O/L are gone.
-Increase responder reply delay if L appears.
-Disable acquisition logger temporarily if testing raw overflow.
-Keep initiator/responder frame geometry identical.
-Use different coarse ZC roots only for channel separation, not for timing fixes.
-```
-
-For current one-responder channel separation:
-
-```text
-Initiator TX POLL:       root 25
-Responder RX POLL:       root 25
-Responder TX RESPONSE:   root 29
-Initiator RX RESPONSE:   root 29, channel_id 1
-```
-
-Delete or rotate old acquisition CSV files before testing new channel metadata:
-
-```bash
-rm -f gr-ofdm_prs_ranging/examples/CSV/initiator_acquisition.csv
-rm -f gr-ofdm_prs_ranging/examples/CSV/responder_acquisition.csv
-```
 
 ## 2026-07-27 Acquisition Attempt Logging
 
-The acquisition CSV now begins with:
+Add the `failure_reason` to distingulish the fail reason of ranging.
 
-```text
-log_time_unix,node,attempt_id,failure_reason,...
-```
+CSV Keeps `attempt_id`, `poll_frame_id`, and `response_frame_id` to find the loss packet rate.
 
 `prs_timed_burst_source` publishes `attempt_id` with the TX tags and
-`tx_time_out` metadata. For SS-TWR, the attempt ID is the poll frame ID, so the
-initiator poll and its received response share one identifier.
+`tx_time_out` metadata. 
+
+The attempt ID is the poll frame ID, if the initiator could not find response.
+The CSV would record this attempt ID with `failure_reason` `NO_PREAMBLE`
 
 `prs_frame_detector` has a separate optional `event_out` message port. The
 initiator and responder acquisition loggers use this port; `frame_out` remains
@@ -898,29 +629,6 @@ UNKNOWN         logger received metadata without a detector failure reason
 the usable level, wrong timing/window, and repeated-preamble threshold failure.
 The detector cannot observe UHD overflow state, so it does not emit a distinct
 UHD failure code.
-
-The initiator can emit one timeout result for every scheduled poll because its
-detector receives the poll `tx_time_out` message. The responder has no knowledge
-of remote polls that produce no detector candidate, so it cannot assign an
-attempt ID to a completely missed remote poll. For a decoded poll it uses the
-payload poll frame ID; a payload-CRC failure without a gating window leaves
-`attempt_id` empty.
-
-The CSV schema changed. Delete or rotate existing acquisition CSV files before
-running the updated flowgraphs, otherwise append mode will retain the old
-header.
-
-## Metric Naming
-
-`coarse_metric` is the canonical name for the normalized ZC confirmation
-correlation. The former PRS metadata field `peak_metric` contained exactly the
-same value and is no longer emitted or written as a separate CSV column.
-Downstream C++ blocks retain read-only fallback support for old metadata that
-contains `peak_metric`.
-
-The exact `payload_metric` reference-correlation and coherent-combining equations
-are documented in `signal.md`. CRC validity remains separate in
-`frame_id_valid`.
 
 ## 2026-07-28 BPSK Payload Documentation
 
@@ -970,7 +678,6 @@ Final burst peak: <= 0.9 through one common scale
 
 Dynamic BPSK payload contents are written at unit amplitude before section
 normalization, so payload insertion can no longer undo the amplitude policy.
-Both SS-TWR examples now use `tx_amp = 0.6`.
 
 The QA measurement over the useful 1024-sample IFFT portion (before CP) is:
 
