@@ -105,9 +105,13 @@ M_z[m] =
 {\sqrt{N_z \sum_{n=0}^{N_z-1}|y[m+n]|^2}}
 ```
 
-The repeated preamble first proposes a frame location. The ZC metric then
-confirms the coarse sync position and, with configurable roots, can separate
-channels/responders.
+The repeated preamble first gates a proposed frame location using the preamble
+threshold. The detector then evaluates `M_z` at offsets `-2...+2` around the
+predicted ZC boundary, selects the strongest valid offset, and accepts it only
+when it passes the separate ZC threshold. The selected offset corrects both the
+frame start and coarse-sync index. A threshold-passing edge maximum recenters
+the five-point window once before acceptance. Configurable roots continue to
+separate channels/responders.
 
 Example channel plan:
 

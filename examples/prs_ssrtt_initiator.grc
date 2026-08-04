@@ -207,6 +207,7 @@ blocks:
     time_gating: 'True'
     window_after_s: '0.004'
     window_before_s: '0.0002'
+    zc_threshold: '0.5'
     zero_guard_len: '1000'
   states:
     bus_sink: false

@@ -38,7 +38,7 @@ class prs_ssrtt_initiator(gr.top_block):
         ##################################################
         self.zc_length = zc_length = 419
         self.samp_rate = samp_rate = 30e6
-        self.premble_rep = premble_rep = 4
+        self.premble_rep = premble_rep = 16
         self.premble_length = premble_length = 256
         self.center_freq = center_freq = 1060e6
 
@@ -92,7 +92,7 @@ class prs_ssrtt_initiator(gr.top_block):
             True, 25)
         self.prs_rx_timekeeper_0 = ofdm_prs_ranging.prs_rx_timekeeper(samp_rate, 0.6)
         self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 1024, 1024, 1.0)
-        self.prs_frame_detector_0 = ofdm_prs_ranging.prs_frame_detector(samp_rate, 1024, 128, 1024, 16, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 29, 1, True, 0.05, 0.0002, 0.004)
+        self.prs_frame_detector_0 = ofdm_prs_ranging.prs_frame_detector(samp_rate, 1024, 128, 1024, 16, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 29, 1, True, 0.05, 0.0002, 0.004, 0.5)
         self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 1024, 128, 1024, 16)
         self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger("CSV/obs.csv", 1)
         self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 1024, 1024, 16, 13990001)

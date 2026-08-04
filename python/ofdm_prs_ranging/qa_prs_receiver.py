@@ -100,6 +100,40 @@ class qa_prs_receiver(gr_unittest.TestCase):
 
         self.assertEqual(debug.num_messages(), 0)
 
+    def test_zc_refinement_corrects_fractional_delay_boundary(self):
+        tx = ofdm_prs_ranging.prs_timed_burst_source(
+            attach_tx_time=False)
+        frame = numpy.asarray(tx.frame_samples(), dtype=numpy.complex64)
+        prefix = 300
+        undelayed = numpy.concatenate((
+            numpy.zeros(prefix, dtype=numpy.complex64),
+            frame,
+            numpy.zeros(302, dtype=numpy.complex64)))
+
+        fraction = 0.75
+        delayed = numpy.zeros_like(undelayed)
+        delayed[1:] = ((1.0 - fraction) * undelayed[1:] +
+                       fraction * undelayed[:-1])
+        source = blocks.vector_source_c(delayed, False)
+        detector = ofdm_prs_ranging.prs_frame_detector(
+            threshold=0.30, zc_threshold=0.20)
+        debug = blocks.message_debug()
+
+        self.tb.connect(source, detector)
+        self.tb.msg_connect((detector, "frame_out"), (debug, "store"))
+        self.tb.run()
+
+        self.assertGreaterEqual(debug.num_messages(), 1)
+        meta = pmt.car(debug.get_message(0))
+        self.assertEqual(
+            pmt.to_uint64(pmt.dict_ref(
+                meta, pmt.intern("frame_start"), pmt.PMT_NIL)),
+            prefix + 1)
+        self.assertGreater(
+            pmt.to_double(pmt.dict_ref(
+                meta, pmt.intern("coarse_metric"), pmt.PMT_NIL)),
+            0.70)
+
     def test_golay_channel_estimator_unity_channel(self):
         csv_path = os.path.abspath(os.path.join(
             os.path.dirname(__file__), "..", "..", "lib",

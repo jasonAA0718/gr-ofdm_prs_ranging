@@ -251,15 +251,21 @@ UHD Source
 
 ```text
 1. repeated-preamble rolling metric
-2. coarse ZC normalized correlation confirmation
+2. five-point coarse ZC correlation refinement at offsets -2...+2
 3. frame extraction
 4. rx_time preservation
 5. payload decode
 6. metadata publication
 ```
 
-The repeated preamble is the continuous acquisition gate. The coarse ZC is only
-checked after the repeated preamble passes.
+The repeated preamble is the continuous acquisition gate and uses `threshold`.
+After that gate passes, the detector evaluates normalized ZC correlation at the
+predicted boundary and offsets `-2`, `-1`, `+1`, and `+2`. It selects the
+strongest valid offset, applies the separate `zc_threshold`, and corrects both
+the frame start and coarse-sync index by the selected offset. If a
+threshold-passing maximum lies at `-2` or `+2`, the five-point window is
+recentered once before acceptance so a still-rising edge is not mistaken for a
+local peak.
 
 ## Receiver Data-Path Efficiency
 

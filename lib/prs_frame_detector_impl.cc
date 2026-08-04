@@ -10,6 +10,7 @@
 #include <gnuradio/io_signature.h>
 #include <algorithm>
 #include <cmath>
+#include <deque>
 #include <limits>
 #include <stdexcept>
 
@@ -33,7 +34,8 @@ prs_frame_detector::sptr prs_frame_detector::make(double samp_rate,
                                                   bool time_gating,
                                                   double reply_delay_s,
                                                   double window_before_s,
-                                                  double window_after_s)
+                                                  double window_after_s,
+                                                  float zc_threshold)
 {
     return gnuradio::make_block_sptr<prs_frame_detector_impl>(samp_rate,
                                                               fft_len,
@@ -52,7 +54,8 @@ prs_frame_detector::sptr prs_frame_detector::make(double samp_rate,
                                                               time_gating,
                                                               reply_delay_s,
                                                               window_before_s,
-                                                              window_after_s);
+                                                              window_after_s,
+                                                              zc_threshold);
 }
 
 prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
@@ -72,11 +75,13 @@ prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
                                                  bool time_gating,
                                                  double reply_delay_s,
                                                  double window_before_s,
-                                                 double window_after_s)
+                                                 double window_after_s,
+                                                 float zc_threshold)
     : gr::block("prs_frame_detector",
                 gr::io_signature::make(1, 1, sizeof(gr_complex)),
                 gr::io_signature::make(0, 0, 0)),
-      d_threshold(threshold),
+      d_preamble_threshold(threshold),
+      d_zc_threshold(zc_threshold),
       d_min_frame_gap(min_frame_gap),
       d_buffer_head(0),
       d_next_scan_index(0),
@@ -95,6 +100,10 @@ prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
 {
     if (samp_rate <= 0.0) {
         throw std::invalid_argument("samp_rate must be positive");
+    }
+    if (threshold <= 0.0f || threshold > 1.0f || zc_threshold <= 0.0f ||
+        zc_threshold > 1.0f) {
+        throw std::invalid_argument("preamble and ZC thresholds must be in (0, 1]");
     }
     if (reply_delay_s < 0.0 || window_before_s < 0.0 || window_after_s <= 0.0) {
         throw std::invalid_argument("correlation window timing must be nonnegative");
@@ -292,7 +301,7 @@ void prs_frame_detector_impl::record_candidate(uint64_t abs_start,
         window.saw_preamble = true;
         window.preamble_metric = std::max(window.preamble_metric, preamble_metric);
         window.coarse_metric = std::max(window.coarse_metric, coarse_metric);
-        window.saw_coarse = window.saw_coarse || coarse_metric >= d_threshold;
+        window.saw_coarse = window.saw_coarse || coarse_metric >= d_zc_threshold;
         break;
     }
 }
@@ -402,29 +411,86 @@ bool prs_frame_detector_impl::find_frame(size_t& frame_start_index,
                  second_power);
     }
 
+    std::deque<std::pair<size_t, float>> zc_metric_cache;
+    const auto cached_coarse_metric = [&](size_t coarse_index) {
+        const auto cached = std::find_if(
+            zc_metric_cache.begin(),
+            zc_metric_cache.end(),
+            [coarse_index](const auto& entry) { return entry.first == coarse_index; });
+        if (cached != zc_metric_cache.end()) {
+            return cached->second;
+        }
+        const float metric = coarse_sync_metric(coarse_index);
+        zc_metric_cache.emplace_back(coarse_index, metric);
+        if (zc_metric_cache.size() > 16) {
+            zc_metric_cache.pop_front();
+        }
+        return metric;
+    };
+
     for (size_t p = d_next_scan_index; p <= max_preamble; ++p) {
         const size_t start = p - static_cast<size_t>(preamble_rel);
         const int64_t abs_start = static_cast<int64_t>(d_buffer_abs_start + start);
         if (abs_start - d_last_frame_start < d_min_frame_gap) {
         } else {
             float corr_power = std::norm(preamble_corr);
-            double threshold_power =
-                d_threshold * d_threshold * first_power * second_power;
+            double threshold_power = d_preamble_threshold * d_preamble_threshold *
+                                     first_power * second_power;
 
             if (corr_power >= threshold_power) {
                 float denom = std::sqrt(first_power * second_power);
                 const float preamble_metric =
                     denom > 0.0 ? static_cast<float>(std::sqrt(corr_power) / denom)
                                 : 0.0f;
-                const size_t c = start + static_cast<size_t>(coarse_rel);
-                const float m = coarse_sync_metric(c);
-                record_candidate(static_cast<uint64_t>(abs_start), preamble_metric, m);
-                if (m >= d_threshold) {
-                    d_next_scan_index = p + static_cast<size_t>(d_min_frame_gap);
-                    frame_start_index = start;
-                    coarse_index = c;
+                float best_metric = -1.0f;
+                size_t best_start = start;
+                size_t best_coarse = start + static_cast<size_t>(coarse_rel);
+                const auto refine_zc = [&](size_t center) {
+                    best_metric = -1.0f;
+                    best_start = center;
+                    best_coarse = center + static_cast<size_t>(coarse_rel);
+                    for (int offset = -2; offset <= 2; ++offset) {
+                        const int64_t refined_start_signed =
+                            static_cast<int64_t>(center) + offset;
+                        if (refined_start_signed < 0) {
+                            continue;
+                        }
+                        const size_t refined_start =
+                            static_cast<size_t>(refined_start_signed);
+                        if (refined_start + static_cast<size_t>(flen) >
+                            buffered_size()) {
+                            continue;
+                        }
+                        const size_t refined_coarse =
+                            refined_start + static_cast<size_t>(coarse_rel);
+                        const float metric = cached_coarse_metric(refined_coarse);
+                        if (metric > best_metric) {
+                            best_metric = metric;
+                            best_start = refined_start;
+                            best_coarse = refined_coarse;
+                        }
+                    }
+                };
+
+                refine_zc(start);
+                const int64_t first_offset =
+                    static_cast<int64_t>(best_start) - static_cast<int64_t>(start);
+                if (best_metric >= d_zc_threshold &&
+                    (first_offset == -2 || first_offset == 2)) {
+                    refine_zc(best_start);
+                }
+
+                const uint64_t refined_abs_start = d_buffer_abs_start + best_start;
+                record_candidate(refined_abs_start, preamble_metric, best_metric);
+                if (best_metric >= d_zc_threshold) {
+                    const size_t refined_preamble =
+                        best_start + static_cast<size_t>(preamble_rel);
+                    d_next_scan_index =
+                        refined_preamble + static_cast<size_t>(d_min_frame_gap);
+                    frame_start_index = best_start;
+                    coarse_index = best_coarse;
                     preamble_metric_out = preamble_metric;
-                    coarse_metric_out = m;
+                    coarse_metric_out = best_metric;
                     return true;
                 }
             }

@@ -87,7 +87,7 @@ class prs_ssrtt_responder(gr.top_block):
             0.1, 0.7, 13990001, 1,
             True, 29)
         self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 1024, 1024, 1.0)
-        self.prs_frame_detector_0 = ofdm_prs_ranging.prs_frame_detector(samp_rate, 1024, 128, 1024, 16, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 25, 0, False, 0.05, 0.0002, 0.004)
+        self.prs_frame_detector_0 = ofdm_prs_ranging.prs_frame_detector(samp_rate, 1024, 128, 1024, 16, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 25, 0, False, 0.05, 0.0002, 0.004, 0.5)
         self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 1024, 128, 1024, 16)
         self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 1024, 1024, 16, 13990001)
         self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/responder_acquisition.csv", "responder", 1)

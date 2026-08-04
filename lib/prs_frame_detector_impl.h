@@ -35,7 +35,8 @@ public:
                             bool time_gating,
                             double reply_delay_s,
                             double window_before_s,
-                            double window_after_s);
+                            double window_after_s,
+                            float zc_threshold);
     ~prs_frame_detector_impl() override = default;
 
     void forecast(int noutput_items, gr_vector_int& ninput_items_required) override;
@@ -46,7 +47,8 @@ public:
 
 private:
     prs_rx_config d_cfg;
-    float d_threshold;
+    float d_preamble_threshold;
+    float d_zc_threshold;
     int d_min_frame_gap;
     std::vector<gr_complex> d_coarse;
     std::vector<gr_complex> d_buffer;
