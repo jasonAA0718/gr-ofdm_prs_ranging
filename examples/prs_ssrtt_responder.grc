@@ -55,7 +55,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [464, 48.0]
+    coordinate: [560, 40.0]
     rotation: 0
     state: enabled
 - name: premble_rep
@@ -67,7 +67,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [584, 48.0]
+    coordinate: [464, 40.0]
     rotation: 0
     state: enabled
 - name: reply_delay_samples
@@ -82,6 +82,18 @@ blocks:
     coordinate: [320, 40.0]
     rotation: 0
     state: enabled
+- name: rx_gain
+  id: variable
+  parameters:
+    comment: ''
+    value: '0.9'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [816, 40.0]
+    rotation: 0
+    state: enabled
 - name: samp_rate
   id: variable
   parameters:
@@ -94,6 +106,18 @@ blocks:
     coordinate: [224, 32.0]
     rotation: 0
     state: enabled
+- name: tx_gain
+  id: variable
+  parameters:
+    comment: ''
+    value: '0.9'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [912, 40.0]
+    rotation: 0
+    state: enabled
 - name: zc_length
   id: variable
   parameters:
@@ -103,7 +127,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [704, 48.0]
+    coordinate: [688, 40.0]
     rotation: 0
     state: enabled
 - name: prs_acquisition_logger_0
@@ -114,7 +138,7 @@ blocks:
     append: '1'
     comment: Logs every detected POLL before responder filtering
     node: '"responder"'
-    path: '"CSV/responder_acquisition.csv"'
+    path: '"CSV/responder_acquisition_v2.csv"'
   states:
     bus_sink: false
     bus_source: false
@@ -140,6 +164,21 @@ blocks:
     bus_source: false
     bus_structure: null
     coordinate: [920, 504.0]
+    rotation: 0
+    state: enabled
+- name: prs_csv_logger_0
+  id: ofdm_prs_ranging_prs_csv_logger
+  parameters:
+    affinity: ''
+    alias: ''
+    append: '1'
+    comment: Records POLL PRS CFO and phase-slope measurements
+    path: '"CSV/responder_measurements.csv"'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1200, 504.0]
     rotation: 0
     state: enabled
 - name: prs_fft_receiver_0
@@ -395,7 +434,7 @@ blocks:
     comment: ''
     dev_addr: '"serial=34D0563"'
     dev_args: ''
-    gain0: '0.9'
+    gain0: tx_gain
     gain1: '0'
     gain10: '0'
     gain11: '0'
@@ -736,7 +775,7 @@ blocks:
     dc_offs_enb9: default
     dev_addr: '"serial=34D0563"'
     dev_args: '"recv_buff_size=20000000,num_recv_frames=700"'
-    gain0: '0.9'
+    gain0: rx_gain
     gain1: '0'
     gain10: '0'
     gain11: '0'
@@ -1054,6 +1093,7 @@ connections:
 - [prs_frame_detector_0, event_out, prs_acquisition_logger_0, frame_in]
 - [prs_frame_detector_0, frame_out, prs_fft_receiver_0, frame_in]
 - [prs_frame_detector_0, frame_out, prs_text_ui_0, frame_in]
+- [prs_phase_slope_estimator_0, measurement_out, prs_csv_logger_0, measurement_in]
 - [prs_phase_slope_estimator_0, measurement_out, prs_ssrtt_responder_0, measurement_in]
 - [prs_phase_slope_estimator_0, measurement_out, prs_text_ui_0, measurement_in]
 - [prs_source, '0', uhd_usrp_sink_0, '0']

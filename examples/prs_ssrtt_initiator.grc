@@ -70,6 +70,18 @@ blocks:
     coordinate: [472, 40.0]
     rotation: 0
     state: enabled
+- name: rx_gain
+  id: variable
+  parameters:
+    comment: ''
+    value: '0.9'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [824, 32.0]
+    rotation: 0
+    state: enabled
 - name: samp_rate
   id: variable
   parameters:
@@ -80,6 +92,18 @@ blocks:
     bus_source: false
     bus_structure: null
     coordinate: [248, 40.0]
+    rotation: 0
+    state: enabled
+- name: tx_gain
+  id: variable
+  parameters:
+    comment: ''
+    value: '0.9'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [920, 32.0]
     rotation: 0
     state: enabled
 - name: zc_length
@@ -119,7 +143,7 @@ blocks:
     append: '1'
     comment: Logs every detector output before SS-RTT filtering
     node: '"initiator"'
-    path: '"CSV/initiator_acquisition.csv"'
+    path: '"CSV/initiator_acquisition_v2.csv"'
   states:
     bus_sink: false
     bus_source: false
@@ -154,7 +178,7 @@ blocks:
     alias: ''
     append: '1'
     comment: ''
-    path: '"CSV/obs.csv"'
+    path: '"CSV/obs_v2.csv"'
   states:
     bus_sink: false
     bus_source: false
@@ -207,7 +231,7 @@ blocks:
     time_gating: 'True'
     window_after_s: '0.004'
     window_before_s: '0.0002'
-    zc_threshold: '0.5'
+    zc_threshold: '0.4'
     zero_guard_len: '1000'
   states:
     bus_sink: false
@@ -431,7 +455,7 @@ blocks:
     comment: ''
     dev_addr: '"serial=34D0564"'
     dev_args: ''
-    gain0: '1'
+    gain0: tx_gain
     gain1: '0'
     gain10: '0'
     gain11: '0'
@@ -772,7 +796,7 @@ blocks:
     dc_offs_enb9: default
     dev_addr: '"serial=34D0564"'
     dev_args: '"recv_buff_size=25000000,num_recv_frames=1024"'
-    gain0: '0.9'
+    gain0: rx_gain
     gain1: '0'
     gain10: '0'
     gain11: '0'

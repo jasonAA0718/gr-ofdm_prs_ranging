@@ -35,12 +35,22 @@ struct prs_rx_config {
     int channel_id = 0;
 };
 
+struct prs_cfo_estimate {
+    double hz = 0.0;
+    double coherence = 0.0;
+    bool valid = false;
+};
+
 int prs_start_offset(const prs_rx_config& cfg);
 int prs_len(const prs_rx_config& cfg);
 int frame_len(const prs_rx_config& cfg);
 std::vector<gr_complex> coarse_sync_sequence(int len, int root = 25);
 std::vector<gr_complex> prs_pilots(const prs_rx_config& cfg);
 std::vector<float> active_frequencies(const prs_rx_config& cfg);
+prs_cfo_estimate estimate_prs_cp_cfo(const gr_complex* frame,
+                                     size_t frame_size,
+                                     const prs_rx_config& cfg,
+                                     double unwrap_reference_hz);
 std::vector<float> unwrap_phase(const std::vector<gr_complex>& samples);
 std::vector<float> unwrap_phase(const gr_complex* samples, size_t size);
 bool pdu_get_c32(const pmt::pmt_t& msg, pmt::pmt_t& meta, std::vector<gr_complex>& data);

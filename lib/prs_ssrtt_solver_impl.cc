@@ -95,8 +95,11 @@ void prs_ssrtt_solver_impl::handle_measurement(pmt::pmt_t msg)
     const uint64_t reply_delay_samples = dict_ref_uint64(meta, "reply_delay_samples", 0);
     const double reply_delay_s = static_cast<double>(reply_delay_samples) / d_samp_rate;
     const double rtt_s = t4 - t1 - reply_delay_s;
-    const double tof_s = (rtt_s-1.1567e-05) / 2.0; // the processing delay of the response packet;
+    const double tof_s = (rtt_s-1.1599999999e-05) / 2.0; // the processing delay of the response packet;
     const double range_m = tof_s * c_mps ;
+    const double response_fine_delay_s = dict_ref_double(meta, "fine_delay", 0.0);
+    const double response_phase_range_correction_m =
+        0.5 * c_mps * response_fine_delay_s;
 
     meta = pmt::dict_add(meta, pmt::mp("t1_tx_time"), pmt::from_double(t1));
     meta = pmt::dict_add(meta, pmt::mp("t4_rx_time"), pmt::from_double(t4));
@@ -104,6 +107,15 @@ void prs_ssrtt_solver_impl::handle_measurement(pmt::pmt_t msg)
     meta = pmt::dict_add(meta, pmt::mp("rtt_s"), pmt::from_double(rtt_s));
     meta = pmt::dict_add(meta, pmt::mp("tof_s"), pmt::from_double(tof_s));
     meta = pmt::dict_add(meta, pmt::mp("range_m"), pmt::from_double(range_m));
+    meta = pmt::dict_add(meta, pmt::mp("integer_tof_s"), pmt::from_double(tof_s));
+    meta = pmt::dict_add(
+        meta, pmt::mp("integer_range_m"), pmt::from_double(range_m));
+    meta = pmt::dict_add(meta,
+                         pmt::mp("response_fine_delay_s"),
+                         pmt::from_double(response_fine_delay_s));
+    meta = pmt::dict_add(meta,
+                         pmt::mp("response_phase_range_correction_m"),
+                         pmt::from_double(response_phase_range_correction_m));
 
     message_port_pub(pmt::mp("ssrtt_out"), pmt::cons(meta, pmt::PMT_NIL));
 }

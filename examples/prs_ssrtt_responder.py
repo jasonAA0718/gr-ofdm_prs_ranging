@@ -36,6 +36,8 @@ class prs_ssrtt_responder(gr.top_block):
         ##################################################
         self.samp_rate = samp_rate = int(30e6)
         self.zc_length = zc_length = 419
+        self.tx_gain = tx_gain = 0.6
+        self.rx_gain = rx_gain = 0.6
         self.reply_delay_samples = reply_delay_samples = int(0.05*samp_rate)
         self.premble_rep = premble_rep = 4
         self.premble_length = premble_length = 256
@@ -60,7 +62,7 @@ class prs_ssrtt_responder(gr.top_block):
         self.uhd_usrp_source_0_0.set_center_freq(center_freq, 0)
         self.uhd_usrp_source_0_0.set_antenna("RX2", 0)
         self.uhd_usrp_source_0_0.set_bandwidth(samp_rate, 0)
-        self.uhd_usrp_source_0_0.set_normalized_gain(0.9, 0)
+        self.uhd_usrp_source_0_0.set_normalized_gain(rx_gain, 0)
         self.uhd_usrp_sink_0 = uhd.usrp_sink(
             ",".join(("serial=34D0563", '')),
             uhd.stream_args(
@@ -77,7 +79,7 @@ class prs_ssrtt_responder(gr.top_block):
         self.uhd_usrp_sink_0.set_center_freq(center_freq, 0)
         self.uhd_usrp_sink_0.set_antenna("TX/RX", 0)
         self.uhd_usrp_sink_0.set_bandwidth(samp_rate, 0)
-        self.uhd_usrp_sink_0.set_normalized_gain(0.9, 0)
+        self.uhd_usrp_sink_0.set_normalized_gain(tx_gain, 0)
         self.prs_text_ui_0 = ofdm_prs_ranging.prs_text_ui("responder", 1.5, 1.0, 2.0, True)
         self.prs_ssrtt_responder_0 = ofdm_prs_ranging.prs_ssrtt_responder(samp_rate, reply_delay_samples)
         self.prs_source = ofdm_prs_ranging.prs_timed_burst_source(
@@ -89,8 +91,9 @@ class prs_ssrtt_responder(gr.top_block):
         self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 1024, 1024, 1.0)
         self.prs_frame_detector_0 = ofdm_prs_ranging.prs_frame_detector(samp_rate, 1024, 128, 1024, 16, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 25, 0, False, 0.05, 0.0002, 0.004, 0.5)
         self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 1024, 128, 1024, 16)
+        self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger("CSV/responder_measurements.csv", 1)
         self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 1024, 1024, 16, 13990001)
-        self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/responder_acquisition.csv", "responder", 1)
+        self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/responder_acquisition_v2.csv", "responder", 1)
 
 
         ##################################################
@@ -101,6 +104,7 @@ class prs_ssrtt_responder(gr.top_block):
         self.msg_connect((self.prs_frame_detector_0, 'event_out'), (self.prs_acquisition_logger_0, 'frame_in'))
         self.msg_connect((self.prs_frame_detector_0, 'frame_out'), (self.prs_fft_receiver_0, 'frame_in'))
         self.msg_connect((self.prs_frame_detector_0, 'frame_out'), (self.prs_text_ui_0, 'frame_in'))
+        self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_csv_logger_0, 'measurement_in'))
         self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_ssrtt_responder_0, 'measurement_in'))
         self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_text_ui_0, 'measurement_in'))
         self.msg_connect((self.prs_source, 'tx_time_out'), (self.prs_text_ui_0, 'tx_in'))
@@ -125,6 +129,20 @@ class prs_ssrtt_responder(gr.top_block):
 
     def set_zc_length(self, zc_length):
         self.zc_length = zc_length
+
+    def get_tx_gain(self):
+        return self.tx_gain
+
+    def set_tx_gain(self, tx_gain):
+        self.tx_gain = tx_gain
+        self.uhd_usrp_sink_0.set_normalized_gain(self.tx_gain, 0)
+
+    def get_rx_gain(self):
+        return self.rx_gain
+
+    def set_rx_gain(self, rx_gain):
+        self.rx_gain = rx_gain
+        self.uhd_usrp_source_0_0.set_normalized_gain(self.rx_gain, 0)
 
     def get_reply_delay_samples(self):
         return self.reply_delay_samples

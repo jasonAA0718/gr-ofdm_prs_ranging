@@ -67,7 +67,9 @@ prs_acquisition_logger_impl::prs_acquisition_logger_impl(const std::string& path
                   "root,packet_type,poll_frame_id,"
                   "response_frame_id,reply_delay_samples,frame_id_valid,rx_time,"
                   "preamble_metric,coarse_metric,"
-                  "payload_metric,cfo,samp_rate,fft_len,cp_len,active_bins,prs_symbols,"
+                  "payload_metric,cfo,preamble_cfo_hz,prs_cp_cfo_hz,"
+                  "prs_cp_cfo_coherence,selected_cfo_hz,payload_retry_used,"
+                  "samp_rate,fft_len,cp_len,active_bins,prs_symbols,"
                   "prs_start_rel,prs_len,pdu_len\n";
     }
     message_port_register_in(pmt::mp("frame_in"));
@@ -114,6 +116,15 @@ void prs_acquisition_logger_impl::handle_frame(pmt::pmt_t msg)
            << dict_ref_double(meta, "coarse_metric", 0.0) << ','
            << dict_ref_double(meta, "payload_metric", 0.0) << ','
            << dict_ref_double(meta, "cfo", 0.0) << ','
+           << dict_ref_double(meta, "preamble_cfo_hz", 0.0) << ','
+           << dict_ref_double(meta, "prs_cp_cfo_hz", 0.0) << ','
+           << dict_ref_double(meta, "prs_cp_cfo_coherence", 0.0) << ','
+           << dict_ref_double(meta, "selected_cfo_hz", 0.0) << ','
+           << (pmt::to_bool(
+                   pmt::dict_ref(meta, pmt::mp("payload_retry_used"), pmt::PMT_F))
+                   ? 1
+                   : 0)
+           << ','
            << dict_ref_double(meta, "samp_rate", 0.0) << ','
            << dict_ref_uint64(meta, "fft_len", 0) << ','
            << dict_ref_uint64(meta, "cp_len", 0) << ','

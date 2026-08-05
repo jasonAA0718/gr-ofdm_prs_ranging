@@ -95,6 +95,58 @@ std::vector<float> active_frequencies(const prs_rx_config& cfg)
     return freq;
 }
 
+prs_cfo_estimate estimate_prs_cp_cfo(const gr_complex* frame,
+                                     size_t frame_size,
+                                     const prs_rx_config& cfg,
+                                     double unwrap_reference_hz)
+{
+    prs_cfo_estimate result;
+    if (frame == nullptr || cfg.samp_rate <= 0.0 || cfg.fft_len <= 0 ||
+        cfg.cp_len <= 0 || cfg.prs_symbols <= 0) {
+        return result;
+    }
+
+    const int start = prs_start_offset(cfg);
+    const size_t needed = static_cast<size_t>(start + prs_len(cfg));
+    if (frame_size < needed) {
+        return result;
+    }
+
+    std::complex<double> corr(0.0, 0.0);
+    double cp_power = 0.0;
+    double tail_power = 0.0;
+    for (int sym = 0; sym < cfg.prs_symbols; ++sym) {
+        const size_t symbol_start = static_cast<size_t>(
+            start + sym * (cfg.fft_len + cfg.cp_len));
+        for (int n = 0; n < cfg.cp_len; ++n) {
+            const auto cp = frame[symbol_start + static_cast<size_t>(n)];
+            const auto tail = frame[symbol_start +
+                                    static_cast<size_t>(cfg.fft_len + n)];
+            corr += std::conj(std::complex<double>(cp.real(), cp.imag())) *
+                    std::complex<double>(tail.real(), tail.imag());
+            cp_power += std::norm(cp);
+            tail_power += std::norm(tail);
+        }
+    }
+
+    const double denom = std::sqrt(cp_power * tail_power);
+    if (!(denom > 0.0)) {
+        return result;
+    }
+
+    double phase = std::atan2(corr.imag(), corr.real());
+    if (std::isfinite(unwrap_reference_hz)) {
+        const double reference_phase =
+            2.0 * pi * unwrap_reference_hz * cfg.fft_len / cfg.samp_rate;
+        phase += 2.0 * pi * std::round((reference_phase - phase) / (2.0 * pi));
+    }
+    result.hz = phase * cfg.samp_rate /
+                (2.0 * pi * static_cast<double>(cfg.fft_len));
+    result.coherence = std::min(1.0, std::abs(corr) / denom);
+    result.valid = std::isfinite(result.hz) && std::isfinite(result.coherence);
+    return result;
+}
+
 std::vector<float> unwrap_phase(const std::vector<gr_complex>& samples)
 {
     return unwrap_phase(samples.data(), samples.size());

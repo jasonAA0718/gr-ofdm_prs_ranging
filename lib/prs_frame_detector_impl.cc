@@ -527,21 +527,45 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
     const double cfo_phase_increment =
         std::atan2(cfo_corr.imag(), cfo_corr.real()) /
         static_cast<double>(d_cfg.preamble_len);
-    const double cfo_hz =
+    const double preamble_cfo_hz =
         cfo_phase_increment * d_cfg.samp_rate /
         (2.0 * 3.141592653589793238462643383279502884);
+
+    const auto prs_cp_cfo = estimate_prs_cp_cfo(
+        frame.data(), frame.size(), d_cfg, preamble_cfo_hz);
 
     prs_payload_info payload_info;
     float payload_metric = 0.0f;
     const int payload_start = d_cfg.zero_guard_len +
                               d_cfg.preamble_len * d_cfg.preamble_repeats +
                               d_cfg.coarse_sync_len;
-    const bool frame_id_valid = decode_packet_payload(
+    bool frame_id_valid = decode_packet_payload(
         frame.data() + payload_start,
         d_cfg.payload_len,
         payload_info,
         payload_metric,
         cfo_phase_increment);
+    bool payload_retry_used = false;
+    double selected_cfo_hz = preamble_cfo_hz;
+    if (!frame_id_valid && prs_cp_cfo.valid && prs_cp_cfo.coherence >= 0.2) {
+        prs_payload_info retry_info;
+        float retry_metric = 0.0f;
+        const double retry_phase_increment =
+            2.0 * 3.141592653589793238462643383279502884 * prs_cp_cfo.hz /
+            d_cfg.samp_rate;
+        payload_retry_used = true;
+        const bool retry_valid = decode_packet_payload(frame.data() + payload_start,
+                                                       d_cfg.payload_len,
+                                                       retry_info,
+                                                       retry_metric,
+                                                       retry_phase_increment);
+        if (retry_valid || retry_metric > payload_metric) {
+            payload_info = retry_info;
+            payload_metric = retry_metric;
+            selected_cfo_hz = prs_cp_cfo.hz;
+        }
+        frame_id_valid = retry_valid;
+    }
     const uint64_t tx_frame_id = payload_info.packet_type == prs_packet_type_response
                                      ? payload_info.response_frame_id
                                      : payload_info.poll_frame_id;
@@ -573,7 +597,20 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
     meta = pmt::dict_add(
         meta, pmt::mp("coarse_zc_root"), pmt::from_long(d_cfg.coarse_zc_root));
     meta = pmt::dict_add(meta, pmt::mp("channel_id"), pmt::from_long(d_cfg.channel_id));
-    meta = pmt::dict_add(meta, pmt::mp("cfo"), pmt::from_double(cfo_hz));
+    meta = pmt::dict_add(
+        meta, pmt::mp("preamble_cfo_hz"), pmt::from_double(preamble_cfo_hz));
+    meta = pmt::dict_add(meta,
+                         pmt::mp("prs_cp_cfo_hz"),
+                         pmt::from_double(prs_cp_cfo.valid ? prs_cp_cfo.hz : 0.0));
+    meta = pmt::dict_add(meta,
+                         pmt::mp("prs_cp_cfo_coherence"),
+                         pmt::from_double(prs_cp_cfo.coherence));
+    meta = pmt::dict_add(meta,
+                         pmt::mp("payload_retry_used"),
+                         payload_retry_used ? pmt::PMT_T : pmt::PMT_F);
+    meta = pmt::dict_add(
+        meta, pmt::mp("selected_cfo_hz"), pmt::from_double(selected_cfo_hz));
+    meta = pmt::dict_add(meta, pmt::mp("cfo"), pmt::from_double(selected_cfo_hz));
     meta = pmt::dict_add(meta, pmt::mp("samp_rate"), pmt::from_double(d_cfg.samp_rate));
     meta = pmt::dict_add(meta, pmt::mp("fft_len"), pmt::from_long(d_cfg.fft_len));
     meta = pmt::dict_add(meta, pmt::mp("cp_len"), pmt::from_long(d_cfg.cp_len));

@@ -695,3 +695,65 @@ Old Random-QPSK, 600 bins        7.4209 dB    8.9281 dB     10.4139 dB
 
 The Random-QPSK implementation used for this comparison exists only in
 `lib/qa_golay_prs.cc`; production OFDM PRS generation does not use it.
+
+## 2026-08-05 PRS CFO Refinement and Phase Diagnostics
+
+The detector now estimates CFO in two stages. The repeated QPSK preamble still
+provides the original coarse estimate. A second estimate combines the cyclic
+prefix correlation from all 16 Golay OFDM symbols (`16 * 128` CP pairs). The
+preamble estimate resolves the CP estimator's phase ambiguity.
+
+Payload decoding first uses the preamble CFO. When CRC fails and PRS CP
+coherence is at least `0.2`, the detector retries once with the PRS CP CFO.
+There is no multi-candidate search in this implementation. Detector metadata
+now includes:
+
+```text
+preamble_cfo_hz
+prs_cp_cfo_hz
+prs_cp_cfo_coherence
+selected_cfo_hz
+payload_retry_used
+```
+
+The channel estimator retains all `16 x 1024` per-symbol channel estimates. It
+estimates CFO from their inter-symbol common-phase rotation, derotates every
+symbol to the first PRS-symbol time, and only then averages the channel. Added
+metadata is:
+
+```text
+prs_channel_cfo_hz
+residual_cfo_hz
+channel_coherence
+```
+
+The measurement CSV also records `phase_slope_rad_per_hz`, `fine_delay_s`,
+`fine_delay_samples`, and `phase_range_contribution_m`. The contribution is
+`c * fine_delay / 2`; it is one directional contribution, not a calibrated
+phase-corrected range. A complete SS-RTT phase correction requires matched poll
+and response rows plus RF-chain group-delay calibration.
+
+New output files avoid mixing the expanded schema with earlier corridor data:
+
+```text
+CSV/initiator_acquisition_v2.csv
+CSV/responder_acquisition_v2.csv
+CSV/initiator_measurements.csv
+CSV/responder_measurements.csv
+```
+
+The initiator measurement file contains received RESPONSE measurements after
+the SS-RTT solver. The responder measurement file contains received POLL
+measurements before response scheduling. Join them using `poll_frame_id`.
+
+Verification completed with GNU Radio 3.10.11:
+
+```text
+cmake --build build -j4
+HOME=/tmp XDG_CACHE_HOME=/tmp ctest --test-dir build --output-on-failure
+7/7 tests passed
+```
+
+The receiver QA covers positive and negative CFO, CRC recovery from a biased
+preamble CFO, inter-symbol channel CFO compensation, combined CFO plus
+fractional delay, CSV schema, and SS-RTT diagnostic fields.

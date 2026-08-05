@@ -619,3 +619,65 @@ are currently larger than the fine propagation phase term being sought.
 Therefore, phase-slope is useful today as a quality/channel diagnostic, but the
 stable absolute range is still dominated by SS-RTT timestamping and empirical
 calibration.
+
+## PRS-Based CFO Refinement
+
+For PRS symbol `m`, the cyclic prefix and corresponding useful-symbol tail are
+separated by `NFFT` samples. The detector combines every CP pair:
+
+```math
+C_{CP} = \sum_m \sum_{n=0}^{N_{CP}-1}
+y_m[n]^* y_m[n+N_{FFT}]
+```
+
+The PRS CP CFO estimate is:
+
+```math
+\hat f_{CP} =
+\frac{F_s}{2\pi N_{FFT}}\angle C_{CP}
+```
+
+The phase is unwrapped to the existing preamble CFO estimate. CP coherence is
+reported as:
+
+```math
+\rho_{CP} =
+\frac{|C_{CP}|}
+{\sqrt{\left(\sum |y_{CP}|^2\right)
+       \left(\sum |y_{tail}|^2\right)}}
+```
+
+If the first payload CRC fails and `rho_CP >= 0.2`, the payload is decoded once
+more using `f_CP`.
+
+The channel estimator initially preserves every symbol channel:
+
+```math
+\hat H_m[k] = Y_m[k] / X_m[k]
+```
+
+It estimates common phase evolution using adjacent symbols:
+
+```math
+C_H = \sum_m \sum_k \hat H_m[k]^* \hat H_{m+1}[k]
+```
+
+```math
+\hat f_H = \frac{\angle C_H}{2\pi T_{sym}}
+```
+
+After unwrapping relative to the PRS CP estimate, every channel symbol is
+rotated to a common time before averaging. This separates the symbol-time CFO
+term from the subcarrier-frequency delay slope. Residual ICI, SFO, multipath,
+and RF group delay remain and are not removed by this model.
+
+The logged phase range contribution is:
+
+```math
+\Delta R_{direction} = \frac{c\,\hat\tau_{direction}}{2}
+```
+
+It must not be interpreted as absolute range. The poll and response directional
+contributions must be matched by `poll_frame_id`, their signs verified with a
+known fractional-delay test, and the bidirectional RF group delay calibrated
+before fusion into the displayed SS-RTT range.
