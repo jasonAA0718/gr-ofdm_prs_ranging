@@ -53,7 +53,7 @@ fft_len      = 1024
 cp_len       = 128
 active_bins  = 1024
 prs_symbols  = 16
-pilot table  = lib/golay_prs_table.h
+pilot table  = lib/DSP/golay_prs_table.h
 ```
 
 All native FFT bins are occupied:
@@ -63,7 +63,7 @@ fft_bin 0 ... 1023
 signed bins -512 ... +511
 ```
 
-The fixed table is generated from `lib/golay_ofdm_1024x16.csv`. Even-numbered
+The fixed table is generated from `lib/DSP/golay_ofdm_1024x16.csv`. Even-numbered
 symbols use Golay A and odd-numbered symbols use Golay B. The `seed` parameter
 is retained for the repeated QPSK acquisition preamble, not for OFDM PRS.
 
@@ -108,7 +108,7 @@ poll_frame_id
 response_frame_id
 reply_delay_samples
 CRC-16
-5x repetition
+280 samples per information bit
 ```
 
 `frame_id_valid=1` must only be set when CRC passes.
@@ -124,21 +124,21 @@ or SS-TWR range formula.
 ### Signal-Processing Efficiency
 
 ```text
-lib/prs_receiver_utils.cc
+lib/DSP/prs_receiver_utils.cc
     Added zero-copy access to PMT complex vectors.
 
-lib/prs_frame_detector_impl.cc
+lib/DSP/prs_frame_detector_impl.cc
     Replaced per-scheduler-call sample shifting with logical buffer drops and
     batched compaction.
 
-lib/prs_fft_receiver_impl.cc
+lib/DSP/prs_fft_receiver_impl.cc
     Reused FFT input, output, and symbol buffers between frames.
 
-lib/prs_channel_estimator_impl.cc
+lib/DSP/prs_channel_estimator_impl.cc
     Precomputed pilot reciprocals and calculated channel residual statistics
     in one input pass.
 
-lib/prs_frame_builder.cc
+lib/DSP/prs_frame_builder.cc
     Replaced the quadratic transmitter DFT with GNU Radio's FFT backend.
 ```
 
@@ -153,8 +153,8 @@ A new `prs_rx_timekeeper` block was added in:
 
 ```text
 include/gnuradio/ofdm_prs_ranging/prs_rx_timekeeper.h
-lib/prs_rx_timekeeper_impl.h
-lib/prs_rx_timekeeper_impl.cc
+lib/USRP/prs_rx_timekeeper_impl.h
+lib/USRP/prs_rx_timekeeper_impl.cc
 python/ofdm_prs_ranging/bindings/prs_rx_timekeeper_python.cc
 grc/ofdm_prs_ranging_prs_rx_timekeeper.block.yml
 ```
@@ -660,7 +660,7 @@ The production OFDM PRS pilots now come only from the compiled table generated
 from:
 
 ```text
-lib/golay_ofdm_1024x16.csv
+lib/DSP/golay_ofdm_1024x16.csv
 ```
 
 The table occupies all `1024` native FFT bins for all `16` symbols. TX writes
@@ -694,7 +694,7 @@ Old Random-QPSK, 600 bins        7.4209 dB    8.9281 dB     10.4139 dB
 ```
 
 The Random-QPSK implementation used for this comparison exists only in
-`lib/qa_golay_prs.cc`; production OFDM PRS generation does not use it.
+`lib/DSP/qa_golay_prs.cc`; production OFDM PRS generation does not use it.
 
 ## 2026-08-05 PRS CFO Refinement and Phase Diagnostics
 
@@ -757,3 +757,55 @@ HOME=/tmp XDG_CACHE_HOME=/tmp ctest --test-dir build --output-on-failure
 The receiver QA covers positive and negative CFO, CRC recovery from a biased
 preamble CFO, inter-symbol channel CFO compensation, combined CFO plus
 fractional delay, CSV schema, and SS-RTT diagnostic fields.
+
+## 2026-08-10 PlutoSDR Untimed Test Path
+
+The production C++ implementations are grouped by responsibility without
+changing their installed public API:
+
+```text
+lib/DSP/    device-independent waveform, detector, estimator, codec, and logger
+lib/USRP/   UHD-time and timed SS-TWR implementations
+lib/Pluto/  untimed Pluto/IIO control implementations
+```
+
+The Pluto path adds two new blocks and does not modify the existing USRP
+blocks:
+
+```text
+pluto_prs_burst_source
+    Continuously produces complex samples for an IIO sink. It outputs zeros
+    while idle and inserts a complete PRS frame after a message trigger. It
+    emits local_tx_sample_index and untimed_tx metadata, never rx_time or
+    tx_time.
+
+pluto_prs_responder
+    Accepts frame detector PDUs and emits a response trigger only when the
+    BPSK payload CRC is valid and packet_type is POLL. The response payload
+    reports reply_delay_samples=0 because IIO does not expose a hardware-timed
+    turnaround in this configuration.
+```
+
+The corresponding examples are:
+
+```text
+examples/PlutoSDR_Initiator.grc
+examples/PlutoSDR_Responder.grc
+```
+
+Both examples use `ip:192.168.6.10`, `10 MS/s`, a default carrier of
+`1.06 GHz`, manual RX gain of `50 dB`, and TX attenuation of `10 dB`. The
+initiator transmits a POLL every 500 ms. The responder sends an untimed
+RESPONSE immediately after a valid decoded POLL. Root 25 identifies POLL and
+root 29 identifies RESPONSE. Detector time gating and all SS-TWR/RTT blocks
+are disabled because this IIO path has no common hardware sample clock API.
+
+Each flowgraph logs acquisition and PRS phase-slope measurements and records
+the first two seconds of TX and RX complex-float samples under `examples/CSV/`.
+At `10 MS/s`, each `.c64` file is approximately 160 MB. The TX capture is the
+software stream submitted to IIO, not a measurement of RF emission time. The
+RX capture is the stream delivered by IIO. Their file indices therefore must
+not be subtracted as RTT. Offline MATLAB can use either capture for waveform,
+CRC, channel, CFO, and phase-slope analysis; an RF RTT experiment additionally
+needs a shared hardware counter, calibrated self-leakage timing, or FPGA timed
+TX/sample-counter support.

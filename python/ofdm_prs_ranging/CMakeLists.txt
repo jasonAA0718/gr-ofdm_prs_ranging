@@ -41,5 +41,6 @@ add_custom_target(
 GR_ADD_TEST(qa_prs_timed_burst_source ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_prs_timed_burst_source.py)
 GR_ADD_TEST(qa_prs_receiver ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_prs_receiver.py)
 GR_ADD_TEST(qa_prs_text_ui ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_prs_text_ui.py)
-set_tests_properties(qa_prs_receiver
+GR_ADD_TEST(qa_pluto_prs ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_pluto_prs.py)
+set_tests_properties(qa_prs_receiver qa_pluto_prs
                      PROPERTIES ENVIRONMENT "HOME=/tmp;XDG_CACHE_HOME=/tmp")

@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /*
- * Generated from lib/golay_ofdm_1024x16.csv.
+ * Generated from lib/DSP/golay_ofdm_1024x16.csv.
  * CSV SHA-256: ae7f304501b07a957238216733c0a5dc58af4334e774d3457e1513e71e731f7f
  *
  * SPDX-License-Identifier: GPL-3.0-or-later

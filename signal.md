@@ -372,13 +372,13 @@ retained only in QA for comparison, measures
 The exact frequency-domain source of truth is:
 
 ```text
-lib/golay_ofdm_1024x16.csv
+lib/DSP/golay_ofdm_1024x16.csv
 ```
 
 It is converted offline into the compile-time table:
 
 ```text
-lib/golay_prs_table.h
+lib/DSP/golay_prs_table.h
 ```
 
 No CSV is read at GNU Radio runtime. The current entries are real BPSK

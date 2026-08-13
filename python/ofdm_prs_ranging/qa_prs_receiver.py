@@ -224,6 +224,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
     def test_golay_channel_estimator_unity_channel(self):
         csv_path = os.path.abspath(os.path.join(
             os.path.dirname(__file__), "..", "..", "lib",
+            "DSP",
             "golay_ofdm_1024x16.csv"))
         rows = numpy.loadtxt(csv_path, delimiter=",", skiprows=1)
         native = (rows[:, 3] + 1j * rows[:, 4]).reshape(16, 1024)
@@ -259,6 +260,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
         delay_samples = 0.25
         csv_path = os.path.abspath(os.path.join(
             os.path.dirname(__file__), "..", "..", "lib",
+            "DSP",
             "golay_ofdm_1024x16.csv"))
         rows = numpy.loadtxt(csv_path, delimiter=",", skiprows=1)
         native = (rows[:, 3] + 1j * rows[:, 4]).reshape(16, 1024)

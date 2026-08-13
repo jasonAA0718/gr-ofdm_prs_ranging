@@ -21,6 +21,8 @@ namespace py = pybind11;
 // Please do not delete
 /**************************************/
 // BINDING_FUNCTION_PROTOTYPES(
+    void bind_pluto_prs_burst_source(py::module& m);
+    void bind_pluto_prs_responder(py::module& m);
     void bind_prs_acquisition_logger(py::module& m);
     void bind_prs_frame_detector(py::module& m);
     void bind_prs_fft_receiver(py::module& m);
@@ -63,6 +65,8 @@ PYBIND11_MODULE(ofdm_prs_ranging_python, m)
     // Please do not delete
     /**************************************/
     // BINDING_FUNCTION_CALLS(
+    bind_pluto_prs_burst_source(m);
+    bind_pluto_prs_responder(m);
     bind_prs_acquisition_logger(m);
     bind_prs_frame_detector(m);
     bind_prs_fft_receiver(m);

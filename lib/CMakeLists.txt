@@ -11,26 +11,37 @@
 ########################################################################
 include(GrPlatform) #define LIB_SUFFIX
 
+set(ofdm_prs_ranging_dsp_sources
+    DSP/prs_acquisition_logger_impl.cc
+    DSP/prs_channel_estimator_impl.cc
+    DSP/prs_csv_logger_impl.cc
+    DSP/prs_fft_receiver_impl.cc
+    DSP/prs_frame_detector_impl.cc
+    DSP/prs_frame_builder.cc
+    DSP/prs_phase_slope_estimator_impl.cc
+    DSP/prs_payload_codec.cc
+    DSP/prs_receiver_utils.cc
+    DSP/zc_packet_utils.cc
+    DSP/zc_peak_detector_impl.cc)
+
+set(ofdm_prs_ranging_usrp_sources
+    USRP/prs_burst_scheduler.cc
+    USRP/prs_rx_timekeeper_impl.cc
+    USRP/prs_ssrtt_responder_impl.cc
+    USRP/prs_ssrtt_solver_impl.cc
+    USRP/prs_timed_burst_source_impl.cc
+    USRP/zc_manual_ping_source_impl.cc
+    USRP/zc_rtt_calculator_impl.cc
+    USRP/zc_rtt_responder_impl.cc)
+
+set(ofdm_prs_ranging_pluto_sources
+    Pluto/pluto_prs_burst_source_impl.cc
+    Pluto/pluto_prs_responder_impl.cc)
+
 list(APPEND ofdm_prs_ranging_sources
-    prs_burst_scheduler.cc
-    prs_acquisition_logger_impl.cc
-    prs_channel_estimator_impl.cc
-    prs_csv_logger_impl.cc
-    prs_fft_receiver_impl.cc
-    prs_frame_detector_impl.cc
-    prs_frame_builder.cc
-    prs_phase_slope_estimator_impl.cc
-    prs_payload_codec.cc
-    prs_receiver_utils.cc
-    prs_rx_timekeeper_impl.cc
-    prs_ssrtt_responder_impl.cc
-    prs_ssrtt_solver_impl.cc
-    prs_timed_burst_source_impl.cc
-    zc_manual_ping_source_impl.cc
-    zc_packet_utils.cc
-    zc_peak_detector_impl.cc
-    zc_rtt_calculator_impl.cc
-    zc_rtt_responder_impl.cc)
+    ${ofdm_prs_ranging_dsp_sources}
+    ${ofdm_prs_ranging_usrp_sources}
+    ${ofdm_prs_ranging_pluto_sources})
 
 set(ofdm_prs_ranging_sources
     "${ofdm_prs_ranging_sources}"
@@ -51,7 +62,10 @@ endif()
 target_include_directories(
     gnuradio-ofdm_prs_ranging
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
-    PUBLIC $<INSTALL_INTERFACE:include>)
+    PUBLIC $<INSTALL_INTERFACE:include>
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/DSP
+            ${CMAKE_CURRENT_SOURCE_DIR}/USRP
+            ${CMAKE_CURRENT_SOURCE_DIR}/Pluto)
 set_target_properties(gnuradio-ofdm_prs_ranging PROPERTIES DEFINE_SYMBOL "gnuradio_ofdm_prs_ranging_EXPORTS")
 
 if(APPLE)
@@ -81,10 +95,10 @@ include(GrTest)
 # List all files that contain Boost.UTF unit tests here
 
 list(APPEND test_ofdm_prs_ranging_sources
-    qa_golay_prs.cc
-    qa_prs_timed_burst_source.cc
-    qa_zc_packet_utils.cc
-    qa_zc_peak_detector.cc
+    DSP/qa_golay_prs.cc
+    USRP/qa_prs_timed_burst_source.cc
+    DSP/qa_zc_packet_utils.cc
+    DSP/qa_zc_peak_detector.cc
 )
 # Anything we need to link to for the unit tests go here
 list(APPEND GR_TEST_TARGET_DEPS gnuradio-ofdm_prs_ranging)
@@ -95,13 +109,19 @@ if(NOT test_ofdm_prs_ranging_sources)
 endif(NOT test_ofdm_prs_ranging_sources)
 
 foreach(qa_file ${test_ofdm_prs_ranging_sources})
-    gr_add_cpp_test("ofdm_prs_ranging_${qa_file}" ${CMAKE_CURRENT_SOURCE_DIR}/${qa_file})
-    if(qa_file STREQUAL "qa_prs_timed_burst_source.cc")
-        target_sources("ofdm_prs_ranging_${qa_file}" PRIVATE
-                       ${CMAKE_CURRENT_SOURCE_DIR}/prs_payload_codec.cc)
+    get_filename_component(qa_name ${qa_file} NAME)
+    set(qa_target "ofdm_prs_ranging_${qa_name}")
+    gr_add_cpp_test(${qa_target} ${CMAKE_CURRENT_SOURCE_DIR}/${qa_file})
+    target_include_directories(${qa_target} PRIVATE
+                               ${CMAKE_CURRENT_SOURCE_DIR}/DSP
+                               ${CMAKE_CURRENT_SOURCE_DIR}/USRP
+                               ${CMAKE_CURRENT_SOURCE_DIR}/Pluto)
+    if(qa_file STREQUAL "USRP/qa_prs_timed_burst_source.cc")
+        target_sources(${qa_target} PRIVATE
+                       ${CMAKE_CURRENT_SOURCE_DIR}/DSP/prs_payload_codec.cc)
     endif()
-    if(qa_file STREQUAL "qa_zc_packet_utils.cc")
-        target_sources("ofdm_prs_ranging_${qa_file}" PRIVATE
-                       ${CMAKE_CURRENT_SOURCE_DIR}/zc_packet_utils.cc)
+    if(qa_file STREQUAL "DSP/qa_zc_packet_utils.cc")
+        target_sources(${qa_target} PRIVATE
+                       ${CMAKE_CURRENT_SOURCE_DIR}/DSP/zc_packet_utils.cc)
     endif()
 endforeach(qa_file)

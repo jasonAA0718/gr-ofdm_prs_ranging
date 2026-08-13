@@ -25,6 +25,8 @@ include(GrPybind)
 ########################################################################
 
 list(APPEND ofdm_prs_ranging_python_files
+    pluto_prs_burst_source_python.cc
+    pluto_prs_responder_python.cc
     prs_acquisition_logger_python.cc
     prs_frame_detector_python.cc
     prs_fft_receiver_python.cc
