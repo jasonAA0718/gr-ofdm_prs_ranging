@@ -24,6 +24,26 @@ except ImportError:
     from gnuradio import ofdm_prs_ranging
 
 
+def load_golay_prs_native():
+    csv_path = os.path.abspath(os.path.join(
+        os.path.dirname(__file__), "..", "..", "lib", "DSP",
+        "golay_ofdm_1024x16.csv"))
+    if os.path.exists(csv_path):
+        rows = numpy.loadtxt(csv_path, delimiter=",", skiprows=1)
+        return (rows[:, 3] + 1j * rows[:, 4]).reshape(16, 1024)
+
+    golay_a = numpy.ones(1, dtype=numpy.float32)
+    golay_b = numpy.ones(1, dtype=numpy.float32)
+    while golay_a.size < 1024:
+        previous_a = golay_a
+        previous_b = golay_b
+        golay_a = numpy.concatenate((previous_a, previous_b))
+        golay_b = numpy.concatenate((previous_a, -previous_b))
+    return numpy.stack(
+        [golay_a if symbol % 2 == 0 else golay_b for symbol in range(16)]
+    ).astype(numpy.complex64)
+
+
 class qa_prs_receiver(gr_unittest.TestCase):
     def setUp(self):
         self.tb = gr.top_block()
@@ -222,12 +242,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
             0.70)
 
     def test_golay_channel_estimator_unity_channel(self):
-        csv_path = os.path.abspath(os.path.join(
-            os.path.dirname(__file__), "..", "..", "lib",
-            "DSP",
-            "golay_ofdm_1024x16.csv"))
-        rows = numpy.loadtxt(csv_path, delimiter=",", skiprows=1)
-        native = (rows[:, 3] + 1j * rows[:, 4]).reshape(16, 1024)
+        native = load_golay_prs_native()
         signed_order = numpy.concatenate(
             (native[:, 512:], native[:, :512]), axis=1).reshape(-1)
 
@@ -258,12 +273,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
         samp_rate = 30e6
         cfo_hz = 350.0
         delay_samples = 0.25
-        csv_path = os.path.abspath(os.path.join(
-            os.path.dirname(__file__), "..", "..", "lib",
-            "DSP",
-            "golay_ofdm_1024x16.csv"))
-        rows = numpy.loadtxt(csv_path, delimiter=",", skiprows=1)
-        native = (rows[:, 3] + 1j * rows[:, 4]).reshape(16, 1024)
+        native = load_golay_prs_native()
         signed = numpy.concatenate((native[:, 512:], native[:, :512]), axis=1)
         frequencies = numpy.arange(-512, 512, dtype=numpy.float64) * samp_rate / 1024.0
         expected_channel = numpy.exp(

@@ -9,7 +9,7 @@ __pycache__/
 
 # Measurement logs
 *.csv
-!lib/golay_ofdm_1024x16.csv
+!lib/DSP/golay_ofdm_1024x16.csv
 *.jsonl
 
 # Raw IQ / capture files
