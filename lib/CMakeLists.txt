@@ -34,14 +34,9 @@ set(ofdm_prs_ranging_usrp_sources
     USRP/zc_rtt_calculator_impl.cc
     USRP/zc_rtt_responder_impl.cc)
 
-set(ofdm_prs_ranging_pluto_sources
-    Pluto/pluto_prs_burst_source_impl.cc
-    Pluto/pluto_prs_responder_impl.cc)
-
 list(APPEND ofdm_prs_ranging_sources
     ${ofdm_prs_ranging_dsp_sources}
-    ${ofdm_prs_ranging_usrp_sources}
-    ${ofdm_prs_ranging_pluto_sources})
+    ${ofdm_prs_ranging_usrp_sources})
 
 set(ofdm_prs_ranging_sources
     "${ofdm_prs_ranging_sources}"
@@ -64,8 +59,7 @@ target_include_directories(
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
     PUBLIC $<INSTALL_INTERFACE:include>
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/DSP
-            ${CMAKE_CURRENT_SOURCE_DIR}/USRP
-            ${CMAKE_CURRENT_SOURCE_DIR}/Pluto)
+            ${CMAKE_CURRENT_SOURCE_DIR}/USRP)
 set_target_properties(gnuradio-ofdm_prs_ranging PROPERTIES DEFINE_SYMBOL "gnuradio_ofdm_prs_ranging_EXPORTS")
 
 if(APPLE)
@@ -114,8 +108,7 @@ foreach(qa_file ${test_ofdm_prs_ranging_sources})
     gr_add_cpp_test(${qa_target} ${CMAKE_CURRENT_SOURCE_DIR}/${qa_file})
     target_include_directories(${qa_target} PRIVATE
                                ${CMAKE_CURRENT_SOURCE_DIR}/DSP
-                               ${CMAKE_CURRENT_SOURCE_DIR}/USRP
-                               ${CMAKE_CURRENT_SOURCE_DIR}/Pluto)
+                               ${CMAKE_CURRENT_SOURCE_DIR}/USRP)
     if(qa_file STREQUAL "USRP/qa_prs_timed_burst_source.cc")
         target_sources(${qa_target} PRIVATE
                        ${CMAKE_CURRENT_SOURCE_DIR}/DSP/prs_payload_codec.cc)

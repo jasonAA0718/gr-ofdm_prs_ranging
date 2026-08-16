@@ -10,8 +10,6 @@
 # Install public header files
 ########################################################################
 install(FILES api.h
-    pluto_prs_burst_source.h
-    pluto_prs_responder.h
     prs_acquisition_logger.h
     prs_rx_timekeeper.h
     prs_timed_burst_source.h
