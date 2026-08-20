@@ -4,6 +4,55 @@ This file is a handoff note for future AI agents and developers working on
 `/home/cnsl/Desktop/gr-ofdm_prs_ranging`. 
 It records the current project architecture, recent implementation state, known problems, and recommended future work.
 
+## Table of Contents
+
+- [Engineering Rules for Future Agents](#engineering-rules-for-future-agents)
+- [Project Goal](#project-goal)
+- [Current OFDM PRS Burst](#current-ofdm-prs-burst)
+- [Current SS-TWR State](#current-ss-twr-state)
+- [Payload State](#payload-state)
+- [Changes on 2026-07-24](#changes-on-2026-07-24)
+- [Current Receiver Chain](#current-receiver-chain)
+- [Receiver Data-Path Efficiency](#receiver-data-path-efficiency)
+- [Decoupled RX Timing](#decoupled-rx-timing)
+- [Recent Coarse ZC Root / Channel Separation Support](#recent-coarse-zc-root--channel-separation-support)
+- [Known Experimental State](#known-experimental-state)
+- [Phase-Slope Estimator Status](#phase-slope-estimator-status)
+- [Known Test Status](#known-test-status)
+- [Installation Reminder](#installation-reminder)
+- [2026-07-27 Acquisition Attempt Logging](#2026-07-27-acquisition-attempt-logging)
+- [2026-07-28 BPSK Payload Documentation](#2026-07-28-bpsk-payload-documentation)
+- [2026-07-28 Golay PRS and Section Scaling](#2026-07-28-golay-prs-and-section-scaling)
+- [2026-08-05 PRS CFO Refinement and Phase Diagnostics](#2026-08-05-prs-cfo-refinement-and-phase-diagnostics)
+- [Future Work](#future-work)
+  - [1. Computational Cost and Processing Latency](#1-computational-cost-and-processing-latency)
+  - [2. End-to-End Update-Rate Budget](#2-end-to-end-update-rate-budget)
+  - [3. Integrate Communication Payload into OFDM](#3-integrate-communication-payload-into-ofdm)
+  - [4. Multi-Responder Observation Separation](#4-multi-responder-observation-separation)
+  - [5. Fine-Ranging Validation and Calibration](#5-fine-ranging-validation-and-calibration)
+  - [6. Positioning Algorithms](#6-positioning-algorithms)
+
+## Engineering Rules for Future Agents
+
+- Do not modify the repeated QPSK acquisition preamble unless explicitly asked.
+- Keep constructor changes backward-compatible by appending parameters with
+  defaults.
+- After changing public block constructors, update:
+
+```text
+include headers
+lib impl headers
+lib impl cc
+Python bindings
+GRC YAML
+examples
+QA tests
+```
+
+- Build after each meaningful change.
+- Run focused tests after changing receiver/transmitter behavior.
+
+
 ## Project Goal
 
 The long-term goal is real-time long-distance positioning using multiple
@@ -466,141 +515,8 @@ python3 -c "from gnuradio import ofdm_prs_ranging; print('OOT import OK')"
 ```
 
 
-## Future Work 1: Long-Distance Positioning Preparation
-
-Before implementing positioning:
-
-1. Stabilize one responder at long range.
-2. Confirm no persistent `O`/`L`.
-3. Confirm acquisition CSV shows expected root/channel only.
-4. Confirm payload CRC pass rate is high.
-5. Confirm `range_m` bias and standard deviation over many samples.
-6. Record responder anchor position and initiator ground truth position.
 
 
-## Future Work 2: Multiple Responders
-
-Recommended multi-responder architecture:
-
-```text
-Initiator UHD Source
-  -> detector(root=29, channel_id=1)
-  -> detector(root=31, channel_id=2)
-  -> detector(root=37, channel_id=3)
-```
-
-Each responder:
-
-```text
-RX detector root = 25       # detects POLL
-TX response root = unique   # identifies responder/channel
-payload responder/frame fields confirm identity
-```
-
-The acquisition root should separate channels before payload decode. Payload
-metadata should confirm identity, not be the first channel separator.
-
-Future payload extension:
-
-```text
-responder_id or anchor_id
-```
-
-Do not add this until the root/channel separation is stable.
-
-Possible scheduling options:
-
-1. Fixed reply delay per responder:
-
-```text
-Responder 1 reply_delay = 50 ms
-Responder 2 reply_delay = 80 ms
-Responder 3 reply_delay = 110 ms
-```
-
-This avoids response collisions.
-
-2. Same reply delay with different roots:
-
-This is more spectrally efficient but more difficult. It risks overlap and
-heavier receiver load from multiple detector branches.
-
-Start with staggered reply delays.
-
-## Future Work 3: Positioning Algorithms
-
-Positioning should consume stable range measurements:
-
-```text
-timestamp
-channel_id
-responder_id
-anchor_position
-range_m
-quality
-coarse_metric
-payload_metric
-phase_residual
-snr
-```
-
-Start with weighted least squares:
-
-```text
-minimize sum_i w_i (||x - a_i|| - r_i)^2
-```
-
-where:
-
-```text
-x   = unknown initiator position
-a_i = known anchor/responder position
-r_i = measured range to anchor i
-w_i = quality-based weight
-```
-
-Only after least squares works should a Kalman filter be added.
-
-Kalman state could later be:
-
-```text
-[x, y, vx, vy]
-```
-
-or for 3D:
-
-```text
-[x, y, z, vx, vy, vz]
-```
-
-Do not begin Kalman work until:
-
-```text
-at least 3 stable 2D anchors or 4 stable 3D anchors
-consistent update rate
-known anchor coordinates
-range outlier rejection
-```
-
-## Engineering Rules for Future Agents
-
-- Do not modify the repeated QPSK acquisition preamble unless explicitly asked.
-- Keep constructor changes backward-compatible by appending parameters with
-  defaults.
-- After changing public block constructors, update:
-
-```text
-include headers
-lib impl headers
-lib impl cc
-Python bindings
-GRC YAML
-examples
-QA tests
-```
-
-- Build after each meaningful change.
-- Run focused tests after changing receiver/transmitter behavior.
 
 ## 2026-07-27 Acquisition Attempt Logging
 
@@ -757,3 +673,249 @@ HOME=/tmp XDG_CACHE_HOME=/tmp ctest --test-dir build --output-on-failure
 The receiver QA covers positive and negative CFO, CRC recovery from a biased
 preamble CFO, inter-symbol channel CFO compensation, combined CFO plus
 fractional delay, CSV schema, and SS-RTT diagnostic fields.
+
+## Future Work
+
+The next phase should quantify the engineering cost of OFDM/PRS fine ranging, reduce avoidable waveform overhead, and extend the single-responder result toward stable multi-anchor measurements. The priority is no longer only to reduce ranging variance, but to measure what computation time, airtime, and system complexity are required to obtain that improvement.
+
+### 1. Computational Cost and Processing Latency
+
+Benchmark the processing time of each receive stage on the target PC using a monotonic high-resolution timer such as `std::chrono::steady_clock`. At minimum, record:
+
+```text
+frame detector
+FFT receiver
+channel estimator and PRS CFO correction
+phase unwrap and phase-slope estimator
+SS-RTT solver/logger
+total per-frame RX processing time
+```
+
+For each block, report:
+
+```text
+mean
+median
+95th percentile
+99th percentile
+maximum
+```
+
+Two costs must be kept separate:
+
+```text
+1. correlation/timestamp ranging -> complete OFDM/PRS ranging cost
+2. existing OFDM receiver       -> incremental fine-ranging cost
+```
+
+The second comparison is important because an OFDM communication modem already pays for FFT processing. In that case, the incremental ranging cost is mainly CFR estimation, CFO refinement, phase extraction/unwrapping, and the weighted phase-slope fit.
+
+The current weighted phase-slope fit is a one-pass linear regression over 1024 frequency bins. It should be implemented and benchmarked as direct accumulated sums rather than a general matrix least-squares solver. Measure whether the FFT, channel estimator, complex rotations, phase extraction, or the regression itself is the actual bottleneck.
+
+Use the measured total processing time to estimate the CPU-side ceiling:
+
+```text
+f_DSP,max ~= 1 / T_processing
+```
+
+This value must be distinguished from the complete over-the-air ranging update rate.
+
+A useful comparison for reporting is a simple DLL-style timing tracker or correlation-only timing baseline. The comparison should focus on the additional computation and latency required by OFDM phase-based fine ranging, not assume that the OFDM method is computationally cheaper.
+
+### 2. End-to-End Update-Rate Budget
+
+Build an explicit timing budget for one complete ranging transaction:
+
+```text
+T_cycle =
+    POLL waveform airtime
+  + responder reply delay
+  + RESPONSE waveform airtime
+  + RX/TX processing latency
+  + scheduling / guard margin
+```
+
+Then estimate:
+
+```text
+f_update,max = 1 / T_cycle
+```
+
+At the current 30 MS/s geometry, the waveform already contains large non-PRS overhead:
+
+```text
+BPSK payload: 33616 samples ~= 1.1205 ms
+PRS block:     18432 samples ~= 0.6144 ms
+```
+
+The current examples also use an approximately 50 ms responder reply delay. Therefore, do not attribute the present update-rate limit to the phase-slope estimator until the complete timing budget has been measured.
+
+Evaluate the effect of:
+
+```text
+shorter reply delay
+shorter payload airtime
+fewer PRS symbols
+reduced guard time
+DSP optimization
+multi-responder scheduling
+```
+
+The final report should show which component limits the update rate before and after each optimization.
+
+### 3. Integrate Communication Payload into OFDM
+
+The current waveform transmits the SS-TWR fields in a separate long repeated-BPSK section before the OFDM PRS block. This is reliable but inefficient in airtime. Evaluate moving the control information into one or more OFDM symbols while preserving known pilot resources required for channel and fine-delay estimation.
+
+Current control fields that must remain protected are:
+
+```text
+packet_type
+poll_frame_id
+response_frame_id
+reply_delay_samples
+CRC-16
+```
+
+A first implementation should avoid redesigning the entire PRS resource map. A practical intermediate waveform is:
+
+```text
+[preamble]
+[coarse ZC]
+[1-2 OFDM control/data symbols]
+[Golay PRS symbols]
+[tail guard]
+```
+
+Compare the current repeated-BPSK payload against the OFDM-integrated version using:
+
+```text
+payload airtime
+BER / packet error rate
+CRC success rate
+ranging bias and standard deviation
+phase residual
+CPU processing time
+maximum update rate
+```
+
+A later design may frequency-multiplex known pilots and data within the same OFDM symbols, but the receiver must retain enough known `X_m[k]` values to estimate `H_m[k] = Y_m[k] / X_m[k]` reliably.
+
+### 4. Multi-Responder Observation Separation
+
+The next system-level objective is to verify that one initiator can obtain stable and correctly associated observations from multiple responders.
+
+Start with time-separated responses rather than simultaneous OFDM transmissions. Use unique response ZC roots / `channel_id` values together with staggered reply delays, for example:
+
+```text
+Responder 1: unique response root, reply slot 1
+Responder 2: unique response root, reply slot 2
+Responder 3: unique response root, reply slot 3
+Responder 4: unique response root, reply slot 4
+```
+
+For every responder, verify independently:
+
+```text
+anchor/responder identity
+poll_frame_id association
+packet loss rate
+integer range
+phase-corrected range
+SNR
+coarse_metric
+payload_metric
+phase_residual
+quality
+```
+
+Unique ZC roots only separate acquisition identities. They do not by themselves separate two fully overlapping OFDM PRS signals. If two responders transmit the same pilots at the same time, the initiator observes a superposition of their channels. Therefore, after TDMA is stable, evaluate orthogonal OFDM resource separation such as:
+
+```text
+different time slots
+different subcarrier groups / PRS combs
+muting patterns
+other orthogonal pilot allocations
+```
+
+Test scalability from one to two, three, and four responders. Include near-far cases and intentional response collisions to determine the conditions under which per-anchor measurements remain identifiable and stable.
+
+### 5. Fine-Ranging Validation and Calibration
+
+Continue validating the phase-based correction across distance rather than only at one static point. Use the same calibration across a distance sweep and fit:
+
+```text
+measured_range = a * ground_truth_range + b
+```
+
+The main goals are to determine whether the remaining error is primarily a fixed bias `b`, a scale error `a`, or environment-dependent multipath.
+
+Recommended tests:
+
+```text
+multiple LOS distances
+small distance increments below one integer RTT range bin
+repeatability across power cycles
+SNR sweep / attenuation sweep
+controlled multipath and NLOS cases
+```
+
+Record fine-delay behavior together with:
+
+```text
+phase_residual
+channel_coherence
+prs_cp_cfo_coherence
+preamble_cfo_hz
+prs_cp_cfo_hz
+prs_channel_cfo_hz
+residual_cfo_hz
+```
+
+Before treating phase slope as a calibrated propagation-delay measurement, implement the recommended pre-FFT time-domain PRS CFO derotation, then estimate only the residual inter-symbol CFO after FFT. Compare the existing full-band weighted regression with the paper-style low/high-frequency OPA estimator on the same frames.
+
+### 6. Positioning Algorithms
+
+Positioning should begin only after multi-responder measurement separation and update rate are stable. The positioning layer should consume:
+
+```text
+timestamp
+channel_id
+responder_id / anchor_id
+anchor_position
+range_m or calibrated phase-corrected range
+quality
+coarse_metric
+payload_metric
+phase_residual
+snr
+```
+
+Start with weighted least squares:
+
+```text
+minimize sum_i w_i (||x - a_i|| - r_i)^2
+```
+
+where:
+
+```text
+x   = unknown initiator position
+a_i = known anchor position
+r_i = measured range
+w_i = quality-based weight
+```
+
+Do not add a Kalman filter until the system has:
+
+```text
+at least 3 stable anchors for 2D or 4 for 3D
+consistent update rate
+known anchor coordinates
+calibrated range bias
+outlier rejection
+reliable anchor identity and observation association
+```
+
+A Kalman filter can then be evaluated for moving-platform tracking after the raw multi-anchor ranging performance is characterized.
+

@@ -21,8 +21,8 @@ Using the common defaults:
 
 ```text
 zero_guard_len    = 1000 samples
-preamble_len      = 128 samples
-preamble_repeats  = 16
+preamble_len      = 256 samples
+preamble_repeats  = 8
 coarse_sync_len   = 839 samples
 payload_len       = 33616 samples
 fft_len           = 1024
@@ -221,8 +221,10 @@ RESPONSE payload CRC failure at initiator
 
 The packet payload starts with `Nref = 16` known reference symbols. The
 remaining `B = 120` data and CRC bits are each repeated `R = 280` times.
-The repeated-preamble CFO estimate is converted to phase increment
-`\hat{\omega}=2\pi\hat{f}_e/F_s` and applied to every payload sample:
+The repeated-preamble CFO estimate is initially converted to phase increment
+`\hat{\omega}=2\pi\hat{f}_e/F_s` and applied to every payload sample. If this
+decode fails CRC, the conditional CP-CFO retry is performed as described in
+the consolidated CFO chapter below.
 
 ```math
 \tilde{y}[i] = y[i]\exp(-j\hat{\omega}i)
@@ -267,7 +269,7 @@ M_{\text{decision}} = \frac{1}{B}\sum_{b=0}^{B-1}m[b]
 ```
 
 ```math
-\text{payload_metric} = \min(M_{\text{ref}}, M_{\text{decision}})
+\text{payload metric} = \min(M_{\text{ref}}, M_{\text{decision}})
 ```
 
 `payload_metric` is in `[0, 1]` and measures reference correlation plus
@@ -463,32 +465,338 @@ The implementation averages over all PRS symbols:
 It also computes a simple SNR-like metric from the average channel power and
 residual error around the average channel estimate.
 
-## Coarse CFO Estimation
+## CFO Estimation and Correction
 
-The repeated preamble also provides a coarse carrier frequency offset estimate.
-If the received repeated preamble has CFO `f_e`, adjacent periods are related by
+The receiver produces three carrier-frequency-offset estimates from different
+parts of an accepted frame:
 
-```math
-y[n+L_p] \approx y[n]\exp\left(j2\pi f_e \frac{L_p}{F_s}\right)
+```text
+repeated preamble -> preamble_cfo_hz
+PRS cyclic prefix -> prs_cp_cfo_hz
+adjacent PRS channel estimates -> prs_channel_cfo_hz
 ```
 
-The detector accumulates
+Let
 
-```math
-C_{\text{CFO}} =
-\sum_n y[n]^*y[n+L_p]
+```text
+Fs    = sample rate
+Lp    = repeated-preamble period length
+R     = number of preamble repetitions
+NFFT  = FFT length
+NCP   = cyclic-prefix length
+M     = number of PRS symbols
+K     = number of active PRS bins
 ```
 
-Then
+The current USRP examples use:
 
-```math
-\hat{f}_e =
-\frac{\angle C_{\text{CFO}}}{2\pi}
-\frac{F_s}{L_p}
+```text
+Fs = 30 MHz, Lp = 256, R = 4
+NFFT = 1024, NCP = 128, M = 16, K = 1024
 ```
 
-This estimate is reported as metadata. In the current receiver chain it is not
-used to derotate the OFDM PRS symbols before phase-slope estimation.
+### Repeated-Preamble CFO
+
+For constant CFO `f_e`, samples in adjacent copies of the repeated preamble are
+approximately related by
+
+```math
+y[n+L_p] \approx y[n]
+\exp\left(j2\pi f_e\frac{L_p}{F_s}\right)
+```
+
+After frame extraction, the detector accumulates
+
+```math
+C_p^{(f)} =
+\sum_{n=0}^{L_p(R-1)-1} y[n]^*y[n+L_p]
+```
+
+and estimates
+
+```math
+\hat f_p =
+\frac{F_s}{2\pi L_p}\angle C_p^{(f)}
+```
+
+This calculation uses `L_p(R-1)` complex correlation products, covers all
+`L_pR` preamble samples, and has correlation lag `L_p`. With the current USRP
+geometry:
+
+```text
+correlation products = 256(4-1) = 768
+unique samples covered = 256(4) = 1024
+observation duration = 1024 / 30 MHz = 34.133 us
+correlation lag = 256 / 30 MHz = 8.533 us
+unambiguous CFO range = +/-Fs/(2Lp) = +/-58.594 kHz
+```
+
+The preamble estimate has the widest acquisition range and is available first.
+The payload decoder initially converts it to phase increment
+
+```math
+\hat\omega_p = 2\pi\frac{\hat f_p}{F_s}
+```
+
+and derotates every BPSK payload sample before coherent combining. The known
+16-sample payload reference then removes the remaining constant phase.
+
+### PRS Cyclic-Prefix CFO
+
+The CP of PRS symbol `m` duplicates the final `N_CP` samples of its useful
+`N_FFT`-sample waveform. Corresponding samples are separated by exactly
+`N_FFT` samples. If `s_m` is the start of the CP, the detector calculates
+
+```math
+C_{\text{CP}} =
+\sum_{m=0}^{M-1}
+\sum_{n=0}^{N_{\text{CP}}-1}
+y[s_m+n]^*y[s_m+N_{\text{FFT}}+n]
+```
+
+The raw phase is ambiguous by integer multiples of `2\pi`. The implementation
+uses the preamble CFO as its unwrap reference:
+
+```math
+\theta_{\text{ref}} =
+2\pi\hat f_p\frac{N_{\text{FFT}}}{F_s}
+```
+
+```math
+\tilde\theta_{\text{CP}} =
+\angle C_{\text{CP}} +
+2\pi\operatorname{round}\left(
+\frac{\theta_{\text{ref}}-\angle C_{\text{CP}}}{2\pi}
+\right)
+```
+
+The CP estimate is
+
+```math
+\hat f_{\text{CP}} =
+\frac{F_s}{2\pi N_{\text{FFT}}}
+\tilde\theta_{\text{CP}}
+```
+
+and its normalized coherence is
+
+```math
+\rho_{\text{CP}} =
+\frac{|C_{\text{CP}}|}
+{\sqrt{
+\left(\sum |y_{\text{CP}}|^2\right)
+\left(\sum |y_{\text{tail}}|^2\right)}}
+```
+
+For the current geometry:
+
+```text
+correlation products = M NCP = 16(128) = 2048
+selected input samples = 4096
+correlation lag = 1024 / 30 MHz = 34.133 us
+complete PRS span = 16(1024+128) = 18432 samples = 614.4 us
+raw unambiguous CFO range = +/-Fs/(2NFFT) = +/-14.648 kHz
+CFO alias interval = Fs/NFFT = 29.297 kHz
+```
+
+The initial payload decode still uses `hat f_p`. If its CRC fails and
+`rho_CP >= 0.2`, the detector retries the complete payload once using
+`hat f_CP`. The CP estimate is available only after a complete frame has been
+extracted, so it cannot rescue failed preamble or ZC acquisition.
+
+### PRS Channel CFO
+
+After the FFT and pilot division, the channel estimator retains every
+per-symbol channel estimate:
+
+```math
+\hat H_m[k] = \frac{Y_m[k]}{X_m[k]}
+```
+
+Constant CFO appears primarily as common phase evolution between adjacent PRS
+symbols:
+
+```math
+\hat H_{m+1}[k] \approx
+\hat H_m[k]\exp(j2\pi f_e T_{\text{sym}})
+```
+
+where
+
+```math
+T_{\text{sym}} =
+\frac{N_{\text{FFT}}+N_{\text{CP}}}{F_s}
+```
+
+The estimator accumulates
+
+```math
+C_H =
+\sum_{m=0}^{M-2}
+\sum_{k=0}^{K-1}
+\hat H_m[k]^*\hat H_{m+1}[k]
+```
+
+It unwraps `angle C_H` relative to `hat f_CP`, or relative to `hat f_p` when
+the CP field is unavailable, and calculates
+
+```math
+\hat f_H =
+\frac{\widetilde{\angle C_H}}
+{2\pi T_{\text{sym}}}
+```
+
+The channel coherence is the magnitude of `C_H` divided by the square root of
+the accumulated powers of the two members of every adjacent-symbol pair. The
+current geometry gives:
+
+```text
+per-symbol channel estimates = MK = 16(1024) = 16384
+adjacent-symbol products = (M-1)K = 15(1024) = 15360
+adjacent-symbol separation = 1152 samples = 38.4 us
+complete PRS span = 18432 samples = 614.4 us
+raw unambiguous CFO range = +/-Fs/[2(NFFT+NCP)] = +/-13.021 kHz
+CFO alias interval = Fs/(NFFT+NCP) = 26.042 kHz
+```
+
+Every symbol channel is then rotated to the time reference of symbol zero:
+
+```math
+\tilde H_m[k] =
+\hat H_m[k]
+\exp(-j2\pi\hat f_H mT_{\text{sym}})
+```
+
+and the CFO-aligned channel used by the phase-slope estimator is
+
+```math
+\hat H[k] = \frac{1}{M}\sum_{m=0}^{M-1}\tilde H_m[k]
+```
+
+### Comparison and Current Roles
+
+| Estimate | Products | Correlation separation | Observation span | Raw CFO range | Current role |
+|---|---:|---:|---:|---:|---|
+| Preamble `hat f_p` | 768 | 256 samples | 1024 samples | +/-58.594 kHz | Initial payload derotation and CP unwrap reference |
+| PRS CP `hat f_CP` | 2048 | 1024 samples | 18432-sample PRS span | +/-14.648 kHz | Conditional payload retry and channel-CFO unwrap reference |
+| PRS channel `hat f_H` | 15360 | 1152 samples | 18432-sample PRS span | +/-13.021 kHz | Inter-symbol channel phase alignment before averaging |
+
+The three estimates should be approximately equal for a stable oscillator and
+a correctly extracted frame. Differences close to `Fs/N_FFT` or
+`Fs/(N_FFT+N_CP)` indicate a likely phase-ambiguity branch error. Low CP
+coherence points toward low SNR, incorrect timing, interference, or delay spread
+beyond the CP. High CP coherence with low channel coherence instead points
+toward channel variation, SFO, ICI, or an FFT-window problem.
+
+The metadata used for comparison is:
+
+```text
+preamble_cfo_hz
+prs_cp_cfo_hz
+prs_cp_cfo_coherence
+selected_cfo_hz
+payload_retry_used
+prs_channel_cfo_hz
+residual_cfo_hz
+channel_coherence
+```
+
+`residual_cfo_hz` currently means `prs_channel_cfo_hz` minus the unwrap
+reference. It is not a fourth independent CFO measurement made after channel
+correction.
+
+### Warning: Current PRS ICI Is Not Removed
+
+> **Warning:** The current FFT receiver does not derotate raw PRS time samples
+> before the FFT. Preamble and CP CFO are used for payload decoding and phase
+> unwrapping, while `hat f_H` is applied only to channel estimates after the
+> FFT.
+
+Post-FFT channel rotation removes common phase evolution between OFDM symbols,
+but it cannot reverse leakage that CFO has already produced between subcarriers.
+For normalized CFO
+
+```math
+\epsilon_f = \frac{f_e}{\Delta f},
+\qquad
+\Delta f = \frac{F_s}{N_{\text{FFT}}}
+```
+
+the received bin contains both its desired term and CFO-dependent contributions
+from other bins. This ICI can bias channel phase and therefore bias the final
+phase-slope delay. The present correction also does not remove SFO, phase noise,
+multipath distortion, or an incorrect integer FFT-window position.
+
+`selected_cfo_hz` records the CFO used by payload decoding; it is not the CFO
+currently applied to PRS time samples. The channel estimator always calculates
+and applies its inter-symbol estimate without a coherence threshold. A
+low-coherence channel CFO can therefore rotate channel symbols using an
+unreliable estimate. In addition, an invalid CP estimate is currently exported
+as finite value zero, so downstream code cannot distinguish invalid CP from a
+true zero-Hz estimate using `prs_cp_cfo_hz` alone.
+
+### Recommended First Implementation
+
+The first implementation should use two correction stages:
+
+```text
+reliable CP CFO, otherwise preamble CFO
+-> continuous time-domain PRS derotation
+-> FFT and pilot division
+-> residual PRS channel CFO estimation
+-> residual inter-symbol channel rotation
+-> channel averaging
+-> phase-slope delay estimation
+```
+
+Select the pre-FFT estimate as
+
+```math
+\hat f_0 =
+\begin{cases}
+\hat f_{\text{CP}}, & \rho_{\text{CP}} \ge \rho_{\min} \\
+\hat f_p, & \text{otherwise}
+\end{cases}
+```
+
+with an initial `rho_min` in the range `0.3...0.5`. Before each FFT, derotate
+the useful PRS samples using a continuous sample index measured from the start
+of the PRS section:
+
+```math
+\tilde y[n] =
+y[n]\exp\left(-j2\pi\hat f_0\frac{n}{F_s}\right)
+```
+
+The phase index must continue across CP-OFDM symbols rather than restart at
+zero for each useful symbol. This removes within-symbol rotation and most
+inter-symbol common phase before the FFT. It requires only `M NFFT = 16384`
+complex multiplications per frame and can use a recursively updated complex
+phasor instead of one sine/cosine evaluation per sample.
+
+After pre-FFT correction, the adjacent-channel estimator measures residual CFO,
+not total CFO. Its unwrap reference must therefore change from `hat f_CP` to
+zero. Define
+
+```math
+\hat f_{\text{total}} = \hat f_0 + \hat f_{\text{res}}
+```
+
+and use `hat f_res` for the remaining inter-symbol channel rotation. Suggested
+metadata is:
+
+```text
+prs_time_cfo_applied_hz
+prs_residual_cfo_hz
+prs_total_cfo_hz
+prs_cp_cfo_valid
+```
+
+If the residual is still large enough to cause meaningful ICI, an optional
+second pass can repeat the PRS derotation and FFT using `hat f_total`. The
+recommended first implementation is the single pre-FFT correction plus
+residual channel rotation; it addresses the existing ICI problem with much
+less computation than a two-pass receiver.
 
 ## Phase-Slope Delay Estimation
 
@@ -619,65 +927,3 @@ are currently larger than the fine propagation phase term being sought.
 Therefore, phase-slope is useful today as a quality/channel diagnostic, but the
 stable absolute range is still dominated by SS-RTT timestamping and empirical
 calibration.
-
-## PRS-Based CFO Refinement
-
-For PRS symbol `m`, the cyclic prefix and corresponding useful-symbol tail are
-separated by `NFFT` samples. The detector combines every CP pair:
-
-```math
-C_{CP} = \sum_m \sum_{n=0}^{N_{CP}-1}
-y_m[n]^* y_m[n+N_{FFT}]
-```
-
-The PRS CP CFO estimate is:
-
-```math
-\hat f_{CP} =
-\frac{F_s}{2\pi N_{FFT}}\angle C_{CP}
-```
-
-The phase is unwrapped to the existing preamble CFO estimate. CP coherence is
-reported as:
-
-```math
-\rho_{CP} =
-\frac{|C_{CP}|}
-{\sqrt{\left(\sum |y_{CP}|^2\right)
-       \left(\sum |y_{tail}|^2\right)}}
-```
-
-If the first payload CRC fails and `rho_CP >= 0.2`, the payload is decoded once
-more using `f_CP`.
-
-The channel estimator initially preserves every symbol channel:
-
-```math
-\hat H_m[k] = Y_m[k] / X_m[k]
-```
-
-It estimates common phase evolution using adjacent symbols:
-
-```math
-C_H = \sum_m \sum_k \hat H_m[k]^* \hat H_{m+1}[k]
-```
-
-```math
-\hat f_H = \frac{\angle C_H}{2\pi T_{sym}}
-```
-
-After unwrapping relative to the PRS CP estimate, every channel symbol is
-rotated to a common time before averaging. This separates the symbol-time CFO
-term from the subcarrier-frequency delay slope. Residual ICI, SFO, multipath,
-and RF group delay remain and are not removed by this model.
-
-The logged phase range contribution is:
-
-```math
-\Delta R_{direction} = \frac{c\,\hat\tau_{direction}}{2}
-```
-
-It must not be interpreted as absolute range. The poll and response directional
-contributions must be matched by `poll_frame_id`, their signs verified with a
-known fractional-delay test, and the bidirectional RF group delay calibrated
-before fusion into the displayed SS-RTT range.

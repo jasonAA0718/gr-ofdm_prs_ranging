@@ -74,7 +74,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '0.9'
+    value: '75'
   states:
     bus_sink: false
     bus_source: false
@@ -98,7 +98,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '0.9'
+    value: '75'
   states:
     bus_sink: false
     bus_source: false
@@ -487,7 +487,7 @@ blocks:
     gain7: '0'
     gain8: '0'
     gain9: '0'
-    gain_type0: normalized
+    gain_type0: default
     gain_type1: default
     gain_type10: default
     gain_type11: default
@@ -828,7 +828,7 @@ blocks:
     gain7: '0'
     gain8: '0'
     gain9: '0'
-    gain_type0: normalized
+    gain_type0: default
     gain_type1: default
     gain_type10: default
     gain_type11: default

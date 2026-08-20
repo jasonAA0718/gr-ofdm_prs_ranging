@@ -95,7 +95,7 @@ void prs_ssrtt_solver_impl::handle_measurement(pmt::pmt_t msg)
     const uint64_t reply_delay_samples = dict_ref_uint64(meta, "reply_delay_samples", 0);
     const double reply_delay_s = static_cast<double>(reply_delay_samples) / d_samp_rate;
     const double rtt_s = t4 - t1 - reply_delay_s;
-    const double tof_s = (rtt_s-1.1599999999e-05) / 2.0; // the processing delay of the response packet;
+    const double tof_s = (rtt_s-1.159952546762614e-05) / 2.0; // the processing delay of the response packet;
     const double range_m = tof_s * c_mps ;
     const double response_fine_delay_s = dict_ref_double(meta, "fine_delay", 0.0);
     const double response_phase_range_correction_m =
