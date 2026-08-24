@@ -3,12 +3,14 @@ label: PRS SS-RTT Solver
 category: '[ofdm_prs_ranging]'
 templates:
   imports: from gnuradio import ofdm_prs_ranging
-  make: ofdm_prs_ranging.prs_ssrtt_solver(${samp_rate})
+  make: ofdm_prs_ranging.prs_ssrtt_solver(${samp_rate}, ${enable_profiling})
 parameters:
 - {id: samp_rate, label: Sample Rate, dtype: real, default: 10e6}
+- {id: enable_profiling, label: Enable Profiling, dtype: bool, default: 'False'}
 inputs:
 - {label: tx_time_in, domain: message}
 - {label: measurement_in, domain: message}
 outputs:
 - {label: ssrtt_out, domain: message}
+- {label: timing_out, domain: message, optional: true}
 file_format: 1

@@ -18,11 +18,12 @@ namespace ofdm_prs_ranging {
 class prs_csv_logger_impl : public prs_csv_logger
 {
 public:
-    prs_csv_logger_impl(const std::string& path, bool append);
+    prs_csv_logger_impl(const std::string& path, bool append, bool enable_profiling);
     ~prs_csv_logger_impl() override;
 
 private:
     std::ofstream d_file;
+    bool d_enable_profiling;
     void handle_measurement(pmt::pmt_t msg);
 };
 

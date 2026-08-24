@@ -24,6 +24,7 @@ It records the current project architecture, recent implementation state, known 
 - [2026-07-28 BPSK Payload Documentation](#2026-07-28-bpsk-payload-documentation)
 - [2026-07-28 Golay PRS and Section Scaling](#2026-07-28-golay-prs-and-section-scaling)
 - [2026-08-05 PRS CFO Refinement and Phase Diagnostics](#2026-08-05-prs-cfo-refinement-and-phase-diagnostics)
+- [2026-08-20 Processing-Time Profiling](#2026-08-20-processing-time-profiling)
 - [Future Work](#future-work)
   - [1. Computational Cost and Processing Latency](#1-computational-cost-and-processing-latency)
   - [2. End-to-End Update-Rate Budget](#2-end-to-end-update-rate-budget)
@@ -674,6 +675,47 @@ The receiver QA covers positive and negative CFO, CRC recovery from a biased
 preamble CFO, inter-symbol channel CFO compensation, combined CFO plus
 fractional delay, CSV schema, and SS-RTT diagnostic fields.
 
+## 2026-08-20 Processing-Time Profiling
+
+Two hardware flowgraphs preserve the current SS-RTT waveform and receiver chain
+while enabling per-stage monotonic-clock profiling:
+
+```text
+examples/prs_ssrtt_initiator_profiling.grc
+examples/prs_ssrtt_responder_profiling.grc
+```
+
+The production blocks retain profiling disabled by default. The profiling
+flowgraphs enable the optional `timing_out` ports on the frame detector, FFT
+receiver, channel estimator, phase-slope estimator, SS-RTT responder/solver,
+and measurement CSV logger. All reports feed one `PRS Timing Collector` block.
+The text UI is omitted so terminal refresh work does not contaminate the timing
+distribution.
+
+The collector buffers timing reports in memory and writes the files when the
+flowgraph stops:
+
+```text
+CSV/initiator_timing_raw.csv
+CSV/initiator_timing_summary.csv
+CSV/responder_timing_raw.csv
+CSV/responder_timing_summary.csv
+```
+
+The raw file contains the role, block, stage, attempt/frame identifiers,
+monotonic handler start/end times, and duration in nanoseconds and microseconds.
+The summary groups each block/stage and reports count, mean, median, p95, p99,
+and maximum time. `handler_total` includes the block handler and message-output
+work but excludes construction/publication of the timing report itself.
+`frame_detector.acquisition_total` additionally includes accumulated
+repeated-preamble and local-ZC scanning time since the preceding reported
+acquisition outcome.
+
+Stop the flowgraph normally with `Ctrl+C` so the collector can finalize both
+CSV files. Compare the raw monotonic timestamps for queue/scheduling gaps, and
+use the stage summary for computation-cost comparisons. Measurement CSV flush
+time is reported separately and must not be attributed to OFDM estimation.
+
 ## Future Work
 
 The next phase should quantify the engineering cost of OFDM/PRS fine ranging, reduce avoidable waveform overhead, and extend the single-responder result toward stable multi-anchor measurements. The priority is no longer only to reduce ranging variance, but to measure what computation time, airtime, and system complexity are required to obtain that improvement.
@@ -918,4 +960,3 @@ reliable anchor identity and observation association
 ```
 
 A Kalman filter can then be evaluated for moving-platform tracking after the raw multi-anchor ranging performance is characterized.
-

@@ -8,8 +8,8 @@
 #ifndef INCLUDED_OFDM_PRS_RANGING_PRS_FRAME_DETECTOR_H
 #define INCLUDED_OFDM_PRS_RANGING_PRS_FRAME_DETECTOR_H
 
-#include <gnuradio/ofdm_prs_ranging/api.h>
 #include <gnuradio/block.h>
+#include <gnuradio/ofdm_prs_ranging/api.h>
 
 namespace gr {
 namespace ofdm_prs_ranging {
@@ -36,7 +36,8 @@ public:
                      double reply_delay_s = 0.05,
                      double window_before_s = 0.0002,
                      double window_after_s = 0.004,
-                     float zc_threshold = 0.35f);
+                     float zc_threshold = 0.35f,
+                     bool enable_profiling = false);
 };
 
 } // namespace ofdm_prs_ranging

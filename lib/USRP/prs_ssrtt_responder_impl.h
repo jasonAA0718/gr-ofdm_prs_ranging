@@ -17,11 +17,14 @@ namespace ofdm_prs_ranging {
 class prs_ssrtt_responder_impl : public prs_ssrtt_responder
 {
 public:
-    prs_ssrtt_responder_impl(double samp_rate, uint32_t reply_delay_samples);
+    prs_ssrtt_responder_impl(double samp_rate,
+                             uint32_t reply_delay_samples,
+                             bool enable_profiling);
 
 private:
     double d_samp_rate;
     uint32_t d_reply_delay_samples;
+    bool d_enable_profiling;
 
     void handle_measurement(pmt::pmt_t msg);
 };

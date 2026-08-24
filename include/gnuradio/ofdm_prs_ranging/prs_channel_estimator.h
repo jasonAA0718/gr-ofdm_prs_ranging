@@ -8,8 +8,8 @@
 #ifndef INCLUDED_OFDM_PRS_RANGING_PRS_CHANNEL_ESTIMATOR_H
 #define INCLUDED_OFDM_PRS_RANGING_PRS_CHANNEL_ESTIMATOR_H
 
-#include <gnuradio/ofdm_prs_ranging/api.h>
 #include <gnuradio/block.h>
+#include <gnuradio/ofdm_prs_ranging/api.h>
 
 namespace gr {
 namespace ofdm_prs_ranging {
@@ -22,7 +22,8 @@ public:
                      int fft_len = 1024,
                      int active_bins = 1024,
                      int prs_symbols = 16,
-                     uint32_t seed = 13990001);
+                     uint32_t seed = 13990001,
+                     bool enable_profiling = false);
 };
 
 } // namespace ofdm_prs_ranging

@@ -5,7 +5,8 @@ namespace py = pybind11;
 void bind_prs_frame_detector(py::module& m)
 {
     using block = gr::ofdm_prs_ranging::prs_frame_detector;
-    py::class_<block, gr::block, gr::basic_block, std::shared_ptr<block>>(m, "prs_frame_detector")
+    py::class_<block, gr::block, gr::basic_block, std::shared_ptr<block>>(
+        m, "prs_frame_detector")
         .def(py::init(&block::make),
              py::arg("samp_rate") = 10e6,
              py::arg("fft_len") = 1024,
@@ -25,5 +26,6 @@ void bind_prs_frame_detector(py::module& m)
              py::arg("reply_delay_s") = 0.05,
              py::arg("window_before_s") = 0.0002,
              py::arg("window_after_s") = 0.004,
-             py::arg("zc_threshold") = 0.35f);
+             py::arg("zc_threshold") = 0.35f,
+             py::arg("enable_profiling") = false);
 }

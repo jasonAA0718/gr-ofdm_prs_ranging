@@ -21,7 +21,8 @@ public:
                                int fft_len,
                                int active_bins,
                                int prs_symbols,
-                               uint32_t seed);
+                               uint32_t seed,
+                               bool enable_profiling);
     ~prs_channel_estimator_impl() override = default;
 
 private:
@@ -30,6 +31,7 @@ private:
     std::vector<gr_complex> d_symbol_channels;
     std::vector<gr_complex> d_channel;
     std::vector<double> d_channel_energy;
+    bool d_enable_profiling;
     void handle_symbols(pmt::pmt_t msg);
 };
 

@@ -23,13 +23,15 @@ public:
                           int fft_len,
                           int cp_len,
                           int active_bins,
-                          int prs_symbols);
+                          int prs_symbols,
+                          bool enable_profiling);
     ~prs_fft_receiver_impl() override = default;
 
 private:
     prs_rx_config d_cfg;
     std::unique_ptr<gr::fft::fft_complex_fwd> d_fft;
     std::vector<gr_complex> d_active;
+    bool d_enable_profiling;
     void handle_frame(pmt::pmt_t msg);
 };
 

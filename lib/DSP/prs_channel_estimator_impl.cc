@@ -6,6 +6,7 @@
  */
 
 #include "prs_channel_estimator_impl.h"
+#include "prs_timing_helper.h"
 #include <gnuradio/io_signature.h>
 #include <algorithm>
 #include <cmath>
@@ -22,20 +23,23 @@ prs_channel_estimator::sptr prs_channel_estimator::make(double samp_rate,
                                                         int fft_len,
                                                         int active_bins,
                                                         int prs_symbols,
-                                                        uint32_t seed)
+                                                        uint32_t seed,
+                                                        bool enable_profiling)
 {
     return gnuradio::make_block_sptr<prs_channel_estimator_impl>(
-        samp_rate, fft_len, active_bins, prs_symbols, seed);
+        samp_rate, fft_len, active_bins, prs_symbols, seed, enable_profiling);
 }
 
 prs_channel_estimator_impl::prs_channel_estimator_impl(double samp_rate,
                                                        int fft_len,
                                                        int active_bins,
                                                        int prs_symbols,
-                                                       uint32_t seed)
+                                                       uint32_t seed,
+                                                       bool enable_profiling)
     : gr::block("prs_channel_estimator",
                 gr::io_signature::make(0, 0, 0),
-                gr::io_signature::make(0, 0, 0))
+                gr::io_signature::make(0, 0, 0)),
+      d_enable_profiling(enable_profiling)
 {
     d_cfg.samp_rate = samp_rate;
     d_cfg.fft_len = fft_len;
@@ -46,27 +50,35 @@ prs_channel_estimator_impl::prs_channel_estimator_impl(double samp_rate,
     for (auto& pilot : d_pilot_reciprocals) {
         pilot = gr_complex(1.0f, 0.0f) / pilot;
     }
-    d_symbol_channels.resize(
-        static_cast<size_t>(d_cfg.prs_symbols * d_cfg.active_bins));
+    d_symbol_channels.resize(static_cast<size_t>(d_cfg.prs_symbols * d_cfg.active_bins));
     d_channel.resize(static_cast<size_t>(d_cfg.active_bins));
     d_channel_energy.resize(static_cast<size_t>(d_cfg.active_bins));
     message_port_register_in(pmt::mp("symbols_in"));
     message_port_register_out(pmt::mp("channel_out"));
-    set_msg_handler(pmt::mp("symbols_in"), [this](pmt::pmt_t msg) { handle_symbols(msg); });
+    message_port_register_out(pmt::mp("timing_out"));
+    set_msg_handler(pmt::mp("symbols_in"),
+                    [this](pmt::pmt_t msg) { handle_symbols(msg); });
 }
 
 void prs_channel_estimator_impl::handle_symbols(pmt::pmt_t msg)
 {
+    profiling::timing_report report(d_enable_profiling, "channel_estimator");
     pmt::pmt_t meta;
     const gr_complex* symbols = nullptr;
     size_t symbols_size = 0;
     if (!pdu_get_c32_view(msg, meta, symbols, symbols_size)) {
         return;
     }
+    report.checkpoint("input_decode");
     const size_t expected = static_cast<size_t>(d_cfg.prs_symbols * d_cfg.active_bins);
     if (symbols_size < expected || d_pilot_reciprocals.size() < expected) {
         meta = pmt::dict_add(meta, pmt::mp("channel_error"), pmt::mp("short_symbols"));
-        message_port_pub(pmt::mp("channel_out"), pmt::cons(meta, pmt::init_c32vector(0, std::vector<gr_complex>())));
+        message_port_pub(
+            pmt::mp("channel_out"),
+            pmt::cons(meta, pmt::init_c32vector(0, std::vector<gr_complex>())));
+        if (report.enabled()) {
+            message_port_pub(pmt::mp("timing_out"), report.finish(meta));
+        }
         return;
     }
 
@@ -76,6 +88,7 @@ void prs_channel_estimator_impl::handle_symbols(pmt::pmt_t msg)
             d_symbol_channels[idx] = symbols[idx] * d_pilot_reciprocals[idx];
         }
     }
+    report.checkpoint("pilot_removal");
 
     std::complex<double> symbol_corr(0.0, 0.0);
     double previous_power = 0.0;
@@ -106,9 +119,9 @@ void prs_channel_estimator_impl::handle_symbols(pmt::pmt_t msg)
     const double prs_channel_cfo_hz = phase / (2.0 * pi * symbol_period);
     const double coherence_denom = std::sqrt(previous_power * next_power);
     const double channel_coherence =
-        coherence_denom > 0.0
-            ? std::min(1.0, std::abs(symbol_corr) / coherence_denom)
-            : 0.0;
+        coherence_denom > 0.0 ? std::min(1.0, std::abs(symbol_corr) / coherence_denom)
+                              : 0.0;
+    report.checkpoint("channel_cfo_estimation");
 
     std::fill(d_channel.begin(), d_channel.end(), gr_complex(0.0f, 0.0f));
     std::fill(d_channel_energy.begin(), d_channel_energy.end(), 0.0);
@@ -127,32 +140,41 @@ void prs_channel_estimator_impl::handle_symbols(pmt::pmt_t msg)
             d_channel_energy[static_cast<size_t>(k)] += std::norm(h);
         }
     }
+    report.checkpoint("cfo_rotation_average");
     for (int k = 0; k < d_cfg.active_bins; ++k) {
         auto& h = d_channel[static_cast<size_t>(k)];
         h /= static_cast<float>(d_cfg.prs_symbols);
         signal_power += std::norm(h);
-        const double residual =
-            d_channel_energy[static_cast<size_t>(k)] -
-            static_cast<double>(d_cfg.prs_symbols) * std::norm(h);
+        const double residual = d_channel_energy[static_cast<size_t>(k)] -
+                                static_cast<double>(d_cfg.prs_symbols) * std::norm(h);
         error_power += std::max(0.0, residual);
     }
     signal_power /= static_cast<double>(d_cfg.active_bins);
     error_power /= static_cast<double>(expected);
     const double snr = 10.0 * std::log10((signal_power + 1e-12) / (error_power + 1e-12));
+    report.checkpoint("residual_snr");
 
+    auto stage_start = report.mark();
     meta = pmt::dict_add(meta, pmt::mp("snr"), pmt::from_double(snr));
-    meta = pmt::dict_add(meta,
-                         pmt::mp("prs_channel_cfo_hz"),
-                         pmt::from_double(prs_channel_cfo_hz));
+    meta = pmt::dict_add(
+        meta, pmt::mp("prs_channel_cfo_hz"), pmt::from_double(prs_channel_cfo_hz));
     meta = pmt::dict_add(meta,
                          pmt::mp("residual_cfo_hz"),
                          pmt::from_double(prs_channel_cfo_hz - unwrap_reference_hz));
-    meta = pmt::dict_add(meta,
-                         pmt::mp("channel_coherence"),
-                         pmt::from_double(channel_coherence));
-    meta = pmt::dict_add(meta, pmt::mp("channel_bins"), pmt::from_long(d_cfg.active_bins));
-    message_port_pub(pmt::mp("channel_out"),
-                     pmt::cons(meta, pmt::init_c32vector(d_channel.size(), d_channel)));
+    meta = pmt::dict_add(
+        meta, pmt::mp("channel_coherence"), pmt::from_double(channel_coherence));
+    meta =
+        pmt::dict_add(meta, pmt::mp("channel_bins"), pmt::from_long(d_cfg.active_bins));
+    const auto output = pmt::cons(meta, pmt::init_c32vector(d_channel.size(), d_channel));
+    auto stage_stop = report.mark();
+    report.add("output_build", stage_start, stage_stop);
+    stage_start = stage_stop;
+    message_port_pub(pmt::mp("channel_out"), output);
+    stage_stop = report.mark();
+    report.add("output_publish", stage_start, stage_stop);
+    if (report.enabled()) {
+        message_port_pub(pmt::mp("timing_out"), report.finish(meta));
+    }
 }
 
 } // namespace ofdm_prs_ranging

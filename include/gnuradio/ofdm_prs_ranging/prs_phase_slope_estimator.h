@@ -8,8 +8,8 @@
 #ifndef INCLUDED_OFDM_PRS_RANGING_PRS_PHASE_SLOPE_ESTIMATOR_H
 #define INCLUDED_OFDM_PRS_RANGING_PRS_PHASE_SLOPE_ESTIMATOR_H
 
-#include <gnuradio/ofdm_prs_ranging/api.h>
 #include <gnuradio/block.h>
+#include <gnuradio/ofdm_prs_ranging/api.h>
 
 namespace gr {
 namespace ofdm_prs_ranging {
@@ -21,7 +21,8 @@ public:
     static sptr make(double samp_rate = 10e6,
                      int fft_len = 1024,
                      int active_bins = 1024,
-                     float max_residual_rms = 1.0f);
+                     float max_residual_rms = 1.0f,
+                     bool enable_profiling = false);
 };
 
 } // namespace ofdm_prs_ranging

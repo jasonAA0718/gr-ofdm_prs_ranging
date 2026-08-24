@@ -20,6 +20,7 @@ install(FILES api.h
     prs_ssrtt_responder.h
     prs_ssrtt_solver.h
     prs_csv_logger.h
+    prs_timing_collector.h
     zc_manual_ping_source.h
     zc_peak_detector.h
     zc_rtt_calculator.h

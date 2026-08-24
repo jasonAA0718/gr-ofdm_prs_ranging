@@ -3,11 +3,13 @@ label: PRS CSV Logger
 category: '[ofdm_prs_ranging]'
 templates:
   imports: from gnuradio import ofdm_prs_ranging
-  make: ofdm_prs_ranging.prs_csv_logger(${path}, ${append})
+  make: ofdm_prs_ranging.prs_csv_logger(${path}, ${append}, ${enable_profiling})
 parameters:
 - {id: path, label: CSV Path, dtype: string, default: '"prs_measurements.csv"'}
 - {id: append, label: Append, dtype: bool, default: 'True'}
+- {id: enable_profiling, label: Enable Profiling, dtype: bool, default: 'False'}
 inputs:
 - {label: measurement_in, domain: message}
-outputs: []
+outputs:
+- {label: timing_out, domain: message, optional: true}
 file_format: 1

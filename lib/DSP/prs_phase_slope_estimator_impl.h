@@ -20,13 +20,15 @@ public:
     prs_phase_slope_estimator_impl(double samp_rate,
                                    int fft_len,
                                    int active_bins,
-                                   float max_residual_rms);
+                                   float max_residual_rms,
+                                   bool enable_profiling);
     ~prs_phase_slope_estimator_impl() override = default;
 
 private:
     prs_rx_config d_cfg;
     float d_max_residual_rms;
     std::vector<float> d_freq;
+    bool d_enable_profiling;
     void handle_channel(pmt::pmt_t msg);
 };
 

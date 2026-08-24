@@ -3,14 +3,16 @@ label: PRS Phase Slope Estimator
 category: '[ofdm_prs_ranging]'
 templates:
   imports: from gnuradio import ofdm_prs_ranging
-  make: ofdm_prs_ranging.prs_phase_slope_estimator(${samp_rate}, ${fft_len}, ${active_bins}, ${max_residual_rms})
+  make: ofdm_prs_ranging.prs_phase_slope_estimator(${samp_rate}, ${fft_len}, ${active_bins}, ${max_residual_rms}, ${enable_profiling})
 parameters:
 - {id: samp_rate, label: Sample Rate, dtype: real, default: 10e6}
 - {id: fft_len, label: FFT Length, dtype: int, default: 1024}
 - {id: active_bins, label: Active Bins, dtype: int, default: 1024}
 - {id: max_residual_rms, label: Max Residual RMS, dtype: real, default: 1.0}
+- {id: enable_profiling, label: Enable Profiling, dtype: bool, default: 'False'}
 inputs:
 - {label: channel_in, domain: message}
 outputs:
 - {label: measurement_out, domain: message}
+- {label: timing_out, domain: message, optional: true}
 file_format: 1

@@ -7,6 +7,7 @@
 
 #include "prs_frame_detector_impl.h"
 #include "prs_payload_codec.h"
+#include "prs_timing_helper.h"
 #include <gnuradio/io_signature.h>
 #include <algorithm>
 #include <cmath>
@@ -35,7 +36,8 @@ prs_frame_detector::sptr prs_frame_detector::make(double samp_rate,
                                                   double reply_delay_s,
                                                   double window_before_s,
                                                   double window_after_s,
-                                                  float zc_threshold)
+                                                  float zc_threshold,
+                                                  bool enable_profiling)
 {
     return gnuradio::make_block_sptr<prs_frame_detector_impl>(samp_rate,
                                                               fft_len,
@@ -55,7 +57,8 @@ prs_frame_detector::sptr prs_frame_detector::make(double samp_rate,
                                                               reply_delay_s,
                                                               window_before_s,
                                                               window_after_s,
-                                                              zc_threshold);
+                                                              zc_threshold,
+                                                              enable_profiling);
 }
 
 prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
@@ -76,7 +79,8 @@ prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
                                                  double reply_delay_s,
                                                  double window_before_s,
                                                  double window_after_s,
-                                                 float zc_threshold)
+                                                 float zc_threshold,
+                                                 bool enable_profiling)
     : gr::block("prs_frame_detector",
                 gr::io_signature::make(1, 1, sizeof(gr_complex)),
                 gr::io_signature::make(0, 0, 0)),
@@ -96,7 +100,9 @@ prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
       d_time_gating(time_gating),
       d_reply_delay_s(reply_delay_s),
       d_window_before_s(window_before_s),
-      d_window_after_s(window_after_s)
+      d_window_after_s(window_after_s),
+      d_enable_profiling(enable_profiling),
+      d_scan_duration_ns(0)
 {
     if (samp_rate <= 0.0) {
         throw std::invalid_argument("samp_rate must be positive");
@@ -126,6 +132,7 @@ prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
     message_port_register_in(pmt::mp("tx_time_in"));
     message_port_register_out(pmt::mp("frame_out"));
     message_port_register_out(pmt::mp("event_out"));
+    message_port_register_out(pmt::mp("timing_out"));
     set_msg_handler(pmt::mp("tx_time_in"),
                     [this](pmt::pmt_t msg) { handle_tx_time(msg); });
 }
@@ -328,6 +335,10 @@ bool prs_frame_detector_impl::complete_attempt(double frame_time, uint64_t& atte
 
 void prs_frame_detector_impl::publish_failed_attempt(const correlation_window& window)
 {
+    profiling::timing_report report(d_enable_profiling, "frame_detector");
+    const uint64_t scan_duration_ns = d_scan_duration_ns;
+    d_scan_duration_ns = 0;
+    report.add("preamble_zc_scan", scan_duration_ns);
     const char* failure_reason = window.saw_coarse
                                      ? "FRAME_BOUNDARY"
                                      : (window.saw_preamble ? "ZC_SYNC" : "NO_PREAMBLE");
@@ -351,7 +362,18 @@ void prs_frame_detector_impl::publish_failed_attempt(const correlation_window& w
     meta = pmt::dict_add(
         meta, pmt::mp("prs_start_rel"), pmt::from_long(prs_start_offset(d_cfg)));
     meta = pmt::dict_add(meta, pmt::mp("prs_len"), pmt::from_long(prs_len(d_cfg)));
-    message_port_pub(pmt::mp("event_out"), pmt::cons(meta, pmt::PMT_NIL));
+    auto stage_start = report.mark();
+    const auto event = pmt::cons(meta, pmt::PMT_NIL);
+    auto stage_stop = report.mark();
+    report.add("failure_output_build", stage_start, stage_stop);
+    stage_start = stage_stop;
+    message_port_pub(pmt::mp("event_out"), event);
+    stage_stop = report.mark();
+    report.add("failure_output_publish", stage_start, stage_stop);
+    report.add("acquisition_total", scan_duration_ns + report.handler_elapsed_ns());
+    if (report.enabled()) {
+        message_port_pub(pmt::mp("timing_out"), report.finish(meta));
+    }
 }
 
 bool prs_frame_detector_impl::find_frame(size_t& frame_start_index,
@@ -359,6 +381,7 @@ bool prs_frame_detector_impl::find_frame(size_t& frame_start_index,
                                          float& preamble_metric_out,
                                          float& coarse_metric_out)
 {
+    profiling::accumulated_timer scan_timer(d_enable_profiling, d_scan_duration_ns);
     const int flen = frame_len(d_cfg);
     const int coarse_rel =
         d_cfg.zero_guard_len + d_cfg.preamble_len * d_cfg.preamble_repeats;
@@ -434,8 +457,8 @@ bool prs_frame_detector_impl::find_frame(size_t& frame_start_index,
         if (abs_start - d_last_frame_start < d_min_frame_gap) {
         } else {
             float corr_power = std::norm(preamble_corr);
-            double threshold_power = d_preamble_threshold * d_preamble_threshold *
-                                     first_power * second_power;
+            double threshold_power =
+                d_preamble_threshold * d_preamble_threshold * first_power * second_power;
 
             if (corr_power >= threshold_power) {
                 float denom = std::sqrt(first_power * second_power);
@@ -457,8 +480,7 @@ bool prs_frame_detector_impl::find_frame(size_t& frame_start_index,
                         }
                         const size_t refined_start =
                             static_cast<size_t>(refined_start_signed);
-                        if (refined_start + static_cast<size_t>(flen) >
-                            buffered_size()) {
+                        if (refined_start + static_cast<size_t>(flen) > buffered_size()) {
                             continue;
                         }
                         const size_t refined_coarse =
@@ -512,11 +534,19 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
                                             float preamble_metric,
                                             float coarse_metric)
 {
+    profiling::timing_report report(d_enable_profiling, "frame_detector");
+    const uint64_t scan_duration_ns = d_scan_duration_ns;
+    d_scan_duration_ns = 0;
+    report.add("preamble_zc_scan", scan_duration_ns);
     const int flen = frame_len(d_cfg);
     const uint64_t abs_start = d_buffer_abs_start + frame_start_index;
     const uint64_t coarse_abs = d_buffer_abs_start + coarse_index;
     const auto frame_begin = d_buffer.begin() + d_buffer_head + frame_start_index;
+    auto stage_start = report.mark();
     std::vector<gr_complex> frame(frame_begin, frame_begin + flen);
+    auto stage_stop = report.mark();
+    report.add("frame_extract", stage_start, stage_stop);
+    stage_start = stage_stop;
     gr_complex cfo_corr(0.0f, 0.0f);
     const int preamble_start = d_cfg.zero_guard_len;
     const int preamble_span = d_cfg.preamble_len * (d_cfg.preamble_repeats - 1);
@@ -524,35 +554,38 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
         cfo_corr += std::conj(frame[preamble_start + i]) *
                     frame[preamble_start + i + d_cfg.preamble_len];
     }
-    const double cfo_phase_increment =
-        std::atan2(cfo_corr.imag(), cfo_corr.real()) /
-        static_cast<double>(d_cfg.preamble_len);
-    const double preamble_cfo_hz =
-        cfo_phase_increment * d_cfg.samp_rate /
-        (2.0 * 3.141592653589793238462643383279502884);
+    const double cfo_phase_increment = std::atan2(cfo_corr.imag(), cfo_corr.real()) /
+                                       static_cast<double>(d_cfg.preamble_len);
+    const double preamble_cfo_hz = cfo_phase_increment * d_cfg.samp_rate /
+                                   (2.0 * 3.141592653589793238462643383279502884);
+    stage_stop = report.mark();
+    report.add("preamble_cfo", stage_start, stage_stop);
 
-    const auto prs_cp_cfo = estimate_prs_cp_cfo(
-        frame.data(), frame.size(), d_cfg, preamble_cfo_hz);
+    stage_start = stage_stop;
+    const auto prs_cp_cfo =
+        estimate_prs_cp_cfo(frame.data(), frame.size(), d_cfg, preamble_cfo_hz);
+    stage_stop = report.mark();
+    report.add("prs_cp_cfo", stage_start, stage_stop);
 
+    stage_start = stage_stop;
     prs_payload_info payload_info;
     float payload_metric = 0.0f;
     const int payload_start = d_cfg.zero_guard_len +
                               d_cfg.preamble_len * d_cfg.preamble_repeats +
                               d_cfg.coarse_sync_len;
-    bool frame_id_valid = decode_packet_payload(
-        frame.data() + payload_start,
-        d_cfg.payload_len,
-        payload_info,
-        payload_metric,
-        cfo_phase_increment);
+    bool frame_id_valid = decode_packet_payload(frame.data() + payload_start,
+                                                d_cfg.payload_len,
+                                                payload_info,
+                                                payload_metric,
+                                                cfo_phase_increment);
     bool payload_retry_used = false;
     double selected_cfo_hz = preamble_cfo_hz;
     if (!frame_id_valid && prs_cp_cfo.valid && prs_cp_cfo.coherence >= 0.2) {
         prs_payload_info retry_info;
         float retry_metric = 0.0f;
-        const double retry_phase_increment =
-            2.0 * 3.141592653589793238462643383279502884 * prs_cp_cfo.hz /
-            d_cfg.samp_rate;
+        const double retry_phase_increment = 2.0 *
+                                             3.141592653589793238462643383279502884 *
+                                             prs_cp_cfo.hz / d_cfg.samp_rate;
         payload_retry_used = true;
         const bool retry_valid = decode_packet_payload(frame.data() + payload_start,
                                                        d_cfg.payload_len,
@@ -566,6 +599,9 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
         }
         frame_id_valid = retry_valid;
     }
+    stage_stop = report.mark();
+    report.add("payload_decode", stage_start, stage_stop);
+    stage_start = stage_stop;
     const uint64_t tx_frame_id = payload_info.packet_type == prs_packet_type_response
                                      ? payload_info.response_frame_id
                                      : payload_info.poll_frame_id;
@@ -602,9 +638,8 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
     meta = pmt::dict_add(meta,
                          pmt::mp("prs_cp_cfo_hz"),
                          pmt::from_double(prs_cp_cfo.valid ? prs_cp_cfo.hz : 0.0));
-    meta = pmt::dict_add(meta,
-                         pmt::mp("prs_cp_cfo_coherence"),
-                         pmt::from_double(prs_cp_cfo.coherence));
+    meta = pmt::dict_add(
+        meta, pmt::mp("prs_cp_cfo_coherence"), pmt::from_double(prs_cp_cfo.coherence));
     meta = pmt::dict_add(meta,
                          pmt::mp("payload_retry_used"),
                          payload_retry_used ? pmt::PMT_T : pmt::PMT_F);
@@ -642,12 +677,24 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
         meta = pmt::dict_add(
             meta, pmt::mp("rx_time_tag_offset"), pmt::from_uint64(d_rx_time_tag_offset));
     }
+    stage_stop = report.mark();
+    report.add("metadata_build", stage_start, stage_stop);
 
+    stage_start = stage_stop;
     const auto data = pmt::init_c32vector(frame.size(), frame);
     const auto pdu = pmt::cons(meta, data);
+    stage_stop = report.mark();
+    report.add("frame_pdu_build", stage_start, stage_stop);
+    stage_start = stage_stop;
     message_port_pub(pmt::mp("event_out"), pdu);
     message_port_pub(pmt::mp("frame_out"), pdu);
+    stage_stop = report.mark();
+    report.add("frame_pdu_publish", stage_start, stage_stop);
     d_last_frame_start = static_cast<int64_t>(abs_start);
+    report.add("acquisition_total", scan_duration_ns + report.handler_elapsed_ns());
+    if (report.enabled()) {
+        message_port_pub(pmt::mp("timing_out"), report.finish(meta));
+    }
 }
 
 int prs_frame_detector_impl::general_work(int noutput_items,

@@ -8,8 +8,8 @@
 #ifndef INCLUDED_OFDM_PRS_RANGING_PRS_SSRTT_RESPONDER_H
 #define INCLUDED_OFDM_PRS_RANGING_PRS_SSRTT_RESPONDER_H
 
-#include <gnuradio/ofdm_prs_ranging/api.h>
 #include <gnuradio/block.h>
+#include <gnuradio/ofdm_prs_ranging/api.h>
 
 namespace gr {
 namespace ofdm_prs_ranging {
@@ -18,7 +18,9 @@ class OFDM_PRS_RANGING_API prs_ssrtt_responder : virtual public gr::block
 {
 public:
     typedef std::shared_ptr<prs_ssrtt_responder> sptr;
-    static sptr make(double samp_rate = 10e6, uint32_t reply_delay_samples = 50000);
+    static sptr make(double samp_rate = 10e6,
+                     uint32_t reply_delay_samples = 50000,
+                     bool enable_profiling = false);
 };
 
 } // namespace ofdm_prs_ranging
