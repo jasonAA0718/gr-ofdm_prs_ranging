@@ -692,29 +692,80 @@ and measurement CSV logger. All reports feed one `PRS Timing Collector` block.
 The text UI is omitted so terminal refresh work does not contaminate the timing
 distribution.
 
-The collector buffers timing reports in memory and writes the files when the
-flowgraph stops:
+The following blocks are timed:
+
+| Timed block | Timed processing boundary |
+| --- | --- |
+| `frame_detector` | Repeated-preamble scanning, local ZC refinement, frame extraction, preamble/CP CFO estimation, payload decoding, metadata construction, and detected-frame publication. |
+| `fft_receiver` | Entry to `handle_frame()` through CP removal, all 16 FFTs, active-bin reordering, output-vector construction, and `symbols_out` publication. |
+| `channel_estimator` | Entry to `handle_symbols()` through pilot removal, inter-symbol CFO estimation, CFO rotation, channel averaging, residual/SNR calculation, and `channel_out` publication. |
+| `phase_slope_estimator` | Entry to `handle_channel()` through phase extraction/unwrapping, weighted regression, residual/quality calculation, and `measurement_out` publication. |
+| `ssrtt_responder` | Processing of an accepted POLL measurement through response-trigger construction and `trigger_out` publication. |
+| `ssrtt_solver` | Storage of a POLL transmit timestamp, or processing of an accepted RESPONSE measurement through SS-RTT calculation and `ssrtt_out` publication. |
+| `csv_logger` | Measurement formatting, file write, and file flush. This is reported separately and is not OFDM estimator cost. |
+
+Each measurement uses `std::chrono::steady_clock`. A start timestamp is taken
+when the relevant handler or code region is entered and a stop timestamp is
+taken immediately after that region completes. Repeated operations, such as
+the 16 FFT executions, are timed individually and accumulated into one stage
+duration for the frame.
+
+`handler_total` is wall-clock elapsed time from entry to the block's message
+handler until completion of its normal output publication:
 
 ```text
-CSV/initiator_timing_raw.csv
-CSV/initiator_timing_summary.csv
-CSV/responder_timing_raw.csv
-CSV/responder_timing_summary.csv
+handler_total = handler_end_time - handler_start_time
 ```
 
-The raw file contains the role, block, stage, attempt/frame identifiers,
-monotonic handler start/end times, and duration in nanoseconds and microseconds.
-The summary groups each block/stage and reports count, mean, median, p95, p99,
-and maximum time. `handler_total` includes the block handler and message-output
-work but excludes construction/publication of the timing report itself.
-`frame_detector.acquisition_total` additionally includes accumulated
-repeated-preamble and local-ZC scanning time since the preceding reported
-acquisition outcome.
+It includes input validation, DSP work, metadata/output construction, output
+message publication, and any operating-system preemption that occurs while the
+handler is running. It excludes time waiting in a GNU Radio message queue,
+upstream and downstream block execution, and construction/publication of the
+separate timing report. It is therefore processing latency observed on the
+handler thread, not a hardware CPU-cycle count.
 
-Stop the flowgraph normally with `Ctrl+C` so the collector can finalize both
-CSV files. Compare the raw monotonic timestamps for queue/scheduling gaps, and
-use the stage summary for computation-cost comparisons. Measurement CSV flush
-time is reported separately and must not be attributed to OFDM estimation.
+The stream-based frame detector is a special case because acquisition scanning
+can span several scheduler calls before a frame or failed acquisition is
+reported. `preamble_zc_scan` accumulates only the wall-clock time actually spent
+inside the repeated-preamble and local-ZC search. `handler_total` covers the
+subsequent frame/failure publication path. Use:
+
+```text
+frame_detector.acquisition_total = preamble_zc_scan + publication-handler time
+```
+
+for detector computational cost. This is not the over-the-air acquisition
+window duration because idle time between scheduler calls is excluded.
+
+An experimental `PRS FFT-ZC Frame Detector` is available as a separate block;
+the production `PRS Frame Detector` remains unchanged. It uses the repeated
+preamble only as a cheap signal gate and CFO estimate, then searches a bounded
+ZC candidate region with overlap-save FFT matched filtering. The responder
+defaults to 1,024 candidates before and after the gate-predicted ZC boundary.
+The time-gated initiator searches new candidates inside its scheduled response
+window. Both paths correct `frame_start` from the maximum ZC peak rather than
+from the preamble gate position.
+
+Use these A/B profiling flowgraphs to compare it with the existing detector:
+
+```text
+examples/prs_ssrtt_initiator_fft_zc_profiling.grc
+examples/prs_ssrtt_responder_fft_zc_profiling.grc
+```
+
+Its `fft_zc_frame_detector` timing report retains the comparable aggregate
+`preamble_zc_scan` and `acquisition_total` stages. It additionally separates
+`preamble_gate_scan`, `zc_input_prepare`, `zc_fft_forward`,
+`zc_spectrum_multiply`, `zc_ifft`, and `zc_normalize_peak`. Therefore the
+existing timing collector can compare acquisition cost without schema changes.
+The optional `zc_peak_ratio` metadata is the largest normalized ZC peak divided
+by the second largest candidate peak; the default threshold `1.0` records the
+diagnostic without rejecting ambiguous peaks.
+
+The timing collector buffers reports and calculates count, mean, median, p95,
+p99, and maximum after normal flowgraph shutdown. The UHD source/sink, RX
+timekeeper, timed burst source, acquisition logger, and timing collector itself
+are not included in the current timed-block set.
 
 ## Future Work
 

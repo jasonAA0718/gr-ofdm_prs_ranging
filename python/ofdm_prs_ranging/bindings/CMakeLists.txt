@@ -27,6 +27,7 @@ include(GrPybind)
 list(APPEND ofdm_prs_ranging_python_files
     prs_acquisition_logger_python.cc
     prs_frame_detector_python.cc
+    prs_fft_zc_frame_detector_python.cc
     prs_fft_receiver_python.cc
     prs_channel_estimator_python.cc
     prs_phase_slope_estimator_python.cc

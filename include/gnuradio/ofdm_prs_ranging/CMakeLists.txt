@@ -14,6 +14,7 @@ install(FILES api.h
     prs_rx_timekeeper.h
     prs_timed_burst_source.h
     prs_frame_detector.h
+    prs_fft_zc_frame_detector.h
     prs_fft_receiver.h
     prs_channel_estimator.h
     prs_phase_slope_estimator.h
