@@ -67,6 +67,15 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
             pmt.to_double(pmt.dict_ref(metadata, pmt.intern("coarse_metric"), pmt.PMT_NIL)),
             0.99,
         )
+        self.assertFalse(
+            pmt.is_null(pmt.dict_ref(metadata, pmt.intern("zc_peak_ratio"), pmt.PMT_NIL))
+        )
+        self.assertLessEqual(
+            abs(pmt.to_long(
+                pmt.dict_ref(metadata, pmt.intern("zc_gate_offset_samples"), pmt.PMT_NIL)
+            )),
+            1024,
+        )
         self.assertEqual(timing_debug.num_messages(), 1)
         timing = timing_debug.get_message(0)
         self.assertEqual(

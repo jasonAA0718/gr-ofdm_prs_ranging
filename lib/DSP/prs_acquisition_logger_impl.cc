@@ -44,6 +44,18 @@ std::string dict_ref_symbol_local(const pmt::pmt_t& dict,
     const auto value = pmt::dict_ref(dict, pmt::mp(key), pmt::PMT_NIL);
     return pmt::is_symbol(value) ? pmt::symbol_to_string(value) : fallback;
 }
+
+int64_t dict_ref_int64_local(const pmt::pmt_t& dict, const char* key, int64_t fallback)
+{
+    const auto value = pmt::dict_ref(dict, pmt::mp(key), pmt::PMT_NIL);
+    if (pmt::is_integer(value)) {
+        return pmt::to_long(value);
+    }
+    if (pmt::is_uint64(value)) {
+        return static_cast<int64_t>(pmt::to_uint64(value));
+    }
+    return fallback;
+}
 } // namespace
 
 prs_acquisition_logger::sptr prs_acquisition_logger::make(const std::string& path,
@@ -66,8 +78,10 @@ prs_acquisition_logger_impl::prs_acquisition_logger_impl(const std::string& path
         d_file << "log_time_unix,node,attempt_id,failure_reason,channel_id,coarse_zc_"
                   "root,packet_type,poll_frame_id,"
                   "response_frame_id,reply_delay_samples,frame_id_valid,rx_time,"
-                  "preamble_metric,coarse_metric,"
-                  "payload_metric,cfo,preamble_cfo_hz,prs_cp_cfo_hz,"
+                  "preamble_metric,coarse_metric,zc_peak_ratio,zc_gate_offset_samples,"
+                  "payload_initial_valid,payload_initial_metric,"
+                  "payload_retry_valid,payload_retry_metric,payload_metric,"
+                  "cfo,preamble_cfo_hz,prs_cp_cfo_hz,"
                   "prs_cp_cfo_coherence,selected_cfo_hz,payload_retry_used,"
                   "samp_rate,fft_len,cp_len,active_bins,prs_symbols,"
                   "prs_start_rel,prs_len,pdu_len\n";
@@ -101,37 +115,46 @@ void prs_acquisition_logger_impl::handle_frame(pmt::pmt_t msg)
     } else if (pmt::is_integer(attempt_id)) {
         d_file << pmt::to_long(attempt_id);
     }
-    d_file << ',' << dict_ref_symbol_local(meta, "failure_reason", "UNKNOWN") << ','
-           << dict_ref_uint64(meta, "channel_id", 0) << ','
-           << dict_ref_uint64(meta, "coarse_zc_root", 25) << ','
-           << dict_ref_uint64(meta, "packet_type", 0) << ','
-           << dict_ref_uint64(meta, "poll_frame_id", 0) << ','
-           << dict_ref_uint64(meta, "response_frame_id", 0) << ','
-           << dict_ref_uint64(meta, "reply_delay_samples", 0) << ','
-           << (pmt::to_bool(pmt::dict_ref(meta, pmt::mp("frame_id_valid"), pmt::PMT_F))
-                   ? 1
-                   : 0)
-           << ',' << dict_ref_time_tuple_local(meta, "rx_time", NAN) << ','
-           << dict_ref_double(meta, "preamble_metric", 0.0) << ','
-           << dict_ref_double(meta, "coarse_metric", 0.0) << ','
-           << dict_ref_double(meta, "payload_metric", 0.0) << ','
-           << dict_ref_double(meta, "cfo", 0.0) << ','
-           << dict_ref_double(meta, "preamble_cfo_hz", 0.0) << ','
-           << dict_ref_double(meta, "prs_cp_cfo_hz", 0.0) << ','
-           << dict_ref_double(meta, "prs_cp_cfo_coherence", 0.0) << ','
-           << dict_ref_double(meta, "selected_cfo_hz", 0.0) << ','
-           << (pmt::to_bool(
-                   pmt::dict_ref(meta, pmt::mp("payload_retry_used"), pmt::PMT_F))
-                   ? 1
-                   : 0)
-           << ','
-           << dict_ref_double(meta, "samp_rate", 0.0) << ','
-           << dict_ref_uint64(meta, "fft_len", 0) << ','
-           << dict_ref_uint64(meta, "cp_len", 0) << ','
-           << dict_ref_uint64(meta, "active_bins", 0) << ','
-           << dict_ref_uint64(meta, "prs_symbols", 0) << ','
-           << dict_ref_uint64(meta, "prs_start_rel", 0) << ','
-           << dict_ref_uint64(meta, "prs_len", 0) << ',' << pdu_len(msg) << '\n';
+    d_file
+        << ',' << dict_ref_symbol_local(meta, "failure_reason", "UNKNOWN") << ','
+        << dict_ref_uint64(meta, "channel_id", 0) << ','
+        << dict_ref_uint64(meta, "coarse_zc_root", 25) << ','
+        << dict_ref_uint64(meta, "packet_type", 0) << ','
+        << dict_ref_uint64(meta, "poll_frame_id", 0) << ','
+        << dict_ref_uint64(meta, "response_frame_id", 0) << ','
+        << dict_ref_uint64(meta, "reply_delay_samples", 0) << ','
+        << (pmt::to_bool(pmt::dict_ref(meta, pmt::mp("frame_id_valid"), pmt::PMT_F)) ? 1
+                                                                                     : 0)
+        << ',' << dict_ref_time_tuple_local(meta, "rx_time", NAN) << ','
+        << dict_ref_double(meta, "preamble_metric", 0.0) << ','
+        << dict_ref_double(meta, "coarse_metric", 0.0) << ','
+        << dict_ref_double(meta, "zc_peak_ratio", 0.0) << ','
+        << dict_ref_int64_local(meta, "zc_gate_offset_samples", 0) << ','
+        << (pmt::to_bool(
+                pmt::dict_ref(meta, pmt::mp("payload_initial_valid"), pmt::PMT_F))
+                ? 1
+                : 0)
+        << ',' << dict_ref_double(meta, "payload_initial_metric", 0.0) << ','
+        << (pmt::to_bool(pmt::dict_ref(meta, pmt::mp("payload_retry_valid"), pmt::PMT_F))
+                ? 1
+                : 0)
+        << ',' << dict_ref_double(meta, "payload_retry_metric", 0.0) << ','
+        << dict_ref_double(meta, "payload_metric", 0.0) << ','
+        << dict_ref_double(meta, "cfo", 0.0) << ','
+        << dict_ref_double(meta, "preamble_cfo_hz", 0.0) << ','
+        << dict_ref_double(meta, "prs_cp_cfo_hz", 0.0) << ','
+        << dict_ref_double(meta, "prs_cp_cfo_coherence", 0.0) << ','
+        << dict_ref_double(meta, "selected_cfo_hz", 0.0) << ','
+        << (pmt::to_bool(pmt::dict_ref(meta, pmt::mp("payload_retry_used"), pmt::PMT_F))
+                ? 1
+                : 0)
+        << ',' << dict_ref_double(meta, "samp_rate", 0.0) << ','
+        << dict_ref_uint64(meta, "fft_len", 0) << ','
+        << dict_ref_uint64(meta, "cp_len", 0) << ','
+        << dict_ref_uint64(meta, "active_bins", 0) << ','
+        << dict_ref_uint64(meta, "prs_symbols", 0) << ','
+        << dict_ref_uint64(meta, "prs_start_rel", 0) << ','
+        << dict_ref_uint64(meta, "prs_len", 0) << ',' << pdu_len(msg) << '\n';
     d_file.flush();
 }
 

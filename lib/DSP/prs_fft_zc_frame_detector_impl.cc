@@ -134,7 +134,8 @@ prs_fft_zc_frame_detector_impl::prs_fft_zc_frame_detector_impl(double samp_rate,
       d_armed_preamble_index(0),
       d_armed_preamble_metric(0.0f),
       d_armed_cfo_hz(0.0),
-      d_last_zc_peak_ratio(0.0f)
+      d_last_zc_peak_ratio(0.0f),
+      d_last_zc_gate_offset_samples(0)
 {
     if (samp_rate <= 0.0) {
         throw std::invalid_argument("samp_rate must be positive");
@@ -278,6 +279,7 @@ void prs_fft_zc_frame_detector_impl::reset_buffer(uint64_t abs_start)
     d_next_gate_index = 0;
     d_next_coarse_index = 0;
     d_gate_armed = false;
+    d_last_zc_gate_offset_samples = 0;
     d_buffer_abs_start = abs_start;
 }
 
@@ -383,21 +385,24 @@ bool prs_fft_zc_frame_detector_impl::find_preamble_gate(size_t& preamble_index,
             d_next_gate_index + static_cast<size_t>(i), corr, first_power, second_power);
     }
 
-    float best_metric = -1.0f;
+    const double threshold_sq =
+        static_cast<double>(d_preamble_threshold) * d_preamble_threshold;
+    double best_metric_sq = -1.0;
     size_t best_index = d_next_gate_index;
     gr_complex best_corr(0.0f, 0.0f);
     for (size_t p = d_next_gate_index; p <= max_preamble; ++p) {
-        const double denom = std::sqrt(std::max(0.0, first_power * second_power));
-        const float metric =
-            denom > 0.0 ? static_cast<float>(std::abs(corr) / denom) : 0.0f;
-        if (metric > best_metric) {
-            best_metric = metric;
+        const double power_product = std::max(0.0, first_power * second_power);
+        const double corr_power = std::norm(corr);
+        const double metric_sq = power_product > 0.0 ? corr_power / power_product : 0.0;
+        if (metric_sq > best_metric_sq) {
+            best_metric_sq = metric_sq;
             best_index = p;
             best_corr = corr;
         }
-        if (require_threshold && metric >= d_preamble_threshold) {
+        if (require_threshold && power_product > 0.0 &&
+            corr_power >= threshold_sq * power_product) {
             preamble_index = p;
-            metric_out = metric;
+            metric_out = static_cast<float>(std::sqrt(metric_sq));
             const double phase_increment =
                 std::atan2(corr.imag(), corr.real()) / d_cfg.preamble_len;
             cfo_hz = phase_increment * d_cfg.samp_rate /
@@ -411,12 +416,12 @@ bool prs_fft_zc_frame_detector_impl::find_preamble_gate(size_t& preamble_index,
     }
 
     d_next_gate_index = max_preamble + 1;
-    if (require_threshold || best_metric < 0.0f) {
+    if (require_threshold || best_metric_sq < 0.0) {
         return false;
     }
     preamble_index = best_index;
-    metric_out = best_metric;
-    if (best_metric >= d_preamble_threshold) {
+    metric_out = static_cast<float>(std::sqrt(best_metric_sq));
+    if (best_metric_sq >= threshold_sq) {
         const double phase_increment =
             std::atan2(best_corr.imag(), best_corr.real()) / d_cfg.preamble_len;
         cfo_hz = phase_increment * d_cfg.samp_rate /
@@ -668,6 +673,7 @@ bool prs_fft_zc_frame_detector_impl::find_frame(size_t& frame_start_index,
     size_t last_coarse = 0;
     float preamble_metric = 0.0f;
     double cfo_hz = 0.0;
+    int64_t predicted_coarse = -1;
 
     if (d_time_gating) {
         if (d_next_coarse_index < coarse_rel) {
@@ -679,7 +685,9 @@ bool prs_fft_zc_frame_detector_impl::find_frame(size_t& frame_start_index,
         first_coarse = d_next_coarse_index;
         last_coarse = max_coarse;
         size_t gate_index = 0;
-        find_preamble_gate(gate_index, preamble_metric, cfo_hz, false);
+        if (find_preamble_gate(gate_index, preamble_metric, cfo_hz, false)) {
+            predicted_coarse = static_cast<int64_t>(gate_index + preamble_total);
+        }
         d_next_coarse_index = max_coarse + 1;
     } else {
         if (!d_gate_armed) {
@@ -693,12 +701,14 @@ bool prs_fft_zc_frame_detector_impl::find_frame(size_t& frame_start_index,
             d_armed_cfo_hz = cfo_hz;
         }
 
-        const size_t predicted_coarse = d_armed_preamble_index + preamble_total;
-        first_coarse = predicted_coarse > static_cast<size_t>(d_zc_search_before)
-                           ? predicted_coarse - static_cast<size_t>(d_zc_search_before)
-                           : coarse_rel;
+        const size_t gate_predicted_coarse = d_armed_preamble_index + preamble_total;
+        predicted_coarse = static_cast<int64_t>(gate_predicted_coarse);
+        first_coarse =
+            gate_predicted_coarse > static_cast<size_t>(d_zc_search_before)
+                ? gate_predicted_coarse - static_cast<size_t>(d_zc_search_before)
+                : coarse_rel;
         first_coarse = std::max(first_coarse, coarse_rel);
-        last_coarse = predicted_coarse + static_cast<size_t>(d_zc_search_after);
+        last_coarse = gate_predicted_coarse + static_cast<size_t>(d_zc_search_after);
         if (max_coarse < last_coarse) {
             return false;
         }
@@ -714,6 +724,8 @@ bool prs_fft_zc_frame_detector_impl::find_frame(size_t& frame_start_index,
         return false;
     }
     d_last_zc_peak_ratio = peak_ratio;
+    d_last_zc_gate_offset_samples =
+        predicted_coarse >= 0 ? static_cast<int64_t>(best_coarse) - predicted_coarse : 0;
 
     if (!d_time_gating) {
         d_next_gate_index =
@@ -798,7 +810,11 @@ void prs_fft_zc_frame_detector_impl::publish_frame(size_t frame_start_index,
                                                 payload_info,
                                                 payload_metric,
                                                 cfo_phase_increment);
+    const bool payload_initial_valid = frame_id_valid;
+    const float payload_initial_metric = payload_metric;
     bool payload_retry_used = false;
+    bool payload_retry_valid = false;
+    float payload_retry_metric = 0.0f;
     double selected_cfo_hz = preamble_cfo_hz;
     if (!frame_id_valid && prs_cp_cfo.valid && prs_cp_cfo.coherence >= 0.2) {
         prs_payload_info retry_info;
@@ -807,17 +823,18 @@ void prs_fft_zc_frame_detector_impl::publish_frame(size_t frame_start_index,
                                              3.141592653589793238462643383279502884 *
                                              prs_cp_cfo.hz / d_cfg.samp_rate;
         payload_retry_used = true;
-        const bool retry_valid = decode_packet_payload(frame.data() + payload_start,
-                                                       d_cfg.payload_len,
-                                                       retry_info,
-                                                       retry_metric,
-                                                       retry_phase_increment);
-        if (retry_valid || retry_metric > payload_metric) {
+        payload_retry_valid = decode_packet_payload(frame.data() + payload_start,
+                                                    d_cfg.payload_len,
+                                                    retry_info,
+                                                    retry_metric,
+                                                    retry_phase_increment);
+        payload_retry_metric = retry_metric;
+        if (payload_retry_valid || retry_metric > payload_metric) {
             payload_info = retry_info;
             payload_metric = retry_metric;
             selected_cfo_hz = prs_cp_cfo.hz;
         }
-        frame_id_valid = retry_valid;
+        frame_id_valid = payload_retry_valid;
     }
     stage_stop = report.mark();
     report.add("payload_decode", stage_start, stage_stop);
@@ -843,6 +860,17 @@ void prs_fft_zc_frame_detector_impl::publish_frame(size_t frame_start_index,
         meta, pmt::mp("frame_id_valid"), frame_id_valid ? pmt::PMT_T : pmt::PMT_F);
     meta =
         pmt::dict_add(meta, pmt::mp("payload_metric"), pmt::from_double(payload_metric));
+    meta = pmt::dict_add(meta,
+                         pmt::mp("payload_initial_valid"),
+                         payload_initial_valid ? pmt::PMT_T : pmt::PMT_F);
+    meta = pmt::dict_add(meta,
+                         pmt::mp("payload_initial_metric"),
+                         pmt::from_double(payload_initial_metric));
+    meta = pmt::dict_add(meta,
+                         pmt::mp("payload_retry_valid"),
+                         payload_retry_valid ? pmt::PMT_T : pmt::PMT_F);
+    meta = pmt::dict_add(
+        meta, pmt::mp("payload_retry_metric"), pmt::from_double(payload_retry_metric));
     meta = pmt::dict_add(
         meta, pmt::mp("absolute_sample_index"), pmt::from_uint64(abs_start));
     meta = pmt::dict_add(meta, pmt::mp("frame_start"), pmt::from_uint64(abs_start));
@@ -852,6 +880,9 @@ void prs_fft_zc_frame_detector_impl::publish_frame(size_t frame_start_index,
     meta = pmt::dict_add(meta, pmt::mp("coarse_metric"), pmt::from_double(coarse_metric));
     meta = pmt::dict_add(
         meta, pmt::mp("zc_peak_ratio"), pmt::from_double(d_last_zc_peak_ratio));
+    meta = pmt::dict_add(meta,
+                         pmt::mp("zc_gate_offset_samples"),
+                         pmt::from_long(d_last_zc_gate_offset_samples));
     meta = pmt::dict_add(
         meta, pmt::mp("coarse_zc_root"), pmt::from_long(d_cfg.coarse_zc_root));
     meta = pmt::dict_add(meta, pmt::mp("channel_id"), pmt::from_long(d_cfg.channel_id));

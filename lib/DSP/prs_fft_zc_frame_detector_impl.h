@@ -95,6 +95,7 @@ private:
     float d_armed_preamble_metric;
     double d_armed_cfo_hz;
     float d_last_zc_peak_ratio;
+    int64_t d_last_zc_gate_offset_samples;
 
     struct correlation_window {
         double start;

@@ -762,6 +762,13 @@ The optional `zc_peak_ratio` metadata is the largest normalized ZC peak divided
 by the second largest candidate peak; the default threshold `1.0` records the
 diagnostic without rejecting ambiguous peaks.
 
+The FFT-ZC profiling flowgraphs write acquisition diagnostics to version-3 CSV
+files. In addition to the existing metrics, they record `zc_peak_ratio`,
+`zc_gate_offset_samples`, and the validity/metric of both the initial
+preamble-CFO payload decode and the CP-CFO retry. Use these fields to separate
+a weak or displaced ZC peak from a payload-only failure. Existing version-2
+profiling captures remain unchanged.
+
 The timing collector buffers reports and calculates count, mean, median, p95,
 p99, and maximum after normal flowgraph shutdown. The UHD source/sink, RX
 timekeeper, timed burst source, acquisition logger, and timing collector itself

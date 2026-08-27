@@ -137,7 +137,7 @@ blocks:
     append: '1'
     comment: Logs every detected POLL before responder filtering
     node: '"responder"'
-    path: '"CSV/profiling/responder_fft_zc_acquisition_v2.csv"'
+    path: '"CSV/profiling/responder_fft_zc_acquisition_v3.csv"'
   states:
     bus_sink: false
     bus_source: false
