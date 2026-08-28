@@ -27,12 +27,13 @@ parameters:
 - {id: correlation_fft_len, label: Correlation FFT Length, dtype: int, default: 2048}
 - {id: zc_search_before, label: ZC Search Before, dtype: int, default: 1024}
 - {id: zc_search_after, label: ZC Search After, dtype: int, default: 1024}
-- {id: cfo_compensation, label: Gate CFO Compensation, dtype: bool, default: 'True'}
+- {id: cfo_compensation, label: PRS FLL CFO Compensation, dtype: bool, default: 'True'}
 - {id: peak_ratio_threshold, label: Peak Ratio Threshold, dtype: real, default: 1.0}
 - {id: enable_profiling, label: Enable Profiling, dtype: bool, default: 'False'}
 inputs:
 - {label: in, domain: stream, dtype: complex}
 - {label: tx_time_in, domain: message, optional: true}
+- {label: prs_cfo_in, domain: message, optional: true}
 outputs:
 - {label: frame_out, domain: message}
 - {label: event_out, domain: message, optional: true}

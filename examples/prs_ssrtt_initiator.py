@@ -5,8 +5,8 @@
 # SPDX-License-Identifier: GPL-3.0
 #
 # GNU Radio Python Flow Graph
-# Title: PRS SS-RTT Initiator FFT-ZC Profiling
-# Description: OFDM PRS SS-RTT initiator FFT-ZC detector profiling
+# Title: PRS SS-RTT Initiator
+# Description: OFDM PRS SS-RTT initiator
 # GNU Radio version: 3.10.11.0
 
 from gnuradio import blocks
@@ -27,17 +27,17 @@ import threading
 
 
 
-class prs_ssrtt_initiator_fft_zc_profiling(gr.top_block):
+class prs_ssrtt_initiator(gr.top_block):
 
     def __init__(self):
-        gr.top_block.__init__(self, "PRS SS-RTT Initiator FFT-ZC Profiling", catch_exceptions=True)
+        gr.top_block.__init__(self, "PRS SS-RTT Initiator", catch_exceptions=True)
         self.flowgraph_started = threading.Event()
 
         ##################################################
         # Variables
         ##################################################
         self.zc_length = zc_length = 419
-        self.tx_gain = tx_gain = 70
+        self.tx_gain = tx_gain = 75
         self.samp_rate = samp_rate = 30e6
         self.rx_gain = rx_gain = 70
         self.premble_rep = premble_rep = 4
@@ -84,8 +84,8 @@ class prs_ssrtt_initiator_fft_zc_profiling(gr.top_block):
         self.uhd_usrp_sink_0.set_bandwidth(samp_rate, 0)
         self.uhd_usrp_sink_0.set_gain(tx_gain, 0)
         self.uhd_usrp_sink_0.set_min_output_buffer(1048576)
-        self.prs_timing_collector_0 = ofdm_prs_ranging.prs_timing_collector("CSV/FFT_profiling/initiator_fft_zc_timing_raw.csv", "CSV/FFT_profiling/initiator_fft_zc_timing_summary.csv", "initiator")
-        self.prs_ssrtt_solver_0 = ofdm_prs_ranging.prs_ssrtt_solver(samp_rate, True)
+        self.prs_text_ui_0 = ofdm_prs_ranging.prs_text_ui("initiator", 1.5, 1.0, 2.0, True)
+        self.prs_ssrtt_solver_0 = ofdm_prs_ranging.prs_ssrtt_solver(samp_rate, False)
         self.prs_source = ofdm_prs_ranging.prs_timed_burst_source(
             samp_rate, 1024, 128, 1024, 16,
             premble_length, premble_rep, zc_length,
@@ -93,12 +93,12 @@ class prs_ssrtt_initiator_fft_zc_profiling(gr.top_block):
             0.2, 0.7, 13990001, 1,
             True, 25)
         self.prs_rx_timekeeper_0 = ofdm_prs_ranging.prs_rx_timekeeper(samp_rate, 0.6)
-        self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 1024, 1024, 1.0, True)
-        self.prs_frame_detector_0_0 = ofdm_prs_ranging.prs_fft_zc_frame_detector(samp_rate, 1024, 128, 1024, 16, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 29, 1, True, 0.05, 0.0002, 0.004, 0.4, 4096, 1024, 3074, True, 1, True)
-        self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 1024, 128, 1024, 16, True)
-        self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger("CSV/FFT_profiling/initiator_fft_zc_measurements.csv", 1, True)
-        self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 1024, 1024, 16, 13990001, True)
-        self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/FFT_profiling/initiator_fft_zc_acquisition_v4.csv", "initiator", 1)
+        self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 1024, 1024, 1.0, False)
+        self.prs_frame_detector_0_0 = ofdm_prs_ranging.prs_fft_zc_frame_detector(samp_rate, 1024, 128, 1024, 16, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 29, 1, True, 0.05, 0.0002, 0.004, 0.4, 4096, 1024, 3074, True, 1, False)
+        self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 1024, 128, 1024, 16, False)
+        self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger("CSV/obs_v2.csv", 1, False)
+        self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 1024, 1024, 16, 13990001, False)
+        self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/initiator_acquisition_v2.csv", "initiator", 1)
         self.blocks_message_strobe_0 = blocks.message_strobe(pmt.PMT_T, 500)
 
 
@@ -107,21 +107,17 @@ class prs_ssrtt_initiator_fft_zc_profiling(gr.top_block):
         ##################################################
         self.msg_connect((self.blocks_message_strobe_0, 'strobe'), (self.prs_rx_timekeeper_0, 'trigger_in'))
         self.msg_connect((self.prs_channel_estimator_0, 'channel_out'), (self.prs_phase_slope_estimator_0, 'channel_in'))
-        self.msg_connect((self.prs_channel_estimator_0, 'channel_out'), (self.prs_frame_detector_0_0, 'prs_cfo_in'))
-        self.msg_connect((self.prs_channel_estimator_0, 'timing_out'), (self.prs_timing_collector_0, 'timing_in'))
-        self.msg_connect((self.prs_csv_logger_0, 'timing_out'), (self.prs_timing_collector_0, 'timing_in'))
         self.msg_connect((self.prs_fft_receiver_0, 'symbols_out'), (self.prs_channel_estimator_0, 'symbols_in'))
-        self.msg_connect((self.prs_fft_receiver_0, 'timing_out'), (self.prs_timing_collector_0, 'timing_in'))
         self.msg_connect((self.prs_frame_detector_0_0, 'event_out'), (self.prs_acquisition_logger_0, 'frame_in'))
         self.msg_connect((self.prs_frame_detector_0_0, 'frame_out'), (self.prs_fft_receiver_0, 'frame_in'))
-        self.msg_connect((self.prs_frame_detector_0_0, 'timing_out'), (self.prs_timing_collector_0, 'timing_in'))
+        self.msg_connect((self.prs_frame_detector_0_0, 'frame_out'), (self.prs_text_ui_0, 'frame_in'))
         self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_ssrtt_solver_0, 'measurement_in'))
-        self.msg_connect((self.prs_phase_slope_estimator_0, 'timing_out'), (self.prs_timing_collector_0, 'timing_in'))
         self.msg_connect((self.prs_rx_timekeeper_0, 'timed_trigger_out'), (self.prs_source, 'trigger'))
         self.msg_connect((self.prs_source, 'tx_time_out'), (self.prs_frame_detector_0_0, 'tx_time_in'))
         self.msg_connect((self.prs_source, 'tx_time_out'), (self.prs_ssrtt_solver_0, 'tx_time_in'))
+        self.msg_connect((self.prs_source, 'tx_time_out'), (self.prs_text_ui_0, 'tx_in'))
         self.msg_connect((self.prs_ssrtt_solver_0, 'ssrtt_out'), (self.prs_csv_logger_0, 'measurement_in'))
-        self.msg_connect((self.prs_ssrtt_solver_0, 'timing_out'), (self.prs_timing_collector_0, 'timing_in'))
+        self.msg_connect((self.prs_ssrtt_solver_0, 'ssrtt_out'), (self.prs_text_ui_0, 'measurement_in'))
         self.connect((self.prs_source, 0), (self.uhd_usrp_sink_0, 0))
         self.connect((self.uhd_usrp_source_0_0, 0), (self.prs_frame_detector_0_0, 0))
         self.connect((self.uhd_usrp_source_0_0, 0), (self.prs_rx_timekeeper_0, 0))
@@ -180,7 +176,7 @@ class prs_ssrtt_initiator_fft_zc_profiling(gr.top_block):
 
 
 
-def main(top_block_cls=prs_ssrtt_initiator_fft_zc_profiling, options=None):
+def main(top_block_cls=prs_ssrtt_initiator, options=None):
     tb = top_block_cls()
 
     def sig_handler(sig=None, frame=None):

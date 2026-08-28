@@ -93,9 +93,13 @@ private:
     bool d_gate_armed;
     size_t d_armed_preamble_index;
     float d_armed_preamble_metric;
-    double d_armed_cfo_hz;
     float d_last_zc_peak_ratio;
     int64_t d_last_zc_gate_offset_samples;
+    std::mutex d_cfo_mutex;
+    bool d_have_tracked_cfo;
+    double d_tracked_cfo_hz;
+    double d_last_detection_cfo_hz;
+    bool d_last_cfo_was_tracked;
 
     struct correlation_window {
         double start;
@@ -111,6 +115,7 @@ private:
     std::vector<correlation_window> d_windows;
 
     void handle_tx_time(const pmt::pmt_t& msg);
+    void handle_prs_cfo(const pmt::pmt_t& msg);
     void update_rx_time_tags(uint64_t abs_start, uint64_t abs_stop);
     double sample_time(uint64_t abs_offset) const;
     size_t buffered_size() const { return d_buffer.size() - d_buffer_head; }
@@ -124,7 +129,6 @@ private:
     void process_samples(const gr_complex* samples, size_t count, uint64_t abs_start);
     bool find_preamble_gate(size_t& preamble_index,
                             float& metric,
-                            double& cfo_hz,
                             bool require_threshold);
     bool fft_zc_search(size_t first_coarse,
                        size_t last_coarse,
@@ -132,6 +136,13 @@ private:
                        size_t& best_coarse,
                        float& best_metric,
                        float& peak_ratio);
+    bool fft_zc_cfo_search(size_t first_coarse,
+                           size_t last_coarse,
+                           size_t& best_coarse,
+                           float& best_metric,
+                           float& peak_ratio,
+                           double& selected_cfo_hz,
+                           bool& used_tracked_cfo);
     void record_candidate(uint64_t abs_start, float preamble_metric, float coarse_metric);
     bool complete_attempt(double frame_time, uint64_t& attempt_id);
     void publish_failed_attempt(const correlation_window& window);

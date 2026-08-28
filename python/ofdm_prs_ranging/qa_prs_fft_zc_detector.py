@@ -67,6 +67,23 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
             pmt.to_double(pmt.dict_ref(metadata, pmt.intern("coarse_metric"), pmt.PMT_NIL)),
             0.99,
         )
+        self.assertEqual(
+            pmt.symbol_to_string(
+                pmt.dict_ref(metadata, pmt.intern("cfo_source"), pmt.PMT_NIL)
+            ),
+            "INITIAL_BIN",
+        )
+        self.assertIn(
+            pmt.to_double(
+                pmt.dict_ref(metadata, pmt.intern("detection_cfo_hz"), pmt.PMT_NIL)
+            ),
+            (-300.0, -200.0, -100.0, 0.0, 100.0, 200.0, 300.0),
+        )
+        self.assertTrue(
+            pmt.is_null(
+                pmt.dict_ref(metadata, pmt.intern("preamble_cfo_hz"), pmt.PMT_NIL)
+            )
+        )
         self.assertFalse(
             pmt.is_null(pmt.dict_ref(metadata, pmt.intern("zc_peak_ratio"), pmt.PMT_NIL))
         )
@@ -92,6 +109,65 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
             "zc_normalize_peak",
         ):
             self.assertFalse(pmt.is_null(pmt.dict_ref(stages, pmt.intern(stage), pmt.PMT_NIL)))
+
+    def test_prs_channel_cfo_feedback_drives_next_acquisition(self):
+        samp_rate = 30e6
+        tx = ofdm_prs_ranging.prs_timed_burst_source(
+            samp_rate=samp_rate,
+            preamble_len=256,
+            preamble_repeats=4,
+            coarse_sync_len=419,
+            attach_tx_time=False,
+        )
+        frame = numpy.asarray(tx.frame_samples(), dtype=numpy.complex64)
+        cfo_hz = 900.0
+        phase = numpy.arange(frame.size) * (2.0 * math.pi * cfo_hz / samp_rate)
+        frame *= numpy.exp(1j * phase).astype(numpy.complex64)
+        prefix = 1500
+        samples = numpy.concatenate(
+            (numpy.zeros(prefix, numpy.complex64), frame, numpy.zeros(2048, numpy.complex64))
+        )
+        source = blocks.vector_source_c(samples, False)
+        detector = ofdm_prs_ranging.prs_fft_zc_frame_detector(
+            samp_rate=samp_rate,
+            preamble_len=256,
+            preamble_repeats=4,
+            coarse_sync_len=419,
+            threshold=0.35,
+            zc_threshold=0.4,
+            correlation_fft_len=2048,
+            zc_search_before=1024,
+            zc_search_after=1024,
+        )
+        debug = blocks.message_debug()
+        feedback = pmt.make_dict()
+        feedback = pmt.dict_add(
+            feedback, pmt.intern("prs_channel_cfo_hz"), pmt.from_double(cfo_hz)
+        )
+        feedback = pmt.dict_add(
+            feedback, pmt.intern("channel_coherence"), pmt.from_double(0.95)
+        )
+
+        detector.to_basic_block()._post(pmt.intern("prs_cfo_in"), feedback)
+        self.tb.connect(source, detector)
+        self.tb.msg_connect((detector, "frame_out"), (debug, "store"))
+        self.tb.run()
+
+        self.assertEqual(debug.num_messages(), 1)
+        metadata = pmt.car(debug.get_message(0))
+        self.assertAlmostEqual(
+            pmt.to_double(
+                pmt.dict_ref(metadata, pmt.intern("detection_cfo_hz"), pmt.PMT_NIL)
+            ),
+            cfo_hz,
+            places=6,
+        )
+        self.assertEqual(
+            pmt.symbol_to_string(
+                pmt.dict_ref(metadata, pmt.intern("cfo_source"), pmt.PMT_NIL)
+            ),
+            "PRS_FLL",
+        )
 
     def test_repeated_signal_without_zc_is_not_a_frame(self):
         rng = numpy.random.default_rng(7)

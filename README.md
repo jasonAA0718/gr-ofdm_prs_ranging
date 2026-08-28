@@ -739,15 +739,33 @@ window duration because idle time between scheduler calls is excluded.
 
 An experimental `PRS FFT-ZC Frame Detector` is available as a separate block;
 the production `PRS Frame Detector` remains unchanged. It uses the repeated
-preamble only as a cheap signal gate and CFO estimate, then searches a bounded
-ZC candidate region with overlap-save FFT matched filtering. The responder
+preamble only as a cheap signal-presence gate, then searches a bounded ZC
+candidate region with overlap-save FFT matched filtering. It does not estimate
+or apply CFO from the repeated preamble. The responder
 defaults to 1,024 candidates before and after the gate-predicted ZC boundary.
 The time-gated initiator searches new candidates inside its scheduled response
-window without running a global repeated-preamble search or applying gate-derived
-CFO correction. Its scheduled window is already the acquisition gate, and a
+window without running a global repeated-preamble search. Its scheduled window
+is already the acquisition gate, and a
 global repeated-metric maximum can occur in the payload or OFDM section. Both
 paths correct `frame_start` from the maximum ZC peak rather than from the
 preamble gate position.
+
+With `PRS FLL CFO Compensation` enabled, the first acquisition evaluates the
+fixed CFO hypotheses `-300, -200, -100, 0, 100, 200, 300 Hz` and records the
+selected value as `detection_cfo_hz` with `cfo_source=INITIAL_BIN`. The channel
+estimator's `channel_out` is fed back to the detector's optional `prs_cfo_in`
+port. A finite `prs_channel_cfo_hz` with `channel_coherence >= 0.2` replaces the
+bootstrap value for the next ZC acquisition and initial BPSK payload decode;
+those frames report `cfo_source=PRS_FLL`. Disabling the option uses zero CFO and
+reports `cfo_source=DISABLED`. The current-frame PRS CP estimate remains the
+unwrap reference for channel CFO and the conditional payload retry.
+
+The seven-bin search is experimental rather than a precise first-frame CFO
+estimator. A 419-sample ZC at 30 MS/s spans about 14 microseconds and has a
+nominal frequency resolution near 71.6 kHz, so ZC magnitudes at hypotheses only
+100 Hz apart are almost identical. Its main cost is seven matched-filter passes
+on the first acquisition. The longer PRS observation provides the useful CFO
+feedback; subsequent acquisitions require one matched-filter pass.
 
 Use these A/B profiling flowgraphs to compare it with the existing detector:
 
@@ -761,6 +779,8 @@ Its `fft_zc_frame_detector` timing report retains the comparable aggregate
 `preamble_gate_scan`, `zc_input_prepare`, `zc_fft_forward`,
 `zc_spectrum_multiply`, `zc_ifft`, and `zc_normalize_peak`. Therefore the
 existing timing collector can compare acquisition cost without schema changes.
+The first acquisition includes all seven CFO hypotheses in these accumulated
+ZC stages; later acquisitions include the single tracked-CFO pass.
 The optional `zc_peak_ratio` metadata is the largest normalized ZC peak divided
 by the second largest candidate peak; the default threshold `1.0` records the
 diagnostic without rejecting ambiguous peaks.
@@ -768,10 +788,11 @@ diagnostic without rejecting ambiguous peaks.
 The FFT-ZC profiling flowgraphs write acquisition diagnostics to version-4 CSV
 files. In addition to the existing metrics, they record `zc_peak_ratio`,
 `zc_gate_offset_samples`, and the validity/metric of both the initial
-preamble-CFO payload decode and the CP-CFO retry. Use these fields to separate
-a weak or displaced ZC peak from a payload-only failure. Existing version-2 and
-version-3 profiling captures remain unchanged. Version 4 identifies captures
-made after removing the time-gated initiator's global preamble search.
+tracked/initial-bin CFO payload decode and the CP-CFO retry. Use these fields to
+separate a weak or displaced ZC peak from a payload-only failure. Existing
+version-2 and version-3 profiling captures remain unchanged. Version 4
+identifies captures made after removing the time-gated initiator's global
+preamble search.
 
 The timing collector buffers reports and calculates count, mean, median, p95,
 p99, and maximum after normal flowgraph shutdown. The UHD source/sink, RX

@@ -133,9 +133,12 @@ prs_fft_zc_frame_detector_impl::prs_fft_zc_frame_detector_impl(double samp_rate,
       d_gate_armed(false),
       d_armed_preamble_index(0),
       d_armed_preamble_metric(0.0f),
-      d_armed_cfo_hz(0.0),
       d_last_zc_peak_ratio(0.0f),
-      d_last_zc_gate_offset_samples(0)
+      d_last_zc_gate_offset_samples(0),
+      d_have_tracked_cfo(false),
+      d_tracked_cfo_hz(0.0),
+      d_last_detection_cfo_hz(0.0),
+      d_last_cfo_was_tracked(false)
 {
     if (samp_rate <= 0.0) {
         throw std::invalid_argument("samp_rate must be positive");
@@ -183,11 +186,14 @@ prs_fft_zc_frame_detector_impl::prs_fft_zc_frame_detector_impl(double samp_rate,
                          d_zc_fft->get_outbuf() + d_correlation_fft_len);
     d_buffer.reserve(static_cast<size_t>(frame_len(d_cfg) + d_cfg.coarse_sync_len) * 2U);
     message_port_register_in(pmt::mp("tx_time_in"));
+    message_port_register_in(pmt::mp("prs_cfo_in"));
     message_port_register_out(pmt::mp("frame_out"));
     message_port_register_out(pmt::mp("event_out"));
     message_port_register_out(pmt::mp("timing_out"));
     set_msg_handler(pmt::mp("tx_time_in"),
                     [this](pmt::pmt_t msg) { handle_tx_time(msg); });
+    set_msg_handler(pmt::mp("prs_cfo_in"),
+                    [this](pmt::pmt_t msg) { handle_prs_cfo(msg); });
 }
 
 void prs_fft_zc_frame_detector_impl::forecast(int noutput_items,
@@ -243,6 +249,25 @@ void prs_fft_zc_frame_detector_impl::handle_tx_time(const pmt::pmt_t& message)
               [](const correlation_window& a, const correlation_window& b) {
                   return a.start < b.start;
               });
+}
+
+void prs_fft_zc_frame_detector_impl::handle_prs_cfo(const pmt::pmt_t& message)
+{
+    const pmt::pmt_t meta = pmt::is_dict(message)
+                                ? message
+                                : (pmt::is_pair(message) ? pmt::car(message) : pmt::PMT_NIL);
+    if (!pmt::is_dict(meta)) {
+        return;
+    }
+    const double cfo_hz = dict_ref_double(
+        meta, "prs_channel_cfo_hz", std::numeric_limits<double>::quiet_NaN());
+    const double coherence = dict_ref_double(meta, "channel_coherence", 0.0);
+    if (!std::isfinite(cfo_hz) || !std::isfinite(coherence) || coherence < 0.2) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(d_cfo_mutex);
+    d_tracked_cfo_hz = cfo_hz;
+    d_have_tracked_cfo = true;
 }
 
 void prs_fft_zc_frame_detector_impl::update_rx_time_tags(uint64_t abs_start,
@@ -342,7 +367,6 @@ void prs_fft_zc_frame_detector_impl::process_samples(const gr_complex* samples,
 
 bool prs_fft_zc_frame_detector_impl::find_preamble_gate(size_t& preamble_index,
                                                         float& metric_out,
-                                                        double& cfo_hz,
                                                         bool require_threshold)
 {
     profiling::accumulated_timer gate_timer(d_enable_profiling, d_gate_scan_duration_ns);
@@ -389,7 +413,6 @@ bool prs_fft_zc_frame_detector_impl::find_preamble_gate(size_t& preamble_index,
         static_cast<double>(d_preamble_threshold) * d_preamble_threshold;
     double best_metric_sq = -1.0;
     size_t best_index = d_next_gate_index;
-    gr_complex best_corr(0.0f, 0.0f);
     for (size_t p = d_next_gate_index; p <= max_preamble; ++p) {
         const double power_product = std::max(0.0, first_power * second_power);
         const double corr_power = std::norm(corr);
@@ -397,16 +420,11 @@ bool prs_fft_zc_frame_detector_impl::find_preamble_gate(size_t& preamble_index,
         if (metric_sq > best_metric_sq) {
             best_metric_sq = metric_sq;
             best_index = p;
-            best_corr = corr;
         }
         if (require_threshold && power_product > 0.0 &&
             corr_power >= threshold_sq * power_product) {
             preamble_index = p;
             metric_out = static_cast<float>(std::sqrt(metric_sq));
-            const double phase_increment =
-                std::atan2(corr.imag(), corr.real()) / d_cfg.preamble_len;
-            cfo_hz = phase_increment * d_cfg.samp_rate /
-                     (2.0 * 3.141592653589793238462643383279502884);
             return true;
         }
         if (p < max_preamble) {
@@ -421,14 +439,6 @@ bool prs_fft_zc_frame_detector_impl::find_preamble_gate(size_t& preamble_index,
     }
     preamble_index = best_index;
     metric_out = static_cast<float>(std::sqrt(best_metric_sq));
-    if (best_metric_sq >= threshold_sq) {
-        const double phase_increment =
-            std::atan2(best_corr.imag(), best_corr.real()) / d_cfg.preamble_len;
-        cfo_hz = phase_increment * d_cfg.samp_rate /
-                 (2.0 * 3.141592653589793238462643383279502884);
-    } else {
-        cfo_hz = 0.0;
-    }
     return true;
 }
 
@@ -546,6 +556,59 @@ bool prs_fft_zc_frame_detector_impl::fft_zc_search(size_t first_coarse,
     peak_ratio = second_metric > 0.0f ? best_metric / second_metric
                                       : std::numeric_limits<float>::infinity();
     return true;
+}
+
+bool prs_fft_zc_frame_detector_impl::fft_zc_cfo_search(size_t first_coarse,
+                                                       size_t last_coarse,
+                                                       size_t& best_coarse,
+                                                       float& best_metric,
+                                                       float& peak_ratio,
+                                                       double& selected_cfo_hz,
+                                                       bool& used_tracked_cfo)
+{
+    double tracked_cfo_hz = 0.0;
+    bool have_tracked_cfo = false;
+    if (d_cfo_compensation) {
+        std::lock_guard<std::mutex> lock(d_cfo_mutex);
+        have_tracked_cfo = d_have_tracked_cfo;
+        tracked_cfo_hz = d_tracked_cfo_hz;
+    }
+
+    if (have_tracked_cfo || !d_cfo_compensation) {
+        selected_cfo_hz = have_tracked_cfo ? tracked_cfo_hz : 0.0;
+        used_tracked_cfo = have_tracked_cfo;
+        return fft_zc_search(first_coarse,
+                             last_coarse,
+                             selected_cfo_hz,
+                             best_coarse,
+                             best_metric,
+                             peak_ratio);
+    }
+
+    // Bootstrap the FLL with a small acquisition bank. Later frames use the
+    // PRS channel-CFO feedback and require only one matched-filter search.
+    best_metric = -1.0f;
+    used_tracked_cfo = false;
+    for (int cfo_hz = -300; cfo_hz <= 300; cfo_hz += 100) {
+        size_t candidate_coarse = first_coarse;
+        float candidate_metric = 0.0f;
+        float candidate_ratio = 0.0f;
+        if (!fft_zc_search(first_coarse,
+                            last_coarse,
+                            static_cast<double>(cfo_hz),
+                            candidate_coarse,
+                            candidate_metric,
+                            candidate_ratio)) {
+            return false;
+        }
+        if (candidate_metric > best_metric) {
+            best_coarse = candidate_coarse;
+            best_metric = candidate_metric;
+            peak_ratio = candidate_ratio;
+            selected_cfo_hz = static_cast<double>(cfo_hz);
+        }
+    }
+    return best_metric >= 0.0f;
 }
 
 void prs_fft_zc_frame_detector_impl::record_candidate(uint64_t abs_start,
@@ -672,7 +735,6 @@ bool prs_fft_zc_frame_detector_impl::find_frame(size_t& frame_start_index,
     size_t first_coarse = 0;
     size_t last_coarse = 0;
     float preamble_metric = 0.0f;
-    double cfo_hz = 0.0;
     int64_t predicted_coarse = -1;
 
     if (d_time_gating) {
@@ -686,20 +748,18 @@ bool prs_fft_zc_frame_detector_impl::find_frame(size_t& frame_start_index,
         last_coarse = max_coarse;
         // The scheduled response window is already the acquisition gate. A global
         // repeated-metric maximum can land on the payload or OFDM section, so it
-        // must not provide either a boundary prediction or ZC CFO correction.
+        // must not provide a boundary prediction.
         preamble_metric = 0.0f;
-        cfo_hz = 0.0;
         d_next_coarse_index = max_coarse + 1;
     } else {
         if (!d_gate_armed) {
             size_t gate_index = 0;
-            if (!find_preamble_gate(gate_index, preamble_metric, cfo_hz, true)) {
+            if (!find_preamble_gate(gate_index, preamble_metric, true)) {
                 return false;
             }
             d_gate_armed = true;
             d_armed_preamble_index = gate_index;
             d_armed_preamble_metric = preamble_metric;
-            d_armed_cfo_hz = cfo_hz;
         }
 
         const size_t gate_predicted_coarse = d_armed_preamble_index + preamble_total;
@@ -714,16 +774,24 @@ bool prs_fft_zc_frame_detector_impl::find_frame(size_t& frame_start_index,
             return false;
         }
         preamble_metric = d_armed_preamble_metric;
-        cfo_hz = d_armed_cfo_hz;
     }
 
     size_t best_coarse = first_coarse;
     float best_metric = 0.0f;
     float peak_ratio = 0.0f;
-    if (!fft_zc_search(
-            first_coarse, last_coarse, cfo_hz, best_coarse, best_metric, peak_ratio)) {
+    double selected_cfo_hz = 0.0;
+    bool used_tracked_cfo = false;
+    if (!fft_zc_cfo_search(first_coarse,
+                            last_coarse,
+                            best_coarse,
+                            best_metric,
+                            peak_ratio,
+                            selected_cfo_hz,
+                            used_tracked_cfo)) {
         return false;
     }
+    d_last_detection_cfo_hz = selected_cfo_hz;
+    d_last_cfo_was_tracked = used_tracked_cfo;
     d_last_zc_peak_ratio = peak_ratio;
     d_last_zc_gate_offset_samples =
         predicted_coarse >= 0 ? static_cast<int64_t>(best_coarse) - predicted_coarse : 0;
@@ -780,23 +848,8 @@ void prs_fft_zc_frame_detector_impl::publish_frame(size_t frame_start_index,
     auto stage_stop = report.mark();
     report.add("frame_extract", stage_start, stage_stop);
     stage_start = stage_stop;
-    gr_complex cfo_corr(0.0f, 0.0f);
-    const int preamble_start = d_cfg.zero_guard_len;
-    const int preamble_span = d_cfg.preamble_len * (d_cfg.preamble_repeats - 1);
-    for (int i = 0; i < preamble_span; ++i) {
-        cfo_corr += std::conj(frame[preamble_start + i]) *
-                    frame[preamble_start + i + d_cfg.preamble_len];
-    }
-    const double cfo_phase_increment = std::atan2(cfo_corr.imag(), cfo_corr.real()) /
-                                       static_cast<double>(d_cfg.preamble_len);
-    const double preamble_cfo_hz = cfo_phase_increment * d_cfg.samp_rate /
-                                   (2.0 * 3.141592653589793238462643383279502884);
-    stage_stop = report.mark();
-    report.add("preamble_cfo", stage_start, stage_stop);
-
-    stage_start = stage_stop;
     const auto prs_cp_cfo =
-        estimate_prs_cp_cfo(frame.data(), frame.size(), d_cfg, preamble_cfo_hz);
+        estimate_prs_cp_cfo(frame.data(), frame.size(), d_cfg, d_last_detection_cfo_hz);
     stage_stop = report.mark();
     report.add("prs_cp_cfo", stage_start, stage_stop);
 
@@ -806,17 +859,20 @@ void prs_fft_zc_frame_detector_impl::publish_frame(size_t frame_start_index,
     const int payload_start = d_cfg.zero_guard_len +
                               d_cfg.preamble_len * d_cfg.preamble_repeats +
                               d_cfg.coarse_sync_len;
+    const double detection_phase_increment =
+        2.0 * 3.141592653589793238462643383279502884 * d_last_detection_cfo_hz /
+        d_cfg.samp_rate;
     bool frame_id_valid = decode_packet_payload(frame.data() + payload_start,
                                                 d_cfg.payload_len,
                                                 payload_info,
                                                 payload_metric,
-                                                cfo_phase_increment);
+                                                detection_phase_increment);
     const bool payload_initial_valid = frame_id_valid;
     const float payload_initial_metric = payload_metric;
     bool payload_retry_used = false;
     bool payload_retry_valid = false;
     float payload_retry_metric = 0.0f;
-    double selected_cfo_hz = preamble_cfo_hz;
+    double selected_cfo_hz = d_last_detection_cfo_hz;
     if (!frame_id_valid && prs_cp_cfo.valid && prs_cp_cfo.coherence >= 0.2) {
         prs_payload_info retry_info;
         float retry_metric = 0.0f;
@@ -887,8 +943,14 @@ void prs_fft_zc_frame_detector_impl::publish_frame(size_t frame_start_index,
     meta = pmt::dict_add(
         meta, pmt::mp("coarse_zc_root"), pmt::from_long(d_cfg.coarse_zc_root));
     meta = pmt::dict_add(meta, pmt::mp("channel_id"), pmt::from_long(d_cfg.channel_id));
-    meta = pmt::dict_add(
-        meta, pmt::mp("preamble_cfo_hz"), pmt::from_double(preamble_cfo_hz));
+    meta = pmt::dict_add(meta,
+                         pmt::mp("detection_cfo_hz"),
+                         pmt::from_double(d_last_detection_cfo_hz));
+    meta = pmt::dict_add(meta,
+                         pmt::mp("cfo_source"),
+                         pmt::mp(d_last_cfo_was_tracked
+                                     ? "PRS_FLL"
+                                     : (d_cfo_compensation ? "INITIAL_BIN" : "DISABLED")));
     meta = pmt::dict_add(meta,
                          pmt::mp("prs_cp_cfo_hz"),
                          pmt::from_double(prs_cp_cfo.valid ? prs_cp_cfo.hz : 0.0));

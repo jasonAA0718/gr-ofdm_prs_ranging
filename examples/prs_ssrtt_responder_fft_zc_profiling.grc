@@ -1245,6 +1245,7 @@ blocks:
 
 connections:
 - [prs_channel_estimator_0, channel_out, prs_phase_slope_estimator_0, channel_in]
+- [prs_channel_estimator_0, channel_out, prs_frame_detector_0, prs_cfo_in]
 - [prs_channel_estimator_0, timing_out, virtual_sink_1_0_0_0_0, '0']
 - [prs_csv_logger_0, timing_out, virtual_sink_1_0_0_0_0_0_0_0, '0']
 - [prs_fft_receiver_0, symbols_out, prs_channel_estimator_0, symbols_in]
