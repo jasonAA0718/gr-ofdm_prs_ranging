@@ -142,7 +142,7 @@ blocks:
     append: '1'
     comment: Logs every detector output before SS-RTT filtering
     node: '"initiator"'
-    path: '"CSV/profiling/initiator_fft_zc_acquisition_v3.csv"'
+    path: '"CSV/profiling/initiator_fft_zc_acquisition_v4.csv"'
   states:
     bus_sink: false
     bus_source: false

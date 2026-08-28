@@ -159,6 +159,18 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
             pmt.to_uint64(pmt.dict_ref(metadata, pmt.intern("attempt_id"), pmt.PMT_NIL)),
             314,
         )
+        self.assertEqual(
+            pmt.to_long(
+                pmt.dict_ref(metadata, pmt.intern("zc_gate_offset_samples"), pmt.PMT_NIL)
+            ),
+            0,
+        )
+        self.assertEqual(
+            pmt.to_double(
+                pmt.dict_ref(metadata, pmt.intern("preamble_metric"), pmt.PMT_NIL)
+            ),
+            0.0,
+        )
 
 
 if __name__ == "__main__":

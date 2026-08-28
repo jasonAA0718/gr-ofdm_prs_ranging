@@ -98,7 +98,7 @@ class prs_ssrtt_initiator_fft_zc_profiling(gr.top_block):
         self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 1024, 128, 1024, 16, True)
         self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger("CSV/profiling/initiator_fft_zc_measurements.csv", 1, True)
         self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 1024, 1024, 16, 13990001, True)
-        self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/profiling/initiator_fft_zc_acquisition_v2.csv", "initiator", 1)
+        self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/profiling/initiator_fft_zc_acquisition_v4.csv", "initiator", 1)
         self.blocks_message_strobe_0 = blocks.message_strobe(pmt.PMT_T, 500)
 
 
