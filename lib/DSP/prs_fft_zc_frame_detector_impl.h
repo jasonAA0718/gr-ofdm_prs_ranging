@@ -43,7 +43,6 @@ public:
                                    int zc_search_before,
                                    int zc_search_after,
                                    bool cfo_compensation,
-                                   float peak_ratio_threshold,
                                    bool enable_profiling);
     ~prs_fft_zc_frame_detector_impl() override = default;
 
@@ -63,7 +62,6 @@ private:
     int d_zc_search_before;
     int d_zc_search_after;
     bool d_cfo_compensation;
-    float d_peak_ratio_threshold;
     std::unique_ptr<gr::fft::fft_complex_fwd> d_zc_fft;
     std::unique_ptr<gr::fft::fft_complex_rev> d_zc_ifft;
     std::vector<gr_complex> d_zc_spectrum;
@@ -93,7 +91,6 @@ private:
     bool d_gate_armed;
     size_t d_armed_preamble_index;
     float d_armed_preamble_metric;
-    float d_last_zc_peak_ratio;
     int64_t d_last_zc_gate_offset_samples;
     std::mutex d_cfo_mutex;
     bool d_have_tracked_cfo;
@@ -135,14 +132,14 @@ private:
                        double cfo_hz,
                        size_t& best_coarse,
                        float& best_metric,
-                       float& peak_ratio);
+                       bool& found_threshold_peak);
     bool fft_zc_cfo_search(size_t first_coarse,
                            size_t last_coarse,
                            size_t& best_coarse,
                            float& best_metric,
-                           float& peak_ratio,
                            double& selected_cfo_hz,
-                           bool& used_tracked_cfo);
+                           bool& used_tracked_cfo,
+                           bool& found_threshold_peak);
     void record_candidate(uint64_t abs_start, float preamble_metric, float coarse_metric);
     bool complete_attempt(double frame_time, uint64_t& attempt_id);
     void publish_failed_attempt(const correlation_window& window);

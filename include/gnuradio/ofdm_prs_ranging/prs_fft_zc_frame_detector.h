@@ -41,7 +41,6 @@ public:
                      int zc_search_before = 1024,
                      int zc_search_after = 1024,
                      bool cfo_compensation = true,
-                     float peak_ratio_threshold = 1.0f,
                      bool enable_profiling = false);
 };
 

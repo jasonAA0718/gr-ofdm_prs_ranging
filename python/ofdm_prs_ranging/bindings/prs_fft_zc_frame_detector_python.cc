@@ -31,6 +31,5 @@ void bind_prs_fft_zc_frame_detector(py::module& m)
              py::arg("zc_search_before") = 1024,
              py::arg("zc_search_after") = 1024,
              py::arg("cfo_compensation") = true,
-             py::arg("peak_ratio_threshold") = 1.0f,
              py::arg("enable_profiling") = false);
 }

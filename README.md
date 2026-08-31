@@ -781,18 +781,79 @@ Its `fft_zc_frame_detector` timing report retains the comparable aggregate
 existing timing collector can compare acquisition cost without schema changes.
 The first acquisition includes all seven CFO hypotheses in these accumulated
 ZC stages; later acquisitions include the single tracked-CFO pass.
-The optional `zc_peak_ratio` metadata is the largest normalized ZC peak divided
-by the second largest candidate peak; the default threshold `1.0` records the
-diagnostic without rejecting ambiguous peaks.
+
+The experimental detector no longer uses a peak-ratio threshold or selects the
+global maximum. Candidates are examined in increasing sample order. Once the
+normalized ZC metric crosses `zc_threshold`, the detector returns the local
+maximum within that first contiguous above-threshold correlation lobe and does
+not compare it with later, stronger paths. The threshold must be high enough to
+exclude partial-overlap sidelobes; the profiling flowgraphs use practical
+values of `0.4` or `0.5`, and clean time-gated QA uses `0.5`.
 
 The FFT-ZC profiling flowgraphs write acquisition diagnostics to version-4 CSV
-files. In addition to the existing metrics, they record `zc_peak_ratio`,
-`zc_gate_offset_samples`, and the validity/metric of both the initial
+files. In addition to the existing metrics, they record
+`zc_gate_offset_samples` and the validity/metric of both the initial
 tracked/initial-bin CFO payload decode and the CP-CFO retry. Use these fields to
 separate a weak or displaced ZC peak from a payload-only failure. Existing
 version-2 and version-3 profiling captures remain unchanged. Version 4
 identifies captures made after removing the time-gated initiator's global
 preamble search.
+
+### Known FFT-ZC Ranging Limitation
+
+The FFT-ZC detector is experimental and must not currently be used as the
+accuracy baseline. A same-environment 12.5 m wireless A/B test produced the
+following results:
+
+| Detector | Paired phase-corrected result | Directional fine-delay behavior |
+|---|---:|---|
+| Legacy local-ZC detector | `13.519 m` mean, `0.084 m` standard deviation | Both directions remained approximately within `+/-0.5` sample |
+| FFT-ZC detector | `15.596 m` mean, `3.254 m` standard deviation before rejection | Poll-link estimates reached `+3.63` samples and produced corrections up to `+18.1 m` |
+
+The unchanged Golay channel estimator and phase-slope estimator return to
+normal behavior when the legacy detector is restored. This isolates the
+regression to the detector/extraction path rather than the propagation channel
+or the phase regression itself. Payload CRC and high CP/channel coherence do
+not prove exact PRS alignment: the 280-sample BPSK integration and OFDM CP can
+tolerate a small frame-boundary error that appears as a linear phase slope.
+
+The leading diagnosis is peak-selection policy. The legacy detector examines
+candidates in time order and accepts the first local ZC peak that passes its
+threshold after narrow refinement. The FFT-ZC detector searches a wider region
+and previously derived `frame_start` from the global maximum. In multipath, the
+strongest correlation path need not be the first arriving path. The observed
+bad fine-delay groups are consistent with approximately two- and four-sample
+boundary changes. The experimental branch now selects the local maximum of the
+earliest above-threshold correlation lobe. Synthetic two-path QA verifies that
+a weaker credible first path is selected ahead of a stronger path delayed by
+eight samples. Wireless validation and same-IQ comparison against the legacy
+detector are still required.
+
+Until that comparison is complete:
+
+- Use the legacy detector for ranging accuracy, calibration, multi-anchor, and
+  waveform experiments.
+- Use the FFT-ZC detector only for acquisition-cost profiling and matched-filter
+  development.
+- Reject rather than clip a fine correction when the phase fit is invalid,
+  either direction has inadequate quality, or the residual fine delay lies
+  outside the expected ambiguity interval. Fall back to integer SS-RTT for that
+  attempt.
+- Do not claim FFT-ZC ranging accuracy from rows that include invalid phase
+  fits.
+
+Before enabling FFT-ZC for ranging, replay identical IQ through both detectors
+and record the legacy ZC index, FFT global-maximum index, earliest FFT local
+peak above threshold, top candidate offsets/metrics, and extracted-frame index.
+The FFT detector should agree with the stable reference boundary within one
+sample for at least `99.9%` of accepted frames and must not regress the
+fine-delay outlier rate. The earliest-credible-peak change is an experimental
+candidate fix, not yet an accuracy result.
+
+The matched-filter development is contained in the four consecutive commits
+after profiling baseline `ceef9e8`: `140240c`, `ea89e9a`, `a243170`, and
+`f1110aa`. Preserve these commits on an experimental branch if the stable UHD
+branch is returned to the legacy detector.
 
 The timing collector buffers reports and calculates count, mean, median, p95,
 p99, and maximum after normal flowgraph shutdown. The UHD source/sink, RX

@@ -42,7 +42,6 @@ prs_fft_zc_frame_detector::make(double samp_rate,
                                 int zc_search_before,
                                 int zc_search_after,
                                 bool cfo_compensation,
-                                float peak_ratio_threshold,
                                 bool enable_profiling)
 {
     return gnuradio::make_block_sptr<prs_fft_zc_frame_detector_impl>(samp_rate,
@@ -68,7 +67,6 @@ prs_fft_zc_frame_detector::make(double samp_rate,
                                                                      zc_search_before,
                                                                      zc_search_after,
                                                                      cfo_compensation,
-                                                                     peak_ratio_threshold,
                                                                      enable_profiling);
 }
 
@@ -95,7 +93,6 @@ prs_fft_zc_frame_detector_impl::prs_fft_zc_frame_detector_impl(double samp_rate,
                                                                int zc_search_before,
                                                                int zc_search_after,
                                                                bool cfo_compensation,
-                                                               float peak_ratio_threshold,
                                                                bool enable_profiling)
     : gr::block("prs_fft_zc_frame_detector",
                 gr::io_signature::make(1, 1, sizeof(gr_complex)),
@@ -107,7 +104,6 @@ prs_fft_zc_frame_detector_impl::prs_fft_zc_frame_detector_impl(double samp_rate,
       d_zc_search_before(zc_search_before),
       d_zc_search_after(zc_search_after),
       d_cfo_compensation(cfo_compensation),
-      d_peak_ratio_threshold(peak_ratio_threshold),
       d_buffer_head(0),
       d_next_gate_index(0),
       d_next_coarse_index(0),
@@ -133,7 +129,6 @@ prs_fft_zc_frame_detector_impl::prs_fft_zc_frame_detector_impl(double samp_rate,
       d_gate_armed(false),
       d_armed_preamble_index(0),
       d_armed_preamble_metric(0.0f),
-      d_last_zc_peak_ratio(0.0f),
       d_last_zc_gate_offset_samples(0),
       d_have_tracked_cfo(false),
       d_tracked_cfo_hz(0.0),
@@ -155,9 +150,8 @@ prs_fft_zc_frame_detector_impl::prs_fft_zc_frame_detector_impl(double samp_rate,
         throw std::invalid_argument(
             "correlation_fft_len must be a power of two and at least coarse_sync_len");
     }
-    if (zc_search_before < 0 || zc_search_after < 0 || peak_ratio_threshold < 1.0f) {
-        throw std::invalid_argument(
-            "ZC search extents must be nonnegative and peak ratio must be at least one");
+    if (zc_search_before < 0 || zc_search_after < 0) {
+        throw std::invalid_argument("ZC search extents must be nonnegative");
     }
 
     d_cfg.samp_rate = samp_rate;
@@ -447,7 +441,7 @@ bool prs_fft_zc_frame_detector_impl::fft_zc_search(size_t first_coarse,
                                                    double cfo_hz,
                                                    size_t& best_coarse,
                                                    float& best_metric,
-                                                   float& peak_ratio)
+                                                   bool& found_threshold_peak)
 {
     if (first_coarse > last_coarse) {
         return false;
@@ -460,9 +454,12 @@ bool prs_fft_zc_frame_detector_impl::fft_zc_search(size_t first_coarse,
             ? -2.0 * 3.141592653589793238462643383279502884 * cfo_hz / d_cfg.samp_rate
             : 0.0;
     const float ifft_scale = 1.0f / static_cast<float>(d_correlation_fft_len);
-    float second_metric = 0.0f;
     best_metric = 0.0f;
     best_coarse = first_coarse;
+    found_threshold_peak = false;
+    bool inside_threshold_lobe = false;
+    size_t lobe_best_coarse = first_coarse;
+    float lobe_best_metric = 0.0f;
     const auto mark = [this]() {
         return d_enable_profiling ? profiling::now() : profiling::timing_point();
     };
@@ -534,12 +531,29 @@ bool prs_fft_zc_frame_detector_impl::fft_zc_search(size_t first_coarse,
                 std::max(0.0, energy * static_cast<double>(d_cfg.coarse_sync_len)));
             const float metric =
                 denom > 0.0 ? magnitude / static_cast<float>(denom) : 0.0f;
-            if (metric > best_metric) {
-                second_metric = best_metric;
+            const size_t coarse_index = block_start + i;
+            if (!inside_threshold_lobe && metric > best_metric) {
                 best_metric = metric;
-                best_coarse = block_start + i;
-            } else if (metric > second_metric) {
-                second_metric = metric;
+                best_coarse = coarse_index;
+            }
+            if (metric >= d_zc_threshold) {
+                if (!inside_threshold_lobe) {
+                    inside_threshold_lobe = true;
+                    lobe_best_coarse = coarse_index;
+                    lobe_best_metric = metric;
+                } else if (metric > lobe_best_metric) {
+                    lobe_best_coarse = coarse_index;
+                    lobe_best_metric = metric;
+                }
+            } else if (inside_threshold_lobe) {
+                best_coarse = lobe_best_coarse;
+                best_metric = lobe_best_metric;
+                found_threshold_peak = true;
+                if (d_enable_profiling) {
+                    d_zc_peak_duration_ns +=
+                        profiling::elapsed_ns(stage_start, mark());
+                }
+                return true;
             }
             if (i + 1 < candidate_count) {
                 energy -= std::norm(input[i]);
@@ -553,8 +567,11 @@ bool prs_fft_zc_frame_detector_impl::fft_zc_search(size_t first_coarse,
         block_start += candidate_count;
     }
 
-    peak_ratio = second_metric > 0.0f ? best_metric / second_metric
-                                      : std::numeric_limits<float>::infinity();
+    if (inside_threshold_lobe) {
+        best_coarse = lobe_best_coarse;
+        best_metric = lobe_best_metric;
+        found_threshold_peak = true;
+    }
     return true;
 }
 
@@ -562,9 +579,9 @@ bool prs_fft_zc_frame_detector_impl::fft_zc_cfo_search(size_t first_coarse,
                                                        size_t last_coarse,
                                                        size_t& best_coarse,
                                                        float& best_metric,
-                                                       float& peak_ratio,
                                                        double& selected_cfo_hz,
-                                                       bool& used_tracked_cfo)
+                                                       bool& used_tracked_cfo,
+                                                       bool& found_threshold_peak)
 {
     double tracked_cfo_hz = 0.0;
     bool have_tracked_cfo = false;
@@ -582,30 +599,36 @@ bool prs_fft_zc_frame_detector_impl::fft_zc_cfo_search(size_t first_coarse,
                              selected_cfo_hz,
                              best_coarse,
                              best_metric,
-                             peak_ratio);
+                             found_threshold_peak);
     }
 
     // Bootstrap the FLL with a small acquisition bank. Later frames use the
     // PRS channel-CFO feedback and require only one matched-filter search.
     best_metric = -1.0f;
     used_tracked_cfo = false;
+    found_threshold_peak = false;
     for (int cfo_hz = -300; cfo_hz <= 300; cfo_hz += 100) {
         size_t candidate_coarse = first_coarse;
         float candidate_metric = 0.0f;
-        float candidate_ratio = 0.0f;
+        bool candidate_found_peak = false;
         if (!fft_zc_search(first_coarse,
                             last_coarse,
                             static_cast<double>(cfo_hz),
                             candidate_coarse,
                             candidate_metric,
-                            candidate_ratio)) {
+                            candidate_found_peak)) {
             return false;
         }
-        if (candidate_metric > best_metric) {
+        const bool prefer_candidate =
+            (candidate_found_peak && !found_threshold_peak) ||
+            (candidate_found_peak == found_threshold_peak &&
+             (candidate_coarse < best_coarse ||
+              (candidate_coarse == best_coarse && candidate_metric > best_metric)));
+        if (prefer_candidate || best_metric < 0.0f) {
             best_coarse = candidate_coarse;
             best_metric = candidate_metric;
-            peak_ratio = candidate_ratio;
             selected_cfo_hz = static_cast<double>(cfo_hz);
+            found_threshold_peak = candidate_found_peak;
         }
     }
     return best_metric >= 0.0f;
@@ -689,8 +712,6 @@ void prs_fft_zc_frame_detector_impl::publish_failed_attempt(
         meta, pmt::mp("preamble_metric"), pmt::from_double(window.preamble_metric));
     meta = pmt::dict_add(
         meta, pmt::mp("coarse_metric"), pmt::from_double(window.coarse_metric));
-    meta = pmt::dict_add(
-        meta, pmt::mp("zc_peak_ratio"), pmt::from_double(d_last_zc_peak_ratio));
     meta = pmt::dict_add(
         meta, pmt::mp("coarse_zc_root"), pmt::from_long(d_cfg.coarse_zc_root));
     meta = pmt::dict_add(meta, pmt::mp("channel_id"), pmt::from_long(d_cfg.channel_id));
@@ -778,21 +799,20 @@ bool prs_fft_zc_frame_detector_impl::find_frame(size_t& frame_start_index,
 
     size_t best_coarse = first_coarse;
     float best_metric = 0.0f;
-    float peak_ratio = 0.0f;
     double selected_cfo_hz = 0.0;
     bool used_tracked_cfo = false;
+    bool found_threshold_peak = false;
     if (!fft_zc_cfo_search(first_coarse,
                             last_coarse,
                             best_coarse,
                             best_metric,
-                            peak_ratio,
                             selected_cfo_hz,
-                            used_tracked_cfo)) {
+                            used_tracked_cfo,
+                            found_threshold_peak)) {
         return false;
     }
     d_last_detection_cfo_hz = selected_cfo_hz;
     d_last_cfo_was_tracked = used_tracked_cfo;
-    d_last_zc_peak_ratio = peak_ratio;
     d_last_zc_gate_offset_samples =
         predicted_coarse >= 0 ? static_cast<int64_t>(best_coarse) - predicted_coarse : 0;
 
@@ -805,7 +825,7 @@ bool prs_fft_zc_frame_detector_impl::find_frame(size_t& frame_start_index,
     const size_t best_start = best_coarse - coarse_rel;
     const uint64_t abs_start = d_buffer_abs_start + best_start;
     record_candidate(abs_start, preamble_metric, best_metric);
-    if (best_metric < d_zc_threshold || peak_ratio < d_peak_ratio_threshold ||
+    if (!found_threshold_peak ||
         static_cast<int64_t>(abs_start) - d_last_frame_start < d_min_frame_gap) {
         return false;
     }
@@ -935,8 +955,6 @@ void prs_fft_zc_frame_detector_impl::publish_frame(size_t frame_start_index,
     meta = pmt::dict_add(
         meta, pmt::mp("preamble_metric"), pmt::from_double(preamble_metric));
     meta = pmt::dict_add(meta, pmt::mp("coarse_metric"), pmt::from_double(coarse_metric));
-    meta = pmt::dict_add(
-        meta, pmt::mp("zc_peak_ratio"), pmt::from_double(d_last_zc_peak_ratio));
     meta = pmt::dict_add(meta,
                          pmt::mp("zc_gate_offset_samples"),
                          pmt::from_long(d_last_zc_gate_offset_samples));

@@ -84,9 +84,6 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
                 pmt.dict_ref(metadata, pmt.intern("preamble_cfo_hz"), pmt.PMT_NIL)
             )
         )
-        self.assertFalse(
-            pmt.is_null(pmt.dict_ref(metadata, pmt.intern("zc_peak_ratio"), pmt.PMT_NIL))
-        )
         self.assertLessEqual(
             abs(pmt.to_long(
                 pmt.dict_ref(metadata, pmt.intern("zc_gate_offset_samples"), pmt.PMT_NIL)
@@ -183,6 +180,51 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
 
         self.assertEqual(frame_debug.num_messages(), 0)
 
+    def test_earliest_threshold_peak_wins_over_stronger_delayed_path(self):
+        samp_rate = 30e6
+        tx = ofdm_prs_ranging.prs_timed_burst_source(
+            samp_rate=samp_rate,
+            preamble_len=256,
+            preamble_repeats=4,
+            coarse_sync_len=419,
+            attach_tx_time=False,
+        )
+        frame = numpy.asarray(tx.frame_samples(), dtype=numpy.complex64)
+        prefix = 1500
+        echo_delay = 8
+        samples = numpy.zeros(
+            prefix + echo_delay + frame.size + 2048, dtype=numpy.complex64
+        )
+        samples[prefix : prefix + frame.size] += 0.7 * frame
+        samples[prefix + echo_delay : prefix + echo_delay + frame.size] += frame
+
+        source = blocks.vector_source_c(samples, False)
+        detector = ofdm_prs_ranging.prs_fft_zc_frame_detector(
+            samp_rate=samp_rate,
+            preamble_len=256,
+            preamble_repeats=4,
+            coarse_sync_len=419,
+            threshold=0.35,
+            zc_threshold=0.50,
+            correlation_fft_len=2048,
+            zc_search_before=1024,
+            zc_search_after=1024,
+            cfo_compensation=False,
+        )
+        debug = blocks.message_debug()
+        self.tb.connect(source, detector)
+        self.tb.msg_connect((detector, "frame_out"), (debug, "store"))
+        self.tb.run()
+
+        self.assertEqual(debug.num_messages(), 1)
+        metadata = pmt.car(debug.get_message(0))
+        self.assertEqual(
+            pmt.to_uint64(
+                pmt.dict_ref(metadata, pmt.intern("frame_start"), pmt.PMT_NIL)
+            ),
+            prefix,
+        )
+
     def test_time_gate_finds_only_the_scheduled_frame(self):
         samp_rate = 1e6
         tx = ofdm_prs_ranging.prs_timed_burst_source(
@@ -204,6 +246,7 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
         detector = ofdm_prs_ranging.prs_fft_zc_frame_detector(
             samp_rate=samp_rate,
             threshold=0.30,
+            zc_threshold=0.50,
             time_gating=True,
             reply_delay_s=0.0,
             window_before_s=0.001,

@@ -168,7 +168,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [608, 1064.0]
+    coordinate: [592, 1064.0]
     rotation: 0
     state: enabled
 - name: prs_csv_logger_0
@@ -228,7 +228,6 @@ blocks:
     maxoutbuf: '0'
     min_frame_gap: '10000'
     minoutbuf: '0'
-    peak_ratio_threshold: '1'
     preamble_len: premble_length
     preamble_repeats: premble_rep
     prs_symbols: '16'
@@ -350,7 +349,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1840, 560.0]
+    coordinate: [1832, 568.0]
     rotation: 0
     state: enabled
 - name: uhd_usrp_sink_0
@@ -1329,8 +1328,8 @@ blocks:
 
 connections:
 - [blocks_message_strobe_0, strobe, prs_rx_timekeeper_0, trigger_in]
-- [prs_channel_estimator_0, channel_out, prs_phase_slope_estimator_0, channel_in]
 - [prs_channel_estimator_0, channel_out, prs_frame_detector_0_0, prs_cfo_in]
+- [prs_channel_estimator_0, channel_out, prs_phase_slope_estimator_0, channel_in]
 - [prs_channel_estimator_0, timing_out, virtual_sink_1_0_0_0_0, '0']
 - [prs_csv_logger_0, timing_out, virtual_sink_1_0_0_0_0_0_0_0, '0']
 - [prs_fft_receiver_0, symbols_out, prs_channel_estimator_0, symbols_in]

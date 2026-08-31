@@ -94,7 +94,7 @@ class prs_ssrtt_initiator_fft_zc_profiling(gr.top_block):
             True, 25)
         self.prs_rx_timekeeper_0 = ofdm_prs_ranging.prs_rx_timekeeper(samp_rate, 0.6)
         self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 1024, 1024, 1.0, True)
-        self.prs_frame_detector_0_0 = ofdm_prs_ranging.prs_fft_zc_frame_detector(samp_rate, 1024, 128, 1024, 16, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 29, 1, True, 0.05, 0.0002, 0.004, 0.4, 4096, 1024, 3074, True, 1, True)
+        self.prs_frame_detector_0_0 = ofdm_prs_ranging.prs_fft_zc_frame_detector(samp_rate, 1024, 128, 1024, 16, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 29, 1, True, 0.05, 0.0002, 0.004, 0.4, 4096, 1024, 3074, True, True)
         self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 1024, 128, 1024, 16, True)
         self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger("CSV/FFT_profiling/initiator_fft_zc_measurements.csv", 1, True)
         self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 1024, 1024, 16, 13990001, True)
@@ -106,8 +106,8 @@ class prs_ssrtt_initiator_fft_zc_profiling(gr.top_block):
         # Connections
         ##################################################
         self.msg_connect((self.blocks_message_strobe_0, 'strobe'), (self.prs_rx_timekeeper_0, 'trigger_in'))
-        self.msg_connect((self.prs_channel_estimator_0, 'channel_out'), (self.prs_phase_slope_estimator_0, 'channel_in'))
         self.msg_connect((self.prs_channel_estimator_0, 'channel_out'), (self.prs_frame_detector_0_0, 'prs_cfo_in'))
+        self.msg_connect((self.prs_channel_estimator_0, 'channel_out'), (self.prs_phase_slope_estimator_0, 'channel_in'))
         self.msg_connect((self.prs_channel_estimator_0, 'timing_out'), (self.prs_timing_collector_0, 'timing_in'))
         self.msg_connect((self.prs_csv_logger_0, 'timing_out'), (self.prs_timing_collector_0, 'timing_in'))
         self.msg_connect((self.prs_fft_receiver_0, 'symbols_out'), (self.prs_channel_estimator_0, 'symbols_in'))

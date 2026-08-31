@@ -148,7 +148,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [720, 784.0]
+    coordinate: [1400, 784.0]
     rotation: 0
     state: enabled
 - name: prs_channel_estimator_0
@@ -169,7 +169,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [536, 1064.0]
+    coordinate: [496, 1112.0]
     rotation: 0
     state: enabled
 - name: prs_csv_logger_0
@@ -187,7 +187,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1528, 1056.0]
+    coordinate: [1656, 1144.0]
     rotation: 0
     state: enabled
 - name: prs_fft_receiver_0
@@ -208,7 +208,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [280, 1048.0]
+    coordinate: [232, 1128.0]
     rotation: 0
     state: enabled
 - name: prs_frame_detector_0
@@ -243,9 +243,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [368, 632.0]
+    coordinate: [976, 576.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: prs_frame_detector_0_0
   id: ofdm_prs_ranging_prs_fft_zc_frame_detector
   parameters:
@@ -264,7 +264,6 @@ blocks:
     maxoutbuf: '0'
     min_frame_gap: '10000'
     minoutbuf: '0'
-    peak_ratio_threshold: '1'
     preamble_len: premble_length
     preamble_repeats: premble_rep
     prs_symbols: '16'
@@ -275,17 +274,17 @@ blocks:
     time_gating: 'True'
     window_after_s: '0.004'
     window_before_s: '0.0002'
-    zc_search_after: '3074'
-    zc_search_before: '1024'
+    zc_search_after: 4096-512
+    zc_search_before: '512'
     zc_threshold: '0.4'
     zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [336, 572.0]
+    coordinate: [744, 540.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: prs_phase_slope_estimator_0
   id: ofdm_prs_ranging_prs_phase_slope_estimator
   parameters:
@@ -303,7 +302,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [864, 1056.0]
+    coordinate: [872, 1120.0]
     rotation: 0
     state: enabled
 - name: prs_rx_timekeeper_0
@@ -369,7 +368,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1248, 1056.0]
+    coordinate: [1304, 1136.0]
     rotation: 0
     state: enabled
 - name: prs_text_ui_0
@@ -664,7 +663,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1280, 356.0]
+    coordinate: [1296, 356.0]
     rotation: 0
     state: enabled
 - name: uhd_usrp_source_0_0
@@ -1139,7 +1138,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [632, 680.0]
+    coordinate: [1376, 688.0]
     rotation: 0
     state: enabled
 - name: virtual_source_0
@@ -1152,7 +1151,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [64, 752.0]
+    coordinate: [216, 720.0]
     rotation: 0
     state: enabled
 - name: virtual_source_0_0
@@ -1178,7 +1177,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [72, 832.0]
+    coordinate: [224, 800.0]
     rotation: 0
     state: enabled
 - name: virtual_source_1_0
@@ -1191,7 +1190,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [944, 960.0]
+    coordinate: [1032, 1072.0]
     rotation: 0
     state: enabled
 - name: virtual_source_1_0_0
@@ -1217,7 +1216,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [56, 1080.0]
+    coordinate: [32, 1160.0]
     rotation: 0
     state: enabled
 - name: virtual_source_1_0_0_0_0_0
@@ -1236,6 +1235,8 @@ blocks:
 
 connections:
 - [blocks_message_strobe_0, strobe, prs_rx_timekeeper_0, trigger_in]
+- [prs_channel_estimator_0, channel_out, prs_frame_detector_0, tx_time_in]
+- [prs_channel_estimator_0, channel_out, prs_frame_detector_0_0, prs_cfo_in]
 - [prs_channel_estimator_0, channel_out, prs_phase_slope_estimator_0, channel_in]
 - [prs_fft_receiver_0, symbols_out, prs_channel_estimator_0, symbols_in]
 - [prs_frame_detector_0, event_out, prs_acquisition_logger_0, frame_in]

@@ -137,12 +137,12 @@ blocks:
     append: '1'
     comment: Logs every detected POLL before responder filtering
     node: '"responder"'
-    path: '"CSV/profiling/responder_fft_zc_acquisition_v4.csv"'
+    path: '"CSV/FFT_profiling/responder_fft_zc_acquisition_v4.csv"'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [672, 688.0]
+    coordinate: [728, 700.0]
     rotation: 0
     state: enabled
 - name: prs_channel_estimator_0
@@ -163,7 +163,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [960, 488.0]
+    coordinate: [992, 468.0]
     rotation: 0
     state: enabled
 - name: prs_csv_logger_0
@@ -176,12 +176,12 @@ blocks:
     enable_profiling: 'True'
     maxoutbuf: '0'
     minoutbuf: '0'
-    path: '"CSV/profiling/responder_fft_zc_measurements.csv"'
+    path: '"CSV/FFT_profiling/responder_fft_zc_measurements.csv"'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1792, 384.0]
+    coordinate: [696, 972.0]
     rotation: 0
     state: enabled
 - name: prs_fft_receiver_0
@@ -211,13 +211,13 @@ blocks:
     active_bins: '1024'
     affinity: ''
     alias: ''
+    cfo_compensation: 'True'
     channel_id: '0'
     coarse_sync_len: zc_length
     coarse_zc_root: '25'
     comment: Connect UHD Source here
-    correlation_fft_len: '2048'
+    correlation_fft_len: '4096'
     cp_len: '128'
-    cfo_compensation: 'True'
     enable_profiling: 'True'
     fft_len: '1024'
     maxoutbuf: '0'
@@ -225,7 +225,6 @@ blocks:
     minoutbuf: '0'
     preamble_len: premble_length
     preamble_repeats: premble_rep
-    peak_ratio_threshold: '1.0'
     prs_symbols: '16'
     reply_delay_s: '0.05'
     samp_rate: samp_rate
@@ -234,15 +233,15 @@ blocks:
     time_gating: 'False'
     window_after_s: '0.004'
     window_before_s: '0.0002'
+    zc_search_after: 4096-512
+    zc_search_before: '512'
     zc_threshold: '0.5'
-    zc_search_after: '1024'
-    zc_search_before: '1024'
     zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [328, 544.0]
+    coordinate: [336, 560.0]
     rotation: 0
     state: enabled
 - name: prs_phase_slope_estimator_0
@@ -262,7 +261,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1376, 496.0]
+    coordinate: [288, 1092.0]
     rotation: 0
     state: enabled
 - name: prs_source
@@ -312,7 +311,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1792, 496.0]
+    coordinate: [696, 1084.0]
     rotation: 0
     state: enabled
 - name: prs_timing_collector_0
@@ -322,9 +321,9 @@ blocks:
     alias: ''
     comment: Buffered per-stage timing output; files are finalized when the flowgraph
       stops
-    raw_csv_path: '"CSV/profiling/responder_fft_zc_timing_raw.csv"'
+    raw_csv_path: '"CSV/FFT_profiling/responder_fft_zc_timing_raw.csv"'
     role: '"responder"'
-    summary_csv_path: '"CSV/profiling/responder_fft_zc_timing_summary.csv"'
+    summary_csv_path: '"CSV/FFT_profiling/responder_fft_zc_timing_summary.csv"'
   states:
     bus_sink: false
     bus_source: false
@@ -1057,7 +1056,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [2184, 488.0]
+    coordinate: [1048, 1088.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_0_0
@@ -1070,7 +1069,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [632, 352.0]
+    coordinate: [600, 384.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_1_0_0
@@ -1109,7 +1108,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1400, 656.0]
+    coordinate: [1368, 552.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_1_0_0_0_0_0
@@ -1122,7 +1121,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1792, 616.0]
+    coordinate: [696, 1208.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_1_0_0_0_0_0_0
@@ -1135,7 +1134,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [2184, 560.0]
+    coordinate: [1048, 1160.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_1_0_0_0_0_0_0_0
@@ -1148,7 +1147,20 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [2184, 328.0]
+    coordinate: [1048, 928.0]
+    rotation: 0
+    state: enabled
+- name: virtual_sink_1_0_0_0_0_1
+  id: virtual_sink
+  parameters:
+    alias: ''
+    comment: ''
+    stream_id: Channel_est
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1392, 456.0]
     rotation: 0
     state: enabled
 - name: virtual_source_0
@@ -1242,10 +1254,22 @@ blocks:
     coordinate: [1192, 376.0]
     rotation: 0
     state: enabled
+- name: virtual_source_1_0_0_0_1_0_0_0_0
+  id: virtual_source
+  parameters:
+    alias: ''
+    comment: ''
+    stream_id: Channel_est
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [40, 1040.0]
+    rotation: 0
+    state: enabled
 
 connections:
-- [prs_channel_estimator_0, channel_out, prs_phase_slope_estimator_0, channel_in]
-- [prs_channel_estimator_0, channel_out, prs_frame_detector_0, prs_cfo_in]
+- [prs_channel_estimator_0, channel_out, virtual_sink_1_0_0_0_0_1, '0']
 - [prs_channel_estimator_0, timing_out, virtual_sink_1_0_0_0_0, '0']
 - [prs_csv_logger_0, timing_out, virtual_sink_1_0_0_0_0_0_0_0, '0']
 - [prs_fft_receiver_0, symbols_out, prs_channel_estimator_0, symbols_in]
@@ -1268,6 +1292,8 @@ connections:
 - [virtual_source_1_0_0_0_1_0, '0', prs_timing_collector_0, timing_in]
 - [virtual_source_1_0_0_0_1_0_0, '0', prs_timing_collector_0, timing_in]
 - [virtual_source_1_0_0_0_1_0_0_0, '0', prs_timing_collector_0, timing_in]
+- [virtual_source_1_0_0_0_1_0_0_0_0, '0', prs_frame_detector_0, prs_cfo_in]
+- [virtual_source_1_0_0_0_1_0_0_0_0, '0', prs_phase_slope_estimator_0, channel_in]
 
 metadata:
   file_format: 1

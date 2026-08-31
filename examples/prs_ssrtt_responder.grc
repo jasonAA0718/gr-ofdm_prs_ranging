@@ -143,7 +143,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [672, 760.0]
+    coordinate: [744, 796.0]
     rotation: 0
     state: enabled
 - name: prs_channel_estimator_0
@@ -153,6 +153,7 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
+    enable_profiling: 'False'
     fft_len: '1024'
     maxoutbuf: '0'
     minoutbuf: '0'
@@ -163,7 +164,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [920, 504.0]
+    coordinate: [1008, 548.0]
     rotation: 0
     state: enabled
 - name: prs_csv_logger_0
@@ -173,12 +174,15 @@ blocks:
     alias: ''
     append: '1'
     comment: Records POLL PRS CFO and phase-slope measurements
+    enable_profiling: 'False'
+    maxoutbuf: '0'
+    minoutbuf: '0'
     path: '"CSV/responder_measurements.csv"'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1680, 368.0]
+    coordinate: [800, 1068.0]
     rotation: 0
     state: enabled
 - name: prs_fft_receiver_0
@@ -189,6 +193,7 @@ blocks:
     alias: ''
     comment: ''
     cp_len: '128'
+    enable_profiling: 'False'
     fft_len: '1024'
     maxoutbuf: '0'
     minoutbuf: '0'
@@ -198,7 +203,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [624, 504.0]
+    coordinate: [704, 548.0]
     rotation: 0
     state: enabled
 - name: prs_frame_detector_0
@@ -212,6 +217,7 @@ blocks:
     coarse_zc_root: '25'
     comment: Connect UHD Source here
     cp_len: '128'
+    enable_profiling: 'False'
     fft_len: '1024'
     maxoutbuf: '0'
     min_frame_gap: '10000'
@@ -232,7 +238,46 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [328, 544.0]
+    coordinate: [360, 636.0]
+    rotation: 0
+    state: disabled
+- name: prs_frame_detector_0_0
+  id: ofdm_prs_ranging_prs_fft_zc_frame_detector
+  parameters:
+    active_bins: '1024'
+    affinity: ''
+    alias: ''
+    cfo_compensation: 'True'
+    channel_id: '0'
+    coarse_sync_len: zc_length
+    coarse_zc_root: '25'
+    comment: Connect UHD Source here
+    correlation_fft_len: '4096'
+    cp_len: '128'
+    enable_profiling: 'True'
+    fft_len: '1024'
+    maxoutbuf: '0'
+    min_frame_gap: '10000'
+    minoutbuf: '0'
+    preamble_len: premble_length
+    preamble_repeats: premble_rep
+    prs_symbols: '16'
+    reply_delay_s: '0.05'
+    samp_rate: samp_rate
+    tail_guard_len: '1000'
+    threshold: '0.35'
+    time_gating: 'False'
+    window_after_s: '0.004'
+    window_before_s: '0.0002'
+    zc_search_after: 4096-512
+    zc_search_before: '512'
+    zc_threshold: '0.5'
+    zero_guard_len: '1000'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [360, 592.0]
     rotation: 0
     state: enabled
 - name: prs_phase_slope_estimator_0
@@ -242,6 +287,7 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
+    enable_profiling: 'False'
     fft_len: '1024'
     max_residual_rms: '1.0'
     maxoutbuf: '0'
@@ -251,7 +297,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1272, 432.0]
+    coordinate: [368, 1164.0]
     rotation: 0
     state: enabled
 - name: prs_source
@@ -292,6 +338,7 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
+    enable_profiling: 'False'
     maxoutbuf: '0'
     minoutbuf: '0'
     reply_delay_samples: reply_delay_samples
@@ -300,7 +347,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1712, 472.0]
+    coordinate: [808, 1196.0]
     rotation: 0
     state: enabled
 - name: prs_text_ui_0
@@ -318,7 +365,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1720, 664.0]
+    coordinate: [816, 1380.0]
     rotation: 0
     state: enabled
 - name: uhd_usrp_sink_0
@@ -1033,7 +1080,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [8, 604.0]
+    coordinate: [16, 720.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_0
@@ -1046,7 +1093,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1992, 448.0]
+    coordinate: [1128, 1200.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_0_0
@@ -1059,7 +1106,20 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [632, 352.0]
+    coordinate: [640, 392.0]
+    rotation: 0
+    state: enabled
+- name: virtual_sink_1_0_0_0_0_1
+  id: virtual_sink
+  parameters:
+    alias: ''
+    comment: ''
+    stream_id: Channel_est
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1320, 592.0]
     rotation: 0
     state: enabled
 - name: virtual_source_0
@@ -1085,16 +1145,32 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1344, 640.0]
+    coordinate: [480, 1360.0]
+    rotation: 0
+    state: enabled
+- name: virtual_source_1_0_0_0_1_0_0_0_0
+  id: virtual_source
+  parameters:
+    alias: ''
+    comment: ''
+    stream_id: Channel_est
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [88, 984.0]
     rotation: 0
     state: enabled
 
 connections:
-- [prs_channel_estimator_0, channel_out, prs_phase_slope_estimator_0, channel_in]
+- [prs_channel_estimator_0, channel_out, virtual_sink_1_0_0_0_0_1, '0']
 - [prs_fft_receiver_0, symbols_out, prs_channel_estimator_0, symbols_in]
 - [prs_frame_detector_0, event_out, prs_acquisition_logger_0, frame_in]
 - [prs_frame_detector_0, frame_out, prs_fft_receiver_0, frame_in]
 - [prs_frame_detector_0, frame_out, prs_text_ui_0, frame_in]
+- [prs_frame_detector_0_0, event_out, prs_acquisition_logger_0, frame_in]
+- [prs_frame_detector_0_0, frame_out, prs_fft_receiver_0, frame_in]
+- [prs_frame_detector_0_0, frame_out, prs_text_ui_0, frame_in]
 - [prs_phase_slope_estimator_0, measurement_out, prs_csv_logger_0, measurement_in]
 - [prs_phase_slope_estimator_0, measurement_out, prs_ssrtt_responder_0, measurement_in]
 - [prs_phase_slope_estimator_0, measurement_out, prs_text_ui_0, measurement_in]
@@ -1102,8 +1178,11 @@ connections:
 - [prs_source, tx_time_out, virtual_sink_0_0, '0']
 - [prs_ssrtt_responder_0, trigger_out, virtual_sink_0, '0']
 - [uhd_usrp_source_0_0, '0', prs_frame_detector_0, '0']
+- [uhd_usrp_source_0_0, '0', prs_frame_detector_0_0, '0']
 - [virtual_source_0, '0', prs_source, trigger]
 - [virtual_source_1, '0', prs_text_ui_0, tx_in]
+- [virtual_source_1_0_0_0_1_0_0_0_0, '0', prs_frame_detector_0_0, prs_cfo_in]
+- [virtual_source_1_0_0_0_1_0_0_0_0, '0', prs_phase_slope_estimator_0, channel_in]
 
 metadata:
   file_format: 1
