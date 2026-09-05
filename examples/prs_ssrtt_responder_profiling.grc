@@ -267,7 +267,7 @@ blocks:
     affinity: ''
     alias: ''
     attach_tx_time: 'True'
-    burst_period: '0.1'
+    burst_period: '0.2'
     coarse_sync_len: zc_length
     coarse_zc_root: '29'
     comment: ''
@@ -282,14 +282,14 @@ blocks:
     samp_rate: samp_rate
     seed: '13990001'
     tail_guard_len: '1000'
-    tx_amp: '0.7'
-    tx_lead_time: '0.5'
+    tx_amp: '0.1'
+    tx_lead_time: '0.6'
     zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [312, 200.0]
+    coordinate: [328, 216.0]
     rotation: 0
     state: enabled
 - name: prs_ssrtt_responder_0

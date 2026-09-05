@@ -767,10 +767,13 @@ bool prs_fft_zc_frame_detector_impl::find_frame(size_t& frame_start_index,
         }
         first_coarse = d_next_coarse_index;
         last_coarse = max_coarse;
-        // The scheduled response window is already the acquisition gate. A global
-        // repeated-metric maximum can land on the payload or OFDM section, so it
-        // must not provide a boundary prediction.
-        preamble_metric = 0.0f;
+        // Retain the full scheduled ZC search, but restore the global repeated-
+        // preamble maximum as a boundary prediction for experimental comparison.
+        // It does not provide CFO correction or constrain the ZC search interval.
+        size_t gate_index = 0;
+        if (find_preamble_gate(gate_index, preamble_metric, false)) {
+            predicted_coarse = static_cast<int64_t>(gate_index + preamble_total);
+        }
         d_next_coarse_index = max_coarse + 1;
     } else {
         if (!d_gate_armed) {

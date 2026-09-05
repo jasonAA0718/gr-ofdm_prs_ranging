@@ -743,12 +743,13 @@ preamble only as a cheap signal-presence gate, then searches a bounded ZC
 candidate region with overlap-save FFT matched filtering. It does not estimate
 or apply CFO from the repeated preamble. The responder
 defaults to 1,024 candidates before and after the gate-predicted ZC boundary.
-The time-gated initiator searches new candidates inside its scheduled response
-window without running a global repeated-preamble search. Its scheduled window
-is already the acquisition gate, and a
-global repeated-metric maximum can occur in the payload or OFDM section. Both
-paths correct `frame_start` from the maximum ZC peak rather than from the
-preamble gate position.
+The time-gated initiator searches ZC candidates across its scheduled response
+window and again runs a global repeated-preamble scan inside that window for
+experimental comparison. The repeated-metric maximum supplies only
+`preamble_metric`, a predicted ZC boundary, and `zc_gate_offset_samples`; it does
+not constrain the ZC interval or supply CFO correction. Because this maximum can
+occur in the payload or OFDM section, `frame_start` still comes from the selected
+ZC correlation lobe rather than from the preamble prediction.
 
 With `PRS FLL CFO Compensation` enabled, the first acquisition evaluates the
 fixed CFO hypotheses `-300, -200, -100, 0, 100, 200, 300 Hz` and records the
@@ -795,9 +796,10 @@ files. In addition to the existing metrics, they record
 `zc_gate_offset_samples` and the validity/metric of both the initial
 tracked/initial-bin CFO payload decode and the CP-CFO retry. Use these fields to
 separate a weak or displaced ZC peak from a payload-only failure. Existing
-version-2 and version-3 profiling captures remain unchanged. Version 4
-identifies captures made after removing the time-gated initiator's global
-preamble search.
+version-2 and version-3 profiling captures remain unchanged. Some version-4
+captures were made while the time-gated initiator's global preamble scan was
+disabled; compare the logged `preamble_metric` (`0` when disabled) when combining
+those captures with current results.
 
 ### Known FFT-ZC Ranging Limitation
 

@@ -282,7 +282,7 @@ blocks:
     coordinate: [408, 448.0]
     rotation: 0
     state: enabled
-- name: prs_source
+- name: prs_source_0
   id: ofdm_prs_ranging_prs_timed_burst_source
   parameters:
     active_bins: '1024'
@@ -304,14 +304,14 @@ blocks:
     samp_rate: samp_rate
     seed: '13990001'
     tail_guard_len: '1000'
-    tx_amp: '0.7'
+    tx_amp: '0.1'
     tx_lead_time: '0.6'
     zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [736, 320.0]
+    coordinate: [712, 312.0]
     rotation: 0
     state: enabled
 - name: prs_ssrtt_solver_0
@@ -1334,9 +1334,9 @@ connections:
 - [prs_frame_detector_0, timing_out, virtual_sink_1_0_0, '0']
 - [prs_phase_slope_estimator_0, measurement_out, prs_ssrtt_solver_0, measurement_in]
 - [prs_phase_slope_estimator_0, timing_out, virtual_sink_1_0_0_0_0_0, '0']
-- [prs_rx_timekeeper_0, timed_trigger_out, prs_source, trigger]
-- [prs_source, '0', uhd_usrp_sink_0, '0']
-- [prs_source, tx_time_out, virtual_sink_1, '0']
+- [prs_rx_timekeeper_0, timed_trigger_out, prs_source_0, trigger]
+- [prs_source_0, '0', uhd_usrp_sink_0, '0']
+- [prs_source_0, tx_time_out, virtual_sink_1, '0']
 - [prs_ssrtt_solver_0, ssrtt_out, prs_csv_logger_0, measurement_in]
 - [prs_ssrtt_solver_0, timing_out, virtual_sink_1_0_0_0_0_0_0, '0']
 - [uhd_usrp_source_0_0, '0', virtual_sink_0, '0']

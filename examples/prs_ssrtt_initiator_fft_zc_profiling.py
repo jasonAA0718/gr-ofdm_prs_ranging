@@ -37,9 +37,9 @@ class prs_ssrtt_initiator_fft_zc_profiling(gr.top_block):
         # Variables
         ##################################################
         self.zc_length = zc_length = 419
-        self.tx_gain = tx_gain = 70
+        self.tx_gain = tx_gain = 60
         self.samp_rate = samp_rate = 30e6
-        self.rx_gain = rx_gain = 70
+        self.rx_gain = rx_gain = 60
         self.premble_rep = premble_rep = 4
         self.premble_length = premble_length = 256
         self.center_freq = center_freq = 1060e6
@@ -86,20 +86,20 @@ class prs_ssrtt_initiator_fft_zc_profiling(gr.top_block):
         self.uhd_usrp_sink_0.set_min_output_buffer(1048576)
         self.prs_timing_collector_0 = ofdm_prs_ranging.prs_timing_collector("CSV/FFT_profiling/initiator_fft_zc_timing_raw.csv", "CSV/FFT_profiling/initiator_fft_zc_timing_summary.csv", "initiator")
         self.prs_ssrtt_solver_0 = ofdm_prs_ranging.prs_ssrtt_solver(samp_rate, True)
-        self.prs_source = ofdm_prs_ranging.prs_timed_burst_source(
+        self.prs_source_0 = ofdm_prs_ranging.prs_timed_burst_source(
             samp_rate, 1024, 128, 1024, 16,
             premble_length, premble_rep, zc_length,
             1000, 1000, 0.6,
-            0.2, 0.7, 13990001, 1,
+            0.2, 0.1, 13990001, 1,
             True, 25)
         self.prs_rx_timekeeper_0 = ofdm_prs_ranging.prs_rx_timekeeper(samp_rate, 0.6)
         self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 1024, 1024, 1.0, True)
-        self.prs_frame_detector_0_0 = ofdm_prs_ranging.prs_fft_zc_frame_detector(samp_rate, 1024, 128, 1024, 16, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 29, 1, True, 0.05, 0.0002, 0.004, 0.4, 4096, 1024, 3074, True, True)
+        self.prs_frame_detector_0_0 = ofdm_prs_ranging.prs_fft_zc_frame_detector(samp_rate, 1024, 128, 1024, 16, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 29, 1, True, 0.05, 0.0002, 0.005, 0.4, 4096, 512, (4096-512), True, True)
         self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 1024, 128, 1024, 16, True)
         self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger("CSV/FFT_profiling/initiator_fft_zc_measurements.csv", 1, True)
         self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 1024, 1024, 16, 13990001, True)
         self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/FFT_profiling/initiator_fft_zc_acquisition_v4.csv", "initiator", 1)
-        self.blocks_message_strobe_0 = blocks.message_strobe(pmt.PMT_T, 500)
+        self.blocks_message_strobe_0 = blocks.message_strobe(pmt.PMT_T, 200)
 
 
         ##################################################
@@ -117,12 +117,12 @@ class prs_ssrtt_initiator_fft_zc_profiling(gr.top_block):
         self.msg_connect((self.prs_frame_detector_0_0, 'timing_out'), (self.prs_timing_collector_0, 'timing_in'))
         self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_ssrtt_solver_0, 'measurement_in'))
         self.msg_connect((self.prs_phase_slope_estimator_0, 'timing_out'), (self.prs_timing_collector_0, 'timing_in'))
-        self.msg_connect((self.prs_rx_timekeeper_0, 'timed_trigger_out'), (self.prs_source, 'trigger'))
-        self.msg_connect((self.prs_source, 'tx_time_out'), (self.prs_frame_detector_0_0, 'tx_time_in'))
-        self.msg_connect((self.prs_source, 'tx_time_out'), (self.prs_ssrtt_solver_0, 'tx_time_in'))
+        self.msg_connect((self.prs_rx_timekeeper_0, 'timed_trigger_out'), (self.prs_source_0, 'trigger'))
+        self.msg_connect((self.prs_source_0, 'tx_time_out'), (self.prs_frame_detector_0_0, 'tx_time_in'))
+        self.msg_connect((self.prs_source_0, 'tx_time_out'), (self.prs_ssrtt_solver_0, 'tx_time_in'))
         self.msg_connect((self.prs_ssrtt_solver_0, 'ssrtt_out'), (self.prs_csv_logger_0, 'measurement_in'))
         self.msg_connect((self.prs_ssrtt_solver_0, 'timing_out'), (self.prs_timing_collector_0, 'timing_in'))
-        self.connect((self.prs_source, 0), (self.uhd_usrp_sink_0, 0))
+        self.connect((self.prs_source_0, 0), (self.uhd_usrp_sink_0, 0))
         self.connect((self.uhd_usrp_source_0_0, 0), (self.prs_frame_detector_0_0, 0))
         self.connect((self.uhd_usrp_source_0_0, 0), (self.prs_rx_timekeeper_0, 0))
 

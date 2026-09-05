@@ -37,7 +37,7 @@ class prs_ssrtt_initiator(gr.top_block):
         # Variables
         ##################################################
         self.zc_length = zc_length = 419
-        self.tx_gain = tx_gain = 75
+        self.tx_gain = tx_gain = 70
         self.samp_rate = samp_rate = 30e6
         self.rx_gain = rx_gain = 70
         self.premble_rep = premble_rep = 4
@@ -90,37 +90,37 @@ class prs_ssrtt_initiator(gr.top_block):
             samp_rate, 1024, 128, 1024, 16,
             premble_length, premble_rep, zc_length,
             1000, 1000, 0.6,
-            0.2, 0.7, 13990001, 1,
+            0.2, 0.1, 13990001, 1,
             True, 25)
         self.prs_rx_timekeeper_0 = ofdm_prs_ranging.prs_rx_timekeeper(samp_rate, 0.6)
         self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 1024, 1024, 1.0, False)
-        self.prs_frame_detector_0 = ofdm_prs_ranging.prs_frame_detector(samp_rate, 1024, 128, 1024, 16, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 29, 1, True, 0.05, 0.0002, 0.004, 0.4, False)
+        self.prs_frame_detector_0_0 = ofdm_prs_ranging.prs_fft_zc_frame_detector(samp_rate, 1024, 128, 1024, 16, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 29, 1, True, 0.05, 0.0002, 0.005, 0.4, 4096, 512, (4096-512), True, False)
         self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 1024, 128, 1024, 16, False)
-        self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger("CSV/obs_v2.csv", 1, False)
+        self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger("CSV/obs.csv", 1, False)
         self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 1024, 1024, 16, 13990001, False)
-        self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/initiator_acquisition_v2.csv", "initiator", 1)
-        self.blocks_message_strobe_0 = blocks.message_strobe(pmt.PMT_T, 500)
+        self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/initiator_acquisition.csv", "initiator", 1)
+        self.blocks_message_strobe_0 = blocks.message_strobe(pmt.PMT_T, 200)
 
 
         ##################################################
         # Connections
         ##################################################
         self.msg_connect((self.blocks_message_strobe_0, 'strobe'), (self.prs_rx_timekeeper_0, 'trigger_in'))
-        self.msg_connect((self.prs_channel_estimator_0, 'channel_out'), (self.prs_frame_detector_0, 'tx_time_in'))
+        self.msg_connect((self.prs_channel_estimator_0, 'channel_out'), (self.prs_frame_detector_0_0, 'prs_cfo_in'))
         self.msg_connect((self.prs_channel_estimator_0, 'channel_out'), (self.prs_phase_slope_estimator_0, 'channel_in'))
         self.msg_connect((self.prs_fft_receiver_0, 'symbols_out'), (self.prs_channel_estimator_0, 'symbols_in'))
-        self.msg_connect((self.prs_frame_detector_0, 'event_out'), (self.prs_acquisition_logger_0, 'frame_in'))
-        self.msg_connect((self.prs_frame_detector_0, 'frame_out'), (self.prs_fft_receiver_0, 'frame_in'))
-        self.msg_connect((self.prs_frame_detector_0, 'frame_out'), (self.prs_text_ui_0, 'frame_in'))
+        self.msg_connect((self.prs_frame_detector_0_0, 'event_out'), (self.prs_acquisition_logger_0, 'frame_in'))
+        self.msg_connect((self.prs_frame_detector_0_0, 'frame_out'), (self.prs_fft_receiver_0, 'frame_in'))
+        self.msg_connect((self.prs_frame_detector_0_0, 'frame_out'), (self.prs_text_ui_0, 'frame_in'))
         self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_ssrtt_solver_0, 'measurement_in'))
         self.msg_connect((self.prs_rx_timekeeper_0, 'timed_trigger_out'), (self.prs_source, 'trigger'))
-        self.msg_connect((self.prs_source, 'tx_time_out'), (self.prs_frame_detector_0, 'tx_time_in'))
+        self.msg_connect((self.prs_source, 'tx_time_out'), (self.prs_frame_detector_0_0, 'tx_time_in'))
         self.msg_connect((self.prs_source, 'tx_time_out'), (self.prs_ssrtt_solver_0, 'tx_time_in'))
         self.msg_connect((self.prs_source, 'tx_time_out'), (self.prs_text_ui_0, 'tx_in'))
         self.msg_connect((self.prs_ssrtt_solver_0, 'ssrtt_out'), (self.prs_csv_logger_0, 'measurement_in'))
         self.msg_connect((self.prs_ssrtt_solver_0, 'ssrtt_out'), (self.prs_text_ui_0, 'measurement_in'))
         self.connect((self.prs_source, 0), (self.uhd_usrp_sink_0, 0))
-        self.connect((self.uhd_usrp_source_0_0, 0), (self.prs_frame_detector_0, 0))
+        self.connect((self.uhd_usrp_source_0_0, 0), (self.prs_frame_detector_0_0, 0))
         self.connect((self.uhd_usrp_source_0_0, 0), (self.prs_rx_timekeeper_0, 0))
 
 

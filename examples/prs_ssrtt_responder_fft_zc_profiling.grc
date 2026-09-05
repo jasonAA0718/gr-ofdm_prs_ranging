@@ -205,7 +205,7 @@ blocks:
     coordinate: [672, 488.0]
     rotation: 0
     state: enabled
-- name: prs_frame_detector_0
+- name: prs_frame_detector_0_0
   id: ofdm_prs_ranging_prs_fft_zc_frame_detector
   parameters:
     active_bins: '1024'
@@ -241,7 +241,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [336, 560.0]
+    coordinate: [328, 504.0]
     rotation: 0
     state: enabled
 - name: prs_phase_slope_estimator_0
@@ -264,14 +264,14 @@ blocks:
     coordinate: [288, 1092.0]
     rotation: 0
     state: enabled
-- name: prs_source
+- name: prs_source_0
   id: ofdm_prs_ranging_prs_timed_burst_source
   parameters:
     active_bins: '1024'
     affinity: ''
     alias: ''
     attach_tx_time: 'True'
-    burst_period: '0.1'
+    burst_period: '0.2'
     coarse_sync_len: zc_length
     coarse_zc_root: '29'
     comment: ''
@@ -286,14 +286,14 @@ blocks:
     samp_rate: samp_rate
     seed: '13990001'
     tail_guard_len: '1000'
-    tx_amp: '0.7'
-    tx_lead_time: '0.5'
+    tx_amp: '0.1'
+    tx_lead_time: '0.6'
     zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [312, 200.0]
+    coordinate: [376, 144.0]
     rotation: 0
     state: enabled
 - name: prs_ssrtt_responder_0
@@ -607,7 +607,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [888, 244.0]
+    coordinate: [760, 144.0]
     rotation: 0
     state: enabled
 - name: uhd_usrp_source_0_0
@@ -1069,7 +1069,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [600, 384.0]
+    coordinate: [704, 384.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_1_0_0
@@ -1173,7 +1173,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [88, 352.0]
+    coordinate: [72, 280.0]
     rotation: 0
     state: enabled
 - name: virtual_source_1_0_0
@@ -1274,25 +1274,25 @@ connections:
 - [prs_csv_logger_0, timing_out, virtual_sink_1_0_0_0_0_0_0_0, '0']
 - [prs_fft_receiver_0, symbols_out, prs_channel_estimator_0, symbols_in]
 - [prs_fft_receiver_0, timing_out, virtual_sink_1_0_0_0, '0']
-- [prs_frame_detector_0, event_out, prs_acquisition_logger_0, frame_in]
-- [prs_frame_detector_0, frame_out, prs_fft_receiver_0, frame_in]
-- [prs_frame_detector_0, timing_out, virtual_sink_1_0_0, '0']
+- [prs_frame_detector_0_0, event_out, prs_acquisition_logger_0, frame_in]
+- [prs_frame_detector_0_0, frame_out, prs_fft_receiver_0, frame_in]
+- [prs_frame_detector_0_0, timing_out, virtual_sink_1_0_0, '0']
 - [prs_phase_slope_estimator_0, measurement_out, prs_csv_logger_0, measurement_in]
 - [prs_phase_slope_estimator_0, measurement_out, prs_ssrtt_responder_0, measurement_in]
 - [prs_phase_slope_estimator_0, timing_out, virtual_sink_1_0_0_0_0_0, '0']
-- [prs_source, '0', uhd_usrp_sink_0, '0']
-- [prs_source, tx_time_out, virtual_sink_0_0, '0']
+- [prs_source_0, '0', uhd_usrp_sink_0, '0']
+- [prs_source_0, tx_time_out, virtual_sink_0_0, '0']
 - [prs_ssrtt_responder_0, timing_out, virtual_sink_1_0_0_0_0_0_0, '0']
 - [prs_ssrtt_responder_0, trigger_out, virtual_sink_0, '0']
-- [uhd_usrp_source_0_0, '0', prs_frame_detector_0, '0']
-- [virtual_source_0, '0', prs_source, trigger]
+- [uhd_usrp_source_0_0, '0', prs_frame_detector_0_0, '0']
+- [virtual_source_0, '0', prs_source_0, trigger]
 - [virtual_source_1_0_0, '0', prs_timing_collector_0, timing_in]
 - [virtual_source_1_0_0_0, '0', prs_timing_collector_0, timing_in]
 - [virtual_source_1_0_0_0_1, '0', prs_timing_collector_0, timing_in]
 - [virtual_source_1_0_0_0_1_0, '0', prs_timing_collector_0, timing_in]
 - [virtual_source_1_0_0_0_1_0_0, '0', prs_timing_collector_0, timing_in]
 - [virtual_source_1_0_0_0_1_0_0_0, '0', prs_timing_collector_0, timing_in]
-- [virtual_source_1_0_0_0_1_0_0_0_0, '0', prs_frame_detector_0, prs_cfo_in]
+- [virtual_source_1_0_0_0_1_0_0_0_0, '0', prs_frame_detector_0_0, prs_cfo_in]
 - [virtual_source_1_0_0_0_1_0_0_0_0, '0', prs_phase_slope_estimator_0, channel_in]
 
 metadata:

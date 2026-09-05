@@ -284,11 +284,11 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
             ),
             0,
         )
-        self.assertEqual(
+        self.assertGreater(
             pmt.to_double(
                 pmt.dict_ref(metadata, pmt.intern("preamble_metric"), pmt.PMT_NIL)
             ),
-            0.0,
+            0.99,
         )
 
 

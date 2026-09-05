@@ -73,7 +73,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '70'
+    value: '60'
   states:
     bus_sink: false
     bus_source: false
@@ -97,7 +97,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '70'
+    value: '60'
   states:
     bus_sink: false
     bus_source: false
@@ -126,7 +126,7 @@ blocks:
     maxoutbuf: '0'
     minoutbuf: '0'
     msg: pmt.PMT_T
-    period: '500'
+    period: '200'
   states:
     bus_sink: false
     bus_source: false
@@ -147,7 +147,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [736, 752.0]
+    coordinate: [816, 760.0]
     rotation: 0
     state: enabled
 - name: prs_channel_estimator_0
@@ -186,7 +186,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1720, 1088.0]
+    coordinate: [1784, 1064.0]
     rotation: 0
     state: enabled
 - name: prs_fft_receiver_0
@@ -236,17 +236,17 @@ blocks:
     tail_guard_len: '1000'
     threshold: '0.35'
     time_gating: 'True'
-    window_after_s: '0.004'
+    window_after_s: '0.005'
     window_before_s: '0.0002'
-    zc_search_after: '3074'
-    zc_search_before: '1024'
+    zc_search_after: 4096-512
+    zc_search_before: '512'
     zc_threshold: '0.4'
     zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [384, 596.0]
+    coordinate: [408, 596.0]
     rotation: 0
     state: enabled
 - name: prs_phase_slope_estimator_0
@@ -266,7 +266,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [992, 1072.0]
+    coordinate: [992, 1080.0]
     rotation: 0
     state: enabled
 - name: prs_rx_timekeeper_0
@@ -286,7 +286,7 @@ blocks:
     coordinate: [408, 448.0]
     rotation: 0
     state: enabled
-- name: prs_source
+- name: prs_source_0
   id: ofdm_prs_ranging_prs_timed_burst_source
   parameters:
     active_bins: '1024'
@@ -308,14 +308,14 @@ blocks:
     samp_rate: samp_rate
     seed: '13990001'
     tail_guard_len: '1000'
-    tx_amp: '0.7'
+    tx_amp: '0.1'
     tx_lead_time: '0.6'
     zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [736, 320.0]
+    coordinate: [752, 320.0]
     rotation: 0
     state: enabled
 - name: prs_ssrtt_solver_0
@@ -332,7 +332,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1384, 1096.0]
+    coordinate: [1448, 1088.0]
     rotation: 0
     state: enabled
 - name: prs_timing_collector_0
@@ -1101,7 +1101,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [752, 680.0]
+    coordinate: [816, 688.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_1_0_0
@@ -1114,7 +1114,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [736, 864.0]
+    coordinate: [816, 872.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_1_0_0_0
@@ -1166,7 +1166,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1768, 1224.0]
+    coordinate: [1704, 1208.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_1_0_0_0_0_0_0_0
@@ -1179,7 +1179,20 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [2016, 1224.0]
+    coordinate: [2064, 1080.0]
+    rotation: 0
+    state: enabled
+- name: virtual_sink_1_0_0_0_0_1
+  id: virtual_sink
+  parameters:
+    alias: ''
+    comment: ''
+    stream_id: Channel_est
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [912, 1016.0]
     rotation: 0
     state: enabled
 - name: virtual_source_0
@@ -1325,11 +1338,24 @@ blocks:
     coordinate: [1504, 760.0]
     rotation: 0
     state: enabled
+- name: virtual_source_1_0_0_0_1_0_0_0_0
+  id: virtual_source
+  parameters:
+    alias: ''
+    comment: ''
+    stream_id: Channel_est
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [64, 912.0]
+    rotation: 0
+    state: enabled
 
 connections:
 - [blocks_message_strobe_0, strobe, prs_rx_timekeeper_0, trigger_in]
-- [prs_channel_estimator_0, channel_out, prs_frame_detector_0_0, prs_cfo_in]
 - [prs_channel_estimator_0, channel_out, prs_phase_slope_estimator_0, channel_in]
+- [prs_channel_estimator_0, channel_out, virtual_sink_1_0_0_0_0_1, '0']
 - [prs_channel_estimator_0, timing_out, virtual_sink_1_0_0_0_0, '0']
 - [prs_csv_logger_0, timing_out, virtual_sink_1_0_0_0_0_0_0_0, '0']
 - [prs_fft_receiver_0, symbols_out, prs_channel_estimator_0, symbols_in]
@@ -1339,9 +1365,9 @@ connections:
 - [prs_frame_detector_0_0, timing_out, virtual_sink_1_0_0, '0']
 - [prs_phase_slope_estimator_0, measurement_out, prs_ssrtt_solver_0, measurement_in]
 - [prs_phase_slope_estimator_0, timing_out, virtual_sink_1_0_0_0_0_0, '0']
-- [prs_rx_timekeeper_0, timed_trigger_out, prs_source, trigger]
-- [prs_source, '0', uhd_usrp_sink_0, '0']
-- [prs_source, tx_time_out, virtual_sink_1, '0']
+- [prs_rx_timekeeper_0, timed_trigger_out, prs_source_0, trigger]
+- [prs_source_0, '0', uhd_usrp_sink_0, '0']
+- [prs_source_0, tx_time_out, virtual_sink_1, '0']
 - [prs_ssrtt_solver_0, ssrtt_out, prs_csv_logger_0, measurement_in]
 - [prs_ssrtt_solver_0, timing_out, virtual_sink_1_0_0_0_0_0_0, '0']
 - [uhd_usrp_source_0_0, '0', virtual_sink_0, '0']
@@ -1356,6 +1382,7 @@ connections:
 - [virtual_source_1_0_0_0_1_0, '0', prs_timing_collector_0, timing_in]
 - [virtual_source_1_0_0_0_1_0_0, '0', prs_timing_collector_0, timing_in]
 - [virtual_source_1_0_0_0_1_0_0_0, '0', prs_timing_collector_0, timing_in]
+- [virtual_source_1_0_0_0_1_0_0_0_0, '0', prs_frame_detector_0_0, prs_cfo_in]
 
 metadata:
   file_format: 1

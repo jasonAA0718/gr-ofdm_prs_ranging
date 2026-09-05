@@ -98,7 +98,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '75'
+    value: '70'
   states:
     bus_sink: false
     bus_source: false
@@ -127,7 +127,7 @@ blocks:
     maxoutbuf: '0'
     minoutbuf: '0'
     msg: pmt.PMT_T
-    period: '500'
+    period: '200'
   states:
     bus_sink: false
     bus_source: false
@@ -143,7 +143,7 @@ blocks:
     append: '1'
     comment: Logs every detector output before SS-RTT filtering
     node: '"initiator"'
-    path: '"CSV/initiator_acquisition_v2.csv"'
+    path: '"CSV/initiator_acquisition.csv"'
   states:
     bus_sink: false
     bus_source: false
@@ -182,7 +182,7 @@ blocks:
     enable_profiling: 'False'
     maxoutbuf: '0'
     minoutbuf: '0'
-    path: '"CSV/obs_v2.csv"'
+    path: '"CSV/obs.csv"'
   states:
     bus_sink: false
     bus_source: false
@@ -211,41 +211,6 @@ blocks:
     coordinate: [232, 1128.0]
     rotation: 0
     state: enabled
-- name: prs_frame_detector_0
-  id: ofdm_prs_ranging_prs_frame_detector
-  parameters:
-    active_bins: '1024'
-    affinity: ''
-    alias: ''
-    channel_id: '1'
-    coarse_sync_len: zc_length
-    coarse_zc_root: '29'
-    comment: Connect UHD Source here
-    cp_len: '128'
-    enable_profiling: 'False'
-    fft_len: '1024'
-    maxoutbuf: '0'
-    min_frame_gap: '10000'
-    minoutbuf: '0'
-    preamble_len: premble_length
-    preamble_repeats: premble_rep
-    prs_symbols: '16'
-    reply_delay_s: '0.05'
-    samp_rate: samp_rate
-    tail_guard_len: '1000'
-    threshold: '0.35'
-    time_gating: 'True'
-    window_after_s: '0.004'
-    window_before_s: '0.0002'
-    zc_threshold: '0.4'
-    zero_guard_len: '1000'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [976, 576.0]
-    rotation: 0
-    state: enabled
 - name: prs_frame_detector_0_0
   id: ofdm_prs_ranging_prs_fft_zc_frame_detector
   parameters:
@@ -272,7 +237,7 @@ blocks:
     tail_guard_len: '1000'
     threshold: '0.35'
     time_gating: 'True'
-    window_after_s: '0.004'
+    window_after_s: '0.005'
     window_before_s: '0.0002'
     zc_search_after: 4096-512
     zc_search_before: '512'
@@ -282,9 +247,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [744, 540.0]
+    coordinate: [528, 572.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: prs_phase_slope_estimator_0
   id: ofdm_prs_ranging_prs_phase_slope_estimator
   parameters:
@@ -344,7 +309,7 @@ blocks:
     samp_rate: samp_rate
     seed: '13990001'
     tail_guard_len: '1000'
-    tx_amp: '0.7'
+    tx_amp: '0.1'
     tx_lead_time: '0.6'
     zero_guard_len: '1000'
   states:
@@ -1235,12 +1200,9 @@ blocks:
 
 connections:
 - [blocks_message_strobe_0, strobe, prs_rx_timekeeper_0, trigger_in]
-- [prs_channel_estimator_0, channel_out, prs_frame_detector_0, tx_time_in]
 - [prs_channel_estimator_0, channel_out, prs_frame_detector_0_0, prs_cfo_in]
 - [prs_channel_estimator_0, channel_out, prs_phase_slope_estimator_0, channel_in]
 - [prs_fft_receiver_0, symbols_out, prs_channel_estimator_0, symbols_in]
-- [prs_frame_detector_0, event_out, prs_acquisition_logger_0, frame_in]
-- [prs_frame_detector_0, frame_out, virtual_sink_1_0, '0']
 - [prs_frame_detector_0_0, event_out, prs_acquisition_logger_0, frame_in]
 - [prs_frame_detector_0_0, frame_out, virtual_sink_1_0, '0']
 - [prs_phase_slope_estimator_0, measurement_out, prs_ssrtt_solver_0, measurement_in]
@@ -1250,10 +1212,8 @@ connections:
 - [prs_ssrtt_solver_0, ssrtt_out, prs_csv_logger_0, measurement_in]
 - [prs_ssrtt_solver_0, ssrtt_out, prs_text_ui_0, measurement_in]
 - [uhd_usrp_source_0_0, '0', virtual_sink_0, '0']
-- [virtual_source_0, '0', prs_frame_detector_0, '0']
 - [virtual_source_0, '0', prs_frame_detector_0_0, '0']
 - [virtual_source_0_0, '0', prs_rx_timekeeper_0, '0']
-- [virtual_source_1, '0', prs_frame_detector_0, tx_time_in]
 - [virtual_source_1, '0', prs_frame_detector_0_0, tx_time_in]
 - [virtual_source_1_0, '0', prs_ssrtt_solver_0, tx_time_in]
 - [virtual_source_1_0_0, '0', prs_text_ui_0, tx_in]
