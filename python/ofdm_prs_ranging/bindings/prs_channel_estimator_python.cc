@@ -9,9 +9,10 @@ void bind_prs_channel_estimator(py::module& m)
         m, "prs_channel_estimator")
         .def(py::init(&block::make),
              py::arg("samp_rate") = 10e6,
-             py::arg("fft_len") = 1024,
-             py::arg("active_bins") = 1024,
-             py::arg("prs_symbols") = 8,
+             py::arg("fft_len") = 512,
+             py::arg("active_bins") = 512,
+             py::arg("prs_symbols") = 127,
              py::arg("seed") = 13990001,
-             py::arg("enable_profiling") = false);
+             py::arg("enable_profiling") = false,
+             py::arg("mc_ds_gold_code_id") = 2);
 }

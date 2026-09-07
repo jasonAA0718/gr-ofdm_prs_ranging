@@ -81,7 +81,7 @@ The current burst is a custom OFDM/PRS-like signal:
 [zero guard]
 [repeated QPSK acquisition preamble]
 [coarse ZC sync]
-[8 MC-DS OFDM PRS/data symbols]
+[127 Gold-code MC-DS OFDM PRS/data symbols]
 [tail guard]
 ```
 
@@ -92,32 +92,35 @@ zero guard:          1000 samples
 short preamble:      preamble_len * preamble_repeats
 coarse ZC sync:      coarse_sync_len samples, historically 839
 standalone payload:  0 samples
-MC-DS OFDM block:    8 * (fft_len + cp_len) = 9216 samples
+MC-DS OFDM block:    127 * (fft_len + cp_len) = 73152 samples
 tail guard:          1000 samples
 ```
 
 Default OFDM parameters:
 
 ```text
-fft_len      = 1024
-cp_len       = 128
-active_bins  = 1024
-prs_symbols  = 8
-pilot table  = lib/DSP/golay_prs_table.h
+fft_len               = 512
+cp_len                = 64
+active_bins            = 512
+prs_symbols            = 127
+mc_ds_gold_code_id     = 2
+Gold code source       = lib/DSP/gold127_family_bipolar.csv
+compiled Gold table    = lib/DSP/gold127_codes.h
 ```
 
-All native FFT bins are occupied. Bins with `k % 8 == 7` carry 128 BPSK
-data/padding values; the other 896 bins carry known pilots:
+All native FFT bins are occupied. Bins with `k % 4 == 3` carry 128 scrambled
+BPSK data/padding values; the other 384 bins carry known pilots:
 
 ```text
-fft_bin 0 ... 1023
-signed bins -512 ... +511
+fft_bin 0 ... 511
+signed bins -256 ... +255
 ```
 
-The fixed table is generated from `lib/DSP/golay_ofdm_1024x16.csv`. The first
-eight rows are used: even-numbered symbols use Golay A and odd-numbered symbols
-use Golay B. The `seed` parameter
-is retained for the repeated QPSK acquisition preamble, not for OFDM PRS.
+A length-512 Golay pair is generated at compile time by the same recursive
+construction as the earlier table: even symbols use A and odd symbols use B.
+Every complete frequency-domain symbol is multiplied by chip `m` from Gold
+row `mc_ds_gold_code_id`; the default is authoritative CSV row 2. The `seed`
+parameter remains only for the repeated QPSK acquisition preamble.
 
 The repeated acquisition preamble is deterministic QPSK and should remain
 unchanged unless explicitly requested. It is the cheap first-stage detector.
@@ -150,8 +153,11 @@ positioning filter yet.
 ## Payload State
 
 The 120-bit BPSK packet and CRC format is preserved, but it is carried on 120
-OFDM data bins and repeated across eight symbols with the fixed spreading code
-`[+1,+1,+1,-1,-1,+1,-1,-1]`. Eight additional positions are zero padding.
+OFDM data bins and repeated across 127 symbols with the selected Gold code.
+Eight additional positions are zero padding. Before BPSK mapping, all 128
+positions are XORed with the fixed balanced scrambler defined in
+`lib/DSP/mc_ds_prs.h`; RX descrambles after its hard decisions and discards the
+padding before the unchanged CRC check.
 The old 280-samples-per-bit standalone section is no longer present.
 
 Payload fields:
@@ -311,7 +317,7 @@ UHD Source
 ```
 
 `prs_channel_estimator` removes the known spreading chip and Golay pilots,
-estimates channel/CFO from 896 pilot bins, despreads and equalizes the 128 data
+estimates channel/CFO from 384 pilot bins, despreads and equalizes the 128 data
 bins, and publishes payload CRC metadata. Only a CRC-valid POLL reaches
 responder scheduling.
 
@@ -875,41 +881,56 @@ are not included in the current timed-block set.
 
 ## 2026-09-05 MC-DS OFDM Payload Prototype
 
-The first single-code prototype from
-`MC_DS_CDMA_BPSK_TO_OFDM_CODEX_PLAN.md` is implemented. It removes the
-33,616-sample standalone BPSK payload and changes the production waveform to
-eight 1024-bin CP-OFDM symbols. Native bins `k % 8 == 7` carry 120 serialized
-payload bits plus eight zero-padding bits; the other 896 bins retain known
-Golay pilots. All bins are multiplied by the fixed chip sequence:
+The original eight-symbol prototype has now been replaced by the production
+configuration specified in `CODEX_512_SCRAMBLER_GOLD127_IMPLEMENTATION.md`.
+It retains the integrated 120-bit packet and removes the 33,616-sample
+standalone BPSK section, but uses 127 true 512-bin CP-OFDM symbols. Native bins
+`k % 4 == 3` carry 120 serialized payload bits plus eight zero-padding bits;
+the other 384 bins carry the length-512 Golay A/B pilots.
 
 ```text
-[+1, +1, +1, -1, -1, +1, -1, -1]
+NFFT = 512, CP = 64, M = 127
+pilot bins = 384, data bins = 128
+default Gold code row = 2
 ```
 
-This sequence is documented as a fixed balanced prototype code, not as a Gold
-code. TX keeps native FFT indexing and uses no fftshift. RX removes the known
-chip before pilot division, estimates channel and inter-symbol CFO from only
-the 896 pilot bins, interpolates the channel onto each data bin, coherently
-despreads the data over eight symbols, and validates the unchanged CRC16.
+The exact 128-bit balanced scrambler is applied after serialization, CRC, and
+zero padding and before BPSK mapping. TX multiplies the entire symbol by one
+chip from the selected row of `lib/DSP/gold127_family_bipolar.csv`. Runtime code
+uses the generated self-contained `lib/DSP/gold127_codes.h`; regenerate it with
+`tools/generate_gold127_header.py`. CSV row index maps directly to `code_id`,
+and chip column maps directly to OFDM symbol index.
+
+TX keeps native FFT indexing and uses no fftshift. RX removes the Gold chip and
+Golay sign before estimating inter-symbol CFO, phase-aligns all 127 symbols,
+and averages only the 384 pilot-bin channel estimates. It separately despreads
+and coherently combines each data bin, interpolates its channel from adjacent
+pilots, hard-decides all 128 values, descrambles, discards padding, and checks
+the unchanged CRC16 over the logical 120-bit packet.
+
+`mc_ds_gold_code_id` selects coherent processing gain; it is not packet
+authentication. A wrong row has low cross-correlation and therefore does not
+combine with the desired 127-symbol gain. In a noiseless single-signal case,
+however, the same residual scalar can appear in both channel and data paths and
+cancel during equalization, so code mismatch alone is not required to force a
+CRC failure. Packet fields, ZC/channel association, and later TDMA/resource
+allocation still provide responder association.
 
 Payload success/failure is now published by `prs_channel_estimator`; the frame
 detectors only publish acquisition failures and accepted raw frames. The phase
-slope estimator receives a compact 896-bin channel vector. The responder is
+slope estimator receives a compact 384-bin channel vector. The responder is
 therefore triggered only after downstream OFDM payload CRC success.
 
-The frame airtime removed at 30 MS/s is:
+The current OFDM block airtime at 30 MS/s is:
 
 ```text
-old standalone payload: 33616 samples = 1.12053 ms
-old 16-symbol PRS:       18432 samples = 0.61440 ms
-new 8-symbol MC-DS:       9216 samples = 0.30720 ms
-total burst reduction:   42832 samples = 1.42773 ms
+one OFDM symbol:          576 samples = 0.01920 ms
+127-symbol MC-DS block: 73152 samples = 2.43840 ms
 ```
 
-QA reports current useful-symbol PAPR as
-`12.0163 / 12.2921 / 12.5678 dB` minimum/mean/maximum for the default POLL.
-This is substantially worse than the pure-Golay waveform and must be included
-in wired gain/clipping validation before RF conclusions are drawn.
+The production scrambler QA over 50,000 sequential POLL IDs reports useful
+symbol PAPR mean/P99.9/maximum of
+`7.1019 / 8.9338 / 9.5733 dB`. The Gold sign does not alter PAPR.
 
 ## Future Work
 
@@ -947,7 +968,7 @@ Two costs must be kept separate:
 
 The second comparison is important because an OFDM communication modem already pays for FFT processing. In that case, the incremental ranging cost is mainly CFR estimation, CFO refinement, phase extraction/unwrapping, and the weighted phase-slope fit.
 
-The current weighted phase-slope fit is a one-pass linear regression over 896
+The current weighted phase-slope fit is a one-pass linear regression over 384
 pilot frequency bins. Measure whether the FFT, channel estimator, complex
 rotations, MC-DS despreading/equalization, phase extraction, or the regression
 itself is the actual bottleneck.
@@ -985,7 +1006,7 @@ At the current 30 MS/s prototype geometry:
 
 ```text
 standalone BPSK payload: 0 samples
-MC-DS OFDM block:        9216 samples ~= 0.3072 ms
+MC-DS OFDM block:       73152 samples = 2.4384 ms
 ```
 
 The current examples also use an approximately 50 ms responder reply delay. Therefore, do not attribute the present update-rate limit to the phase-slope estimator until the complete timing budget has been measured.
@@ -1024,7 +1045,7 @@ A deployed prototype burst is:
 ```text
 [preamble]
 [coarse ZC]
-[8 MC-DS OFDM PRS/data symbols]
+[127 Gold-code MC-DS OFDM PRS/data symbols]
 [tail guard]
 ```
 
@@ -1040,7 +1061,7 @@ CPU processing time
 maximum update rate
 ```
 
-The receiver retains 896 known pilot bins for channel and phase-slope
+The receiver retains 384 known pilot bins for channel and phase-slope
 estimation. Multi-code and simultaneous-responder behavior remain future work.
 
 ### 4. Multi-Responder Observation Separation

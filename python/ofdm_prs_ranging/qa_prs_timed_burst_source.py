@@ -35,21 +35,21 @@ class qa_prs_timed_burst_source(gr_unittest.TestCase):
         src = prs_timed_burst_source()
         expected_prs_start = 1000 + 128 * 16 + 839
         self.assertEqual(
-            src.frame_len(), expected_prs_start + 8 * (1024 + 128) + 1000)
+            src.frame_len(), expected_prs_start + 127 * (512 + 64) + 1000)
         self.assertEqual(src.prs_start(), expected_prs_start)
-        self.assertEqual(src.prs_len(), 8 * (1024 + 128))
+        self.assertEqual(src.prs_len(), 127 * (512 + 64))
 
     def test_active_subcarrier_mapping(self):
         src = prs_timed_burst_source()
         frame = numpy.asarray(src.frame_samples(), dtype=numpy.complex64)
-        prs0 = frame[src.prs_start() + 128 : src.prs_start() + 128 + 1024]
+        prs0 = frame[src.prs_start() + 64 : src.prs_start() + 64 + 512]
         freq = numpy.fft.fft(prs0)
         mag = numpy.abs(freq)
 
-        self.assertEqual(numpy.count_nonzero(mag > 1e-6), 1024)
+        self.assertEqual(numpy.count_nonzero(mag > 1e-6), 512)
         self.assertGreater(mag[0], 1e-6)
         numpy.testing.assert_allclose(
-            mag, numpy.full(1024, mag[0]), rtol=1e-5, atol=1e-5)
+            mag, numpy.full(512, mag[0]), rtol=1e-5, atol=1e-5)
 
     def test_amplitude_limit(self):
         src = prs_timed_burst_source()
@@ -86,6 +86,8 @@ class qa_prs_timed_burst_source(gr_unittest.TestCase):
             "fft_len",
             "cp_len",
             "active_bins",
+            "prs_symbols",
+            "mc_ds_gold_code_id",
             "samp_rate",
             "tx_eob",
         ):

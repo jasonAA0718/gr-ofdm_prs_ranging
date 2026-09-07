@@ -10,7 +10,7 @@ templates:
         ${preamble_len}, ${preamble_repeats}, ${coarse_sync_len},
         ${zero_guard_len}, ${tail_guard_len}, ${tx_lead_time},
         ${burst_period}, ${tx_amp}, ${seed}, ${pings_per_trigger},
-        ${attach_tx_time}, ${coarse_zc_root})
+        ${attach_tx_time}, ${coarse_zc_root}, ${mc_ds_gold_code_id})
 
 parameters:
 - id: samp_rate
@@ -20,19 +20,19 @@ parameters:
 - id: fft_len
   label: FFT Length
   dtype: int
-  default: 1024
+  default: 512
 - id: cp_len
   label: CP Length
   dtype: int
-  default: 128
+  default: 64
 - id: active_bins
   label: Active Bins
   dtype: int
-  default: 1024
+  default: 512
 - id: prs_symbols
   label: PRS Symbols
   dtype: int
-  default: 8
+  default: 127
 - id: preamble_len
   label: Preamble Length
   dtype: int
@@ -49,6 +49,10 @@ parameters:
   label: Coarse ZC Root
   dtype: int
   default: 25
+- id: mc_ds_gold_code_id
+  label: Gold127 Code ID
+  dtype: int
+  default: 2
 - id: zero_guard_len
   label: Zero Guard Length
   dtype: int

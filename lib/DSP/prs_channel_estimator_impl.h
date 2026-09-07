@@ -22,7 +22,8 @@ public:
                                int active_bins,
                                int prs_symbols,
                                uint32_t seed,
-                               bool enable_profiling);
+                               bool enable_profiling,
+                               int mc_ds_gold_code_id);
     ~prs_channel_estimator_impl() override = default;
 
 private:

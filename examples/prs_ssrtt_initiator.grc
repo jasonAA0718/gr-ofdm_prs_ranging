@@ -62,7 +62,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '4'
+    value: '8'
   states:
     bus_sink: false
     bus_source: false
@@ -74,7 +74,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '70'
+    value: '60'
   states:
     bus_sink: false
     bus_source: false
@@ -98,7 +98,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '70'
+    value: '75'
   states:
     bus_sink: false
     bus_source: false
@@ -110,7 +110,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '419'
+    value: '2401'
   states:
     bus_sink: false
     bus_source: false
@@ -154,15 +154,16 @@ blocks:
 - name: prs_channel_estimator_0
   id: ofdm_prs_ranging_prs_channel_estimator
   parameters:
-    active_bins: '1024'
+    active_bins: '512'
     affinity: ''
     alias: ''
     comment: ''
     enable_profiling: 'False'
-    fft_len: '1024'
+    fft_len: '512'
+    mc_ds_gold_code_id: '2'
     maxoutbuf: '0'
     minoutbuf: '0'
-    prs_symbols: '8'
+    prs_symbols: '127'
     samp_rate: samp_rate
     seed: '13990001'
   states:
@@ -193,16 +194,16 @@ blocks:
 - name: prs_fft_receiver_0
   id: ofdm_prs_ranging_prs_fft_receiver
   parameters:
-    active_bins: '1024'
+    active_bins: '512'
     affinity: ''
     alias: ''
     comment: ''
-    cp_len: '128'
+    cp_len: '64'
     enable_profiling: 'False'
-    fft_len: '1024'
+    fft_len: '512'
     maxoutbuf: '0'
     minoutbuf: '0'
-    prs_symbols: '8'
+    prs_symbols: '127'
     samp_rate: samp_rate
   states:
     bus_sink: false
@@ -214,7 +215,7 @@ blocks:
 - name: prs_frame_detector_0_0
   id: ofdm_prs_ranging_prs_fft_zc_frame_detector
   parameters:
-    active_bins: '1024'
+    active_bins: '512'
     affinity: ''
     alias: ''
     cfo_compensation: 'True'
@@ -223,15 +224,15 @@ blocks:
     coarse_zc_root: '29'
     comment: Connect UHD Source here
     correlation_fft_len: '4096'
-    cp_len: '128'
+    cp_len: '64'
     enable_profiling: 'False'
-    fft_len: '1024'
+    fft_len: '512'
     maxoutbuf: '0'
     min_frame_gap: '10000'
     minoutbuf: '0'
     preamble_len: premble_length
     preamble_repeats: premble_rep
-    prs_symbols: '8'
+    prs_symbols: '127'
     reply_delay_s: '0.05'
     samp_rate: samp_rate
     tail_guard_len: '1000'
@@ -253,12 +254,12 @@ blocks:
 - name: prs_phase_slope_estimator_0
   id: ofdm_prs_ranging_prs_phase_slope_estimator
   parameters:
-    active_bins: '1024'
+    active_bins: '512'
     affinity: ''
     alias: ''
     comment: ''
     enable_profiling: 'False'
-    fft_len: '1024'
+    fft_len: '512'
     max_residual_rms: '1.0'
     maxoutbuf: '0'
     minoutbuf: '0'
@@ -290,7 +291,7 @@ blocks:
 - name: prs_source
   id: ofdm_prs_ranging_prs_timed_burst_source
   parameters:
-    active_bins: '1024'
+    active_bins: '512'
     affinity: ''
     alias: ''
     attach_tx_time: 'True'
@@ -298,18 +299,19 @@ blocks:
     coarse_sync_len: zc_length
     coarse_zc_root: '25'
     comment: ''
-    cp_len: '128'
-    fft_len: '1024'
+    cp_len: '64'
+    fft_len: '512'
+    mc_ds_gold_code_id: '2'
     maxoutbuf: '0'
     minoutbuf: '0'
     pings_per_trigger: '1'
     preamble_len: premble_length
     preamble_repeats: premble_rep
-    prs_symbols: '8'
+    prs_symbols: '127'
     samp_rate: samp_rate
     seed: '13990001'
     tail_guard_len: '1000'
-    tx_amp: '0.1'
+    tx_amp: '0.5'
     tx_lead_time: '0.6'
     zero_guard_len: '1000'
   states:
@@ -628,7 +630,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1296, 356.0]
+    coordinate: [1208, 252.0]
     rotation: 0
     state: enabled
 - name: uhd_usrp_source_0_0
@@ -1005,7 +1007,7 @@ blocks:
     nchan: '1'
     num_mboards: '1'
     otw: ''
-    rx_agc0: Disabled
+    rx_agc0: Default
     rx_agc1: Default
     rx_agc10: Default
     rx_agc11: Default

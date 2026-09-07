@@ -29,10 +29,16 @@ prs_channel_estimator::sptr prs_channel_estimator::make(double samp_rate,
                                                         int active_bins,
                                                         int prs_symbols,
                                                         uint32_t seed,
-                                                        bool enable_profiling)
+                                                        bool enable_profiling,
+                                                        int mc_ds_gold_code_id)
 {
-    return gnuradio::make_block_sptr<prs_channel_estimator_impl>(
-        samp_rate, fft_len, active_bins, prs_symbols, seed, enable_profiling);
+    return gnuradio::make_block_sptr<prs_channel_estimator_impl>(samp_rate,
+                                                                 fft_len,
+                                                                 active_bins,
+                                                                 prs_symbols,
+                                                                 seed,
+                                                                 enable_profiling,
+                                                                 mc_ds_gold_code_id);
 }
 
 prs_channel_estimator_impl::prs_channel_estimator_impl(double samp_rate,
@@ -40,7 +46,8 @@ prs_channel_estimator_impl::prs_channel_estimator_impl(double samp_rate,
                                                        int active_bins,
                                                        int prs_symbols,
                                                        uint32_t seed,
-                                                       bool enable_profiling)
+                                                       bool enable_profiling,
+                                                       int mc_ds_gold_code_id)
     : gr::block("prs_channel_estimator",
                 gr::io_signature::make(0, 0, 0),
                 gr::io_signature::make(0, 0, 0)),
@@ -50,11 +57,15 @@ prs_channel_estimator_impl::prs_channel_estimator_impl(double samp_rate,
     d_cfg.fft_len = fft_len;
     d_cfg.active_bins = active_bins;
     d_cfg.prs_symbols = prs_symbols;
+    d_cfg.mc_ds_gold_code_id = mc_ds_gold_code_id;
     (void)seed;
     if (fft_len != mc_ds_fft_len || active_bins != mc_ds_fft_len ||
         prs_symbols != mc_ds_symbol_count) {
         throw std::invalid_argument(
-            "MC-DS channel estimator requires 1024 bins and 8 symbols");
+            "MC-DS channel estimator requires 512 bins and 127 symbols");
+    }
+    if (mc_ds_gold_code_id < 0 || mc_ds_gold_code_id >= gold127_family_size) {
+        throw std::invalid_argument("mc_ds_gold_code_id must be in [0, 128]");
     }
     d_symbol_channels.resize(static_cast<size_t>(prs_symbols * active_bins));
     d_full_channel.resize(static_cast<size_t>(active_bins));
@@ -97,9 +108,11 @@ void prs_channel_estimator_impl::handle_symbols(pmt::pmt_t msg)
         for (int ordered_bin = 0; ordered_bin < d_cfg.active_bins; ++ordered_bin) {
             const size_t idx = static_cast<size_t>(sym * d_cfg.active_bins + ordered_bin);
             const int native_bin = mc_ds_ordered_to_native_bin(ordered_bin);
-            d_symbol_channels[idx] = mc_ds_is_data_bin(native_bin)
-                                         ? gr_complex(0.0f, 0.0f)
-                                         : symbols[idx] / mc_ds_pilot(sym, native_bin);
+            d_symbol_channels[idx] =
+                mc_ds_is_data_bin(native_bin)
+                    ? gr_complex(0.0f, 0.0f)
+                    : symbols[idx] /
+                          mc_ds_pilot(sym, native_bin, d_cfg.mc_ds_gold_code_id);
         }
     }
     report.checkpoint("pilot_removal");
@@ -186,6 +199,7 @@ void prs_channel_estimator_impl::handle_symbols(pmt::pmt_t msg)
     const double snr = 10.0 * std::log10((signal_power + 1e-12) / (error_power + 1e-12));
     report.checkpoint("cfo_rotation_average");
 
+    std::array<uint8_t, mc_ds_data_bin_count> scrambled_bits{};
     std::array<uint8_t, prs_payload_data_bits> decoded_bits{};
     double margin_sum = 0.0;
     for (int q = 0; q < mc_ds_data_bin_count; ++q) {
@@ -194,7 +208,7 @@ void prs_channel_estimator_impl::handle_symbols(pmt::pmt_t msg)
         gr_complex combined(0.0f, 0.0f);
         for (int sym = 0; sym < d_cfg.prs_symbols; ++sym) {
             const size_t idx = static_cast<size_t>(sym * d_cfg.active_bins + ordered_bin);
-            combined += symbols[idx] * mc_ds_prn_code[static_cast<size_t>(sym)] *
+            combined += symbols[idx] * mc_ds_gold_chip(d_cfg.mc_ds_gold_code_id, sym) *
                         symbol_rotations[static_cast<size_t>(sym)];
         }
         combined /= static_cast<float>(d_cfg.prs_symbols);
@@ -208,8 +222,10 @@ void prs_channel_estimator_impl::handle_symbols(pmt::pmt_t msg)
         const float h_power = std::norm(h);
         const gr_complex equalized =
             h_power > 1e-12f ? combined * std::conj(h) / h_power : gr_complex(0.0f, 0.0f);
+        scrambled_bits[static_cast<size_t>(q)] = equalized.real() >= 0.0f ? 1U : 0U;
         if (q < prs_payload_data_bits) {
-            decoded_bits[static_cast<size_t>(q)] = equalized.real() >= 0.0f ? 1U : 0U;
+            decoded_bits[static_cast<size_t>(q)] =
+                scrambled_bits[static_cast<size_t>(q)] ^ mc_ds_scrambler_bit(q);
             margin_sum +=
                 std::abs(equalized.real()) / std::max(1e-12f, std::abs(equalized));
         }
@@ -264,8 +280,11 @@ void prs_channel_estimator_impl::handle_symbols(pmt::pmt_t msg)
         meta, pmt::mp("channel_bins"), pmt::from_long(mc_ds_pilot_bin_count));
     meta = pmt::dict_add(meta, pmt::mp("mc_ds_enabled"), pmt::PMT_T);
     meta = pmt::dict_add(
-        meta, pmt::mp("mc_ds_code_length"), pmt::from_long(mc_ds_code_length));
-    meta = pmt::dict_add(meta, pmt::mp("mc_ds_code_id"), pmt::from_long(mc_ds_code_id));
+        meta, pmt::mp("mc_ds_code_length"), pmt::from_long(gold127_code_length));
+    meta = pmt::dict_add(
+        meta, pmt::mp("mc_ds_code_id"), pmt::from_long(d_cfg.mc_ds_gold_code_id));
+    meta = pmt::dict_add(
+        meta, pmt::mp("mc_ds_gold_code_id"), pmt::from_long(d_cfg.mc_ds_gold_code_id));
     meta = pmt::dict_add(
         meta, pmt::mp("mc_ds_despread_metric"), pmt::from_double(payload_metric));
     report.checkpoint("metadata_build");

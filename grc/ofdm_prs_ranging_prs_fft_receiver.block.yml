@@ -6,10 +6,10 @@ templates:
   make: ofdm_prs_ranging.prs_fft_receiver(${samp_rate}, ${fft_len}, ${cp_len}, ${active_bins}, ${prs_symbols}, ${enable_profiling})
 parameters:
 - {id: samp_rate, label: Sample Rate, dtype: real, default: 10e6}
-- {id: fft_len, label: FFT Length, dtype: int, default: 1024}
-- {id: cp_len, label: CP Length, dtype: int, default: 128}
-- {id: active_bins, label: Active Bins, dtype: int, default: 1024}
-- {id: prs_symbols, label: PRS Symbols, dtype: int, default: 8}
+- {id: fft_len, label: FFT Length, dtype: int, default: 512}
+- {id: cp_len, label: CP Length, dtype: int, default: 64}
+- {id: active_bins, label: Active Bins, dtype: int, default: 512}
+- {id: prs_symbols, label: PRS Symbols, dtype: int, default: 127}
 - {id: enable_profiling, label: Enable Profiling, dtype: bool, default: 'False'}
 inputs:
 - {label: frame_in, domain: message}

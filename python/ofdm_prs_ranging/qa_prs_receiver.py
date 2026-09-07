@@ -25,37 +25,36 @@ except ImportError:
 
 
 def load_golay_prs_native():
-    csv_path = os.path.abspath(os.path.join(
-        os.path.dirname(__file__), "..", "..", "lib", "DSP",
-        "golay_ofdm_1024x16.csv"))
-    if os.path.exists(csv_path):
-        rows = numpy.loadtxt(csv_path, delimiter=",", skiprows=1)
-        return (rows[:, 3] + 1j * rows[:, 4]).reshape(16, 1024)
-
     golay_a = numpy.ones(1, dtype=numpy.float32)
     golay_b = numpy.ones(1, dtype=numpy.float32)
-    while golay_a.size < 1024:
+    while golay_a.size < 512:
         previous_a = golay_a
         previous_b = golay_b
         golay_a = numpy.concatenate((previous_a, previous_b))
         golay_b = numpy.concatenate((previous_a, -previous_b))
     return numpy.stack(
-        [golay_a if symbol % 2 == 0 else golay_b for symbol in range(16)]
+        [golay_a if symbol % 2 == 0 else golay_b for symbol in range(127)]
     ).astype(numpy.complex64)
 
 
-MC_DS_CODE = numpy.asarray([1, 1, 1, -1, -1, 1, -1, -1],
-                           dtype=numpy.float32)
+def load_gold_code(code_id=2):
+    csv_path = os.path.abspath(os.path.join(
+        os.path.dirname(__file__), "..", "..", "lib", "DSP",
+        "gold127_family_bipolar.csv"))
+    return numpy.loadtxt(csv_path, delimiter=",", dtype=numpy.float32)[code_id]
+
+
+MC_DS_CODE = load_gold_code(2)
 
 
 def mc_ds_pilot_mask_native():
-    return numpy.arange(1024) % 8 != 7
+    return numpy.arange(512) % 4 != 3
 
 
 def mc_ds_pilot_frequencies(samp_rate):
-    ordered_native = (numpy.arange(1024) + 512) % 1024
-    signed_bins = numpy.arange(-512, 512, dtype=numpy.float64)
-    return signed_bins[ordered_native % 8 != 7] * samp_rate / 1024.0
+    ordered_native = (numpy.arange(512) + 256) % 512
+    signed_bins = numpy.arange(-256, 256, dtype=numpy.float64)
+    return signed_bins[ordered_native % 4 != 3] * samp_rate / 512.0
 
 
 class qa_prs_receiver(gr_unittest.TestCase):
@@ -130,6 +129,69 @@ class qa_prs_receiver(gr_unittest.TestCase):
             meta, pmt.intern("frame_id_valid"), pmt.PMT_F)))
         self.assertEqual(pmt.symbol_to_string(pmt.dict_ref(
             meta, pmt.intern("failure_reason"), pmt.PMT_NIL)), "NONE")
+
+    def test_gold127_processing_gain_and_wrong_code_rejection(self):
+        rng = numpy.random.default_rng(12702)
+        trials = 5000
+        noise = (rng.standard_normal((trials, 127)) +
+                 1j * rng.standard_normal((trials, 127)))
+        observations = MC_DS_CODE[None, :] + noise
+        estimate_8 = numpy.mean(
+            observations[:, :8] * MC_DS_CODE[None, :8], axis=1)
+        estimate_127 = numpy.mean(
+            observations * MC_DS_CODE[None, :], axis=1)
+        mse_8 = float(numpy.mean(numpy.abs(estimate_8 - 1.0) ** 2))
+        mse_127 = float(numpy.mean(numpy.abs(estimate_127 - 1.0) ** 2))
+        self.assertGreater(mse_8 / mse_127, 12.0)
+
+        wrong_code = load_gold_code(3)
+        normalized_cross_correlation = abs(
+            float(numpy.dot(MC_DS_CODE, wrong_code))) / 127.0
+        self.assertLess(normalized_cross_correlation, 0.25)
+
+        with self.assertRaises(ValueError):
+            ofdm_prs_ranging.prs_channel_estimator(mc_ds_gold_code_id=-1)
+        with self.assertRaises(ValueError):
+            ofdm_prs_ranging.prs_channel_estimator(mc_ds_gold_code_id=129)
+
+    def test_sequential_poll_ids_round_trip(self):
+        count = 3
+        tx = ofdm_prs_ranging.prs_timed_burst_source(
+            pings_per_trigger=count, attach_tx_time=False)
+        frame_len = tx.frame_len()
+        rx_time = pmt.make_tuple(pmt.from_uint64(0), pmt.from_double(0.0))
+        tags = [gr.tag_utils.python_to_tag(
+            (0, pmt.intern("rx_time"), rx_time, pmt.intern("qa")))]
+        timing = blocks.vector_source_c(
+            [0j] * (count * frame_len + 1000), False, 1, tags)
+        head = blocks.head(gr.sizeof_gr_complex, count * frame_len)
+        sink = blocks.vector_sink_c()
+        self.tb.connect(timing, tx, head, sink)
+        tx.to_basic_block()._post(pmt.intern("trigger"), pmt.PMT_T)
+        self.tb.run()
+        self.assertEqual(len(sink.data()), count * frame_len)
+
+        self.tb = gr.top_block()
+        source = blocks.vector_source_c(
+            [0j] * 300 + list(sink.data()) + [0j] * 300, False)
+        detector = ofdm_prs_ranging.prs_frame_detector(threshold=0.30)
+        fft = ofdm_prs_ranging.prs_fft_receiver()
+        channel = ofdm_prs_ranging.prs_channel_estimator()
+        debug = blocks.message_debug()
+        self.tb.connect(source, detector)
+        self.tb.msg_connect((detector, "frame_out"), (fft, "frame_in"))
+        self.tb.msg_connect((fft, "symbols_out"), (channel, "symbols_in"))
+        self.tb.msg_connect((channel, "event_out"), (debug, "store"))
+        self.tb.run()
+
+        frame_ids = []
+        for index in range(debug.num_messages()):
+            meta = pmt.car(debug.get_message(index))
+            if pmt.to_bool(pmt.dict_ref(
+                    meta, pmt.intern("frame_id_valid"), pmt.PMT_F)):
+                frame_ids.append(pmt.to_uint64(pmt.dict_ref(
+                    meta, pmt.intern("poll_frame_id"), pmt.PMT_NIL)))
+        self.assertEqual(frame_ids, [0, 1, 2])
 
     def test_triggered_response_payload_round_trip(self):
         tx = ofdm_prs_ranging.prs_timed_burst_source(attach_tx_time=False)
@@ -331,13 +393,13 @@ class qa_prs_receiver(gr_unittest.TestCase):
             0.70)
 
     def test_mc_ds_channel_estimator_unity_channel(self):
-        native = load_golay_prs_native()[:8].copy()
+        native = load_golay_prs_native().copy()
         native *= MC_DS_CODE[:, None]
         signed_order = numpy.concatenate(
-            (native[:, 512:], native[:, :512]), axis=1).reshape(-1)
+            (native[:, 256:], native[:, :256]), axis=1).reshape(-1)
 
         estimator = ofdm_prs_ranging.prs_channel_estimator(
-            10e6, 1024, 1024, 8, 13990001)
+            10e6, 512, 512, 127, 13990001, False, 2)
         debug = blocks.message_debug()
         symbols = pmt.init_c32vector(
             len(signed_order), [complex(value) for value in signed_order])
@@ -355,32 +417,32 @@ class qa_prs_receiver(gr_unittest.TestCase):
         self.assertGreaterEqual(debug.num_messages(), 1)
         channel = numpy.asarray(
             pmt.c32vector_elements(pmt.cdr(debug.get_message(0))))
-        self.assertEqual(channel.size, 896)
+        self.assertEqual(channel.size, 384)
         numpy.testing.assert_allclose(
-            channel, numpy.ones(896), rtol=1e-6, atol=1e-6)
+            channel, numpy.ones(384), rtol=1e-6, atol=1e-6)
 
     def test_channel_estimator_removes_prs_symbol_cfo_rotation(self):
         samp_rate = 30e6
         cfo_hz = 350.0
         delay_samples = 0.25
-        native = load_golay_prs_native()[:8].copy()
+        native = load_golay_prs_native().copy()
         native *= MC_DS_CODE[:, None]
-        signed = numpy.concatenate((native[:, 512:], native[:, :512]), axis=1)
-        frequencies = numpy.arange(-512, 512, dtype=numpy.float64) * samp_rate / 1024.0
+        signed = numpy.concatenate((native[:, 256:], native[:, :256]), axis=1)
+        frequencies = numpy.arange(-256, 256, dtype=numpy.float64) * samp_rate / 512.0
         expected_channel = numpy.exp(
             -1j * 2.0 * numpy.pi * frequencies * delay_samples / samp_rate)
-        symbol_period = (1024 + 128) / samp_rate
+        symbol_period = (512 + 64) / samp_rate
         rotations = numpy.exp(
             1j * 2.0 * numpy.pi * cfo_hz * symbol_period *
-            numpy.arange(8, dtype=numpy.float64))
+            numpy.arange(127, dtype=numpy.float64))
         received = (signed * expected_channel[None, :] *
                     rotations[:, None]).reshape(-1)
 
         estimator = ofdm_prs_ranging.prs_channel_estimator(
-            samp_rate, 1024, 1024, 8, 13990001)
+            samp_rate, 512, 512, 127, 13990001, False, 2)
         debug = blocks.message_debug()
         phase = ofdm_prs_ranging.prs_phase_slope_estimator(
-            samp_rate, 1024, 1024, 1.0)
+            samp_rate, 512, 512, 1.0)
         phase_debug = blocks.message_debug()
         meta = pmt.dict_add(pmt.make_dict(),
                             pmt.intern("prs_cp_cfo_hz"),
@@ -407,7 +469,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
             result, pmt.intern("channel_coherence"), pmt.PMT_NIL)), 0.999)
         channel = numpy.asarray(pmt.c32vector_elements(pmt.cdr(msg)))
         expected_pilots = expected_channel[
-            ((numpy.arange(1024) + 512) % 1024) % 8 != 7]
+            ((numpy.arange(512) + 256) % 512) % 4 != 3]
         numpy.testing.assert_allclose(
             channel, expected_pilots, rtol=1e-5, atol=1e-5)
         self.assertGreaterEqual(phase_debug.num_messages(), 1)
@@ -425,7 +487,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
             (delay_samples / samp_rate))
 
         estimator = ofdm_prs_ranging.prs_phase_slope_estimator(
-            samp_rate, 1024, 1024, 1.0)
+            samp_rate, 512, 512, 1.0)
         debug = blocks.message_debug()
         meta = pmt.make_dict()
         meta = pmt.dict_add(

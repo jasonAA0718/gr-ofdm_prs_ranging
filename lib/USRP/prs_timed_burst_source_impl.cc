@@ -86,7 +86,8 @@ prs_timed_burst_source::sptr prs_timed_burst_source::make(double samp_rate,
                                                           uint32_t seed,
                                                           int pings_per_trigger,
                                                           bool attach_tx_time,
-                                                          int coarse_zc_root)
+                                                          int coarse_zc_root,
+                                                          int mc_ds_gold_code_id)
 {
     return gnuradio::make_block_sptr<prs_timed_burst_source_impl>(samp_rate,
                                                                   fft_len,
@@ -104,7 +105,8 @@ prs_timed_burst_source::sptr prs_timed_burst_source::make(double samp_rate,
                                                                   seed,
                                                                   pings_per_trigger,
                                                                   attach_tx_time,
-                                                                  coarse_zc_root);
+                                                                  coarse_zc_root,
+                                                                  mc_ds_gold_code_id);
 }
 
 prs_timed_burst_source_impl::prs_timed_burst_source_impl(double samp_rate,
@@ -123,7 +125,8 @@ prs_timed_burst_source_impl::prs_timed_burst_source_impl(double samp_rate,
                                                          uint32_t seed,
                                                          int pings_per_trigger,
                                                          bool attach_tx_time,
-                                                         int coarse_zc_root)
+                                                         int coarse_zc_root,
+                                                         int mc_ds_gold_code_id)
     : gr::block("prs_timed_burst_source",
                 gr::io_signature::make(0, 1, sizeof(gr_complex)),
                 gr::io_signature::make(1, 1, sizeof(gr_complex))),
@@ -144,6 +147,7 @@ prs_timed_burst_source_impl::prs_timed_burst_source_impl(double samp_rate,
       d_pings_per_trigger(pings_per_trigger),
       d_attach_tx_time(attach_tx_time),
       d_coarse_zc_root(coarse_zc_root),
+      d_mc_ds_gold_code_id(mc_ds_gold_code_id),
       d_prs_start(0),
       d_prs_len(0),
       d_payload_start(0),
@@ -173,10 +177,10 @@ void prs_timed_burst_source_impl::validate_parameters() const
     if (d_fft_len <= 0 || d_cp_len < 0 || d_cp_len > d_fft_len) {
         throw std::invalid_argument("invalid fft_len/cp_len");
     }
-    if (d_fft_len != 1024 || d_active_bins != 1024 || d_prs_symbols != 8 ||
-        d_cp_len != 128) {
-        throw std::invalid_argument("MC-DS PRS requires fft_len=1024, active_bins=1024, "
-                                    "prs_symbols=8, cp_len=128");
+    if (d_fft_len != 512 || d_active_bins != 512 || d_prs_symbols != 127 ||
+        d_cp_len != 64) {
+        throw std::invalid_argument("MC-DS PRS requires fft_len=512, active_bins=512, "
+                                    "prs_symbols=127, cp_len=64");
     }
     if (d_prs_symbols <= 0 || d_preamble_len <= 0 || d_preamble_repeats <= 0 ||
         d_coarse_sync_len <= 0 || d_zero_guard_len < 0 || d_tail_guard_len < 0) {
@@ -187,6 +191,9 @@ void prs_timed_burst_source_impl::validate_parameters() const
     }
     if (d_pings_per_trigger <= 0) {
         throw std::invalid_argument("pings_per_trigger must be positive");
+    }
+    if (d_mc_ds_gold_code_id < 0 || d_mc_ds_gold_code_id >= 129) {
+        throw std::invalid_argument("mc_ds_gold_code_id must be in [0, 128]");
     }
 }
 
@@ -205,7 +212,8 @@ prs_frame_config prs_timed_burst_source_impl::frame_config() const
                              d_tail_guard_len,
                              d_tx_amp,
                              d_seed,
-                             d_coarse_zc_root };
+                             d_coarse_zc_root,
+                             d_mc_ds_gold_code_id };
 }
 
 void prs_timed_burst_source_impl::build_frame()
@@ -363,6 +371,11 @@ void prs_timed_burst_source_impl::add_burst_tags(uint64_t abs_offset,
     add_item_tag(0, abs_offset, pmt::mp("fft_len"), pmt::from_long(d_fft_len));
     add_item_tag(0, abs_offset, pmt::mp("cp_len"), pmt::from_long(d_cp_len));
     add_item_tag(0, abs_offset, pmt::mp("active_bins"), pmt::from_long(d_active_bins));
+    add_item_tag(0, abs_offset, pmt::mp("prs_symbols"), pmt::from_long(d_prs_symbols));
+    add_item_tag(0,
+                 abs_offset,
+                 pmt::mp("mc_ds_gold_code_id"),
+                 pmt::from_long(d_mc_ds_gold_code_id));
     add_item_tag(0, abs_offset, pmt::mp("samp_rate"), pmt::from_double(d_samp_rate));
 
     PRS_TBS_DEBUG("PRS burst tags: frame_id={} start_abs={} tx_time={} attach_tx_time={}",
@@ -398,6 +411,9 @@ void prs_timed_burst_source_impl::publish_tx_time(const prs_pending_burst& burst
     meta = pmt::dict_add(meta, pmt::mp("fft_len"), pmt::from_long(d_fft_len));
     meta = pmt::dict_add(meta, pmt::mp("cp_len"), pmt::from_long(d_cp_len));
     meta = pmt::dict_add(meta, pmt::mp("active_bins"), pmt::from_long(d_active_bins));
+    meta = pmt::dict_add(meta, pmt::mp("prs_symbols"), pmt::from_long(d_prs_symbols));
+    meta = pmt::dict_add(
+        meta, pmt::mp("mc_ds_gold_code_id"), pmt::from_long(d_mc_ds_gold_code_id));
     message_port_pub(pmt::mp("tx_time_out"), meta);
 }
 

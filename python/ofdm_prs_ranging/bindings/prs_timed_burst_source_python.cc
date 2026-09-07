@@ -41,10 +41,10 @@ void bind_prs_timed_burst_source(py::module& m)
 
         .def(py::init(&prs_timed_burst_source::make),
              py::arg("samp_rate") = 1.0E+7,
-             py::arg("fft_len") = 1024,
-             py::arg("cp_len") = 128,
-             py::arg("active_bins") = 1024,
-             py::arg("prs_symbols") = 8,
+             py::arg("fft_len") = 512,
+             py::arg("cp_len") = 64,
+             py::arg("active_bins") = 512,
+             py::arg("prs_symbols") = 127,
              py::arg("preamble_len") = 128,
              py::arg("preamble_repeats") = 16,
              py::arg("coarse_sync_len") = 839,
@@ -57,6 +57,7 @@ void bind_prs_timed_burst_source(py::module& m)
              py::arg("pings_per_trigger") = 1,
              py::arg("attach_tx_time") = true,
              py::arg("coarse_zc_root") = 25,
+             py::arg("mc_ds_gold_code_id") = 2,
              D(prs_timed_burst_source, make))
 
 

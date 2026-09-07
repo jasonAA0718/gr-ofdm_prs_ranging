@@ -31,6 +31,7 @@ struct prs_frame_config {
     float tx_amp;
     uint32_t seed;
     int coarse_zc_root = 25;
+    int mc_ds_gold_code_id = 2;
 };
 
 struct prs_frame {

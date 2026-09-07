@@ -23,10 +23,11 @@ zero_guard_len    = 1000 samples
 preamble_len      = 256 samples
 preamble_repeats  = 8
 coarse_sync_len   = 839 samples
-fft_len           = 1024
-cp_len            = 128
-active_bins       = 1024
-prs_symbols       = 8
+fft_len           = 512
+cp_len            = 64
+active_bins       = 512
+prs_symbols       = 127
+Gold code ID      = 2
 ```
 
 The OFDM PRS-like section length is
@@ -38,7 +39,7 @@ N_{\text{PRS}} = N_{\text{sym}}(N_{\text{FFT}} + N_{\text{CP}})
 For the default values:
 
 ```math
-N_{\text{PRS}} = 8(1024 + 128) = 9216
+N_{\text{PRS}} = 127(512 + 64) = 73152
 ```
 
 ## Repeated QPSK Acquisition Preamble
@@ -124,13 +125,13 @@ Initiator RX detector:   coarse_zc_root = 29, channel_id = 1
 
 The current prototype carries the existing 120-bit SS-TWR packet inside the
 OFDM symbols. There is no standalone time-domain payload. Native FFT bins use
-a fixed seven-pilot/one-data comb:
+a fixed three-pilot/one-data comb:
 
 ```math
-\mathcal{D}=\{k: k\bmod 8=7\},\qquad |\mathcal{D}|=128
+\mathcal{D}=\{k: k\bmod 4=3\},\qquad |\mathcal{D}|=128
 ```
 
-The other 896 bins form the pilot set `P`. Data-bin indices `q=0...119`
+The other 384 bins form the pilot set `P`. Data-bin indices `q=0...119`
 contain the serialized packet bits and `q=120...127` contain zero padding.
 Serialization remains LSB-first and the CRC16 initial value and polynomial
 remain `0xffff` and `0x1021`.
@@ -143,30 +144,46 @@ remain `0xffff` and `0x1021`.
 | `reply_delay_samples` | 32 | Zero/unused | Configured delay |
 | CRC16 | 16 | Enabled | Enabled |
 
-The fixed prototype spreading sequence is
+After serialization, CRC generation, and padding, TX XORs this exact fixed
+128-bit scrambler:
 
-```math
-c[m]=[+1,+1,+1,-1,-1,+1,-1,-1],\quad 0\le m<8.
+```text
+00100101001010011100110011110110010101100100000010010111100110111111010100001000001100001101101100111100000111111110011100100011
 ```
 
-It is a fixed balanced prototype code, not a standards-derived Gold code. Let
-`G_m[k]` be row `m` of the existing compile-time Golay table and let `b_q` be
-the BPSK value of payload/padding bit `q`. The native-IFFT input is
+It has 64 zeros and 64 ones. If `u_q` is the logical payload or padding bit and
+`s_q` is the scrambler bit, `b_q=2(u_q\mathbin{\mathrm{XOR}}s_q)-1` under the
+project's `0 -> -1`, `1 -> +1` BPSK convention. CRC covers only the original
+120 logical bits.
+
+Let `c_i[m]` be chip `m` from row `i` of
+`lib/DSP/gold127_family_bipolar.csv`, where row index equals `code_id`. The
+default is `i=2`; each row has 127 real chips in `{-1,+1}`. Let `G_m[k]` be
+Golay A512 for even `m` and B512 for odd `m`. The native-IFFT input is
 
 ```math
 X_m[k]=
 \begin{cases}
-c[m]b_q, & k=8q+7 \\
-c[m]G_m[k], & k\in\mathcal{P}.
+c_i[m]b_q, & k=4q+3 \\
+c_i[m]G_m[k], & k\in\mathcal{P}.
 \end{cases}
 ```
 
-Every symbol repeats the same 128 data values and uses the same known chip.
-The receiver first removes `c[m]`; pilot bins remove `G_m[k]` and are averaged
-for channel estimation. Data bins are despread coherently over all eight
-symbols, equalized with linear interpolation from adjacent pilot-channel
-estimates, and hard-decided from the real sign. Only the first 120 bits enter
-packet parsing and CRC validation.
+The one chip `c_i[m]` multiplies the complete 512-bin symbol. It is not applied
+per subcarrier or per time sample. Every symbol repeats the same 128 scrambled
+data values. RX removes the Gold chip and Golay sign before inter-symbol CFO
+estimation. After CFO phase alignment, it averages channel estimates across
+all 127 symbols on the 384 pilot bins. Data bins are Gold-despread, coherently
+combined across 127 symbols, equalized by adjacent-pilot interpolation, and
+hard-decided. RX XORs the same scrambler, discards positions `120...127`, and
+parses/checks the unchanged 120-bit packet and CRC.
+
+A mismatched Gold row suppresses coherent amplitude according to its
+cross-correlation with the transmitted row, but `code_id` is not an identity or
+authentication check. In a noiseless single-user case, a common residual scale
+can cancel when the despread data is divided by the despread channel. Reliable
+multi-anchor association must therefore also use packet identity and scheduled
+or otherwise separable resources.
 
 The OFDM payload quality metric is the mean normalized BPSK decision margin:
 
@@ -417,37 +434,31 @@ Fs     = sample rate
 Deltaf = Fs / N
 ```
 
-Every native FFT bin is occupied. The CSV uses the exact native indexing passed
-to the IFFT:
+Every native FFT bin is occupied. The exact native indexing passed to the IFFT
+is:
 
 ```text
-fft_bin 0 ... 511    -> signed bins 0 ... +511
-fft_bin 512 ... 1023 -> signed bins -512 ... -1
+fft_bin 0 ... 255   -> signed bins 0 ... +255
+fft_bin 256 ... 511 -> signed bins -256 ... -1
 ```
 
-Measured over each useful 1024-sample IFFT output before CP, the current eight
-MC-DS symbols have minimum/mean/maximum PAPR of
-`12.0163 / 12.2921 / 12.5678 dB` for the default serialized POLL. Replacing
-one bin in eight with repeated payload data destroys the earlier pure-Golay
-approximately 3 dB PAPR property. This is an important prototype limitation.
+Measured over each useful 512-sample IFFT output before CP for 50,000
+sequential POLL IDs, the production scrambler gives PAPR
+mean/P99.9/maximum of `7.1019 / 8.9338 / 9.5733 dB`. Multiplication by a real
+Gold chip does not alter a symbol's PAPR.
 
-The exact frequency-domain source of truth is:
+The Gold-code source of truth and its production representation are:
 
 ```text
-lib/DSP/golay_ofdm_1024x16.csv
+lib/DSP/gold127_family_bipolar.csv
+lib/DSP/gold127_codes.h
 ```
 
-It is converted offline into the compile-time table:
+No CSV is read at GNU Radio runtime. `tools/generate_gold127_header.py`
+validates exactly 129 rows by 127 columns of `+1/-1` and generates the header.
+CSV row `i` maps to code ID `i`, and column `m` maps to OFDM symbol `m`.
 
-```text
-lib/DSP/golay_prs_table.h
-```
-
-No CSV is read at GNU Radio runtime. The current entries are real BPSK
-`+1+j0` or `-1+j0`, but both real and imaginary components are retained in the
-compiled representation.
-
-The table contains the recursively generated length-1024 Golay pair:
+The length-512 Golay pair is generated at compile time using:
 
 ```text
 A0 = [1]
@@ -456,15 +467,15 @@ A_next = [A, B]
 B_next = [A, -B]
 ```
 
-The current prototype uses only the first eight rows and assigns:
+The 127 symbols assign:
 
 ```text
-symbols 0,2,4,6 -> A
-symbols 1,3,5,7 -> B
+even symbols 0,2,...,126 -> A512
+odd symbols 1,3,...,125  -> B512
 ```
 
-TX uses native `k=0...1023` without fftshift. Pilot positions use the table
-entry multiplied by the known MC-DS chip; positions `k mod 8 = 7` use the
+TX uses native `k=0...511` without fftshift. Pilot positions use the Golay
+entry multiplied by the known Gold chip; positions `k mod 4 = 3` use the
 spread BPSK data value. There is no OFDM PRS MT19937 generation.
 
 The time-domain OFDM symbol before cyclic prefix is
@@ -491,8 +502,8 @@ The receiver removes the CP and computes the native FFT. For phase-slope
 processing it flattens bins in monotonic signed-frequency order:
 
 ```text
-native 512 ... 1023, then native 0 ... 511
-signed -512 ... -1, then signed 0 ... +511
+native 256 ... 511, then native 0 ... 255
+signed -256 ... -1, then signed 0 ... +255
 ```
 
 The channel estimator fetches Golay references in this same flattened order,
@@ -523,7 +534,7 @@ The implementation averages over all PRS symbols:
 \frac{Y_m[k]}{c[m]G_m[k]}
 ```
 
-Only the 896 pilot estimates are emitted to the phase-slope estimator. The
+Only the 384 pilot estimates are emitted to the phase-slope estimator. The
 implementation also computes a relative SNR-like metric from average pilot
 channel power and residual error; it is not calibrated RF power.
 
@@ -553,8 +564,8 @@ K     = number of active PRS bins
 The current USRP examples use:
 
 ```text
-Fs = 30 MHz, Lp = 256, R = 4
-NFFT = 1024, NCP = 128, M = 8, K = 896 pilot bins
+Fs = 30 MHz, Lp = 256, R = 8
+NFFT = 512, NCP = 64, M = 127, K = 384 pilot bins
 ```
 
 ### Repeated-Preamble CFO
@@ -591,9 +602,9 @@ This calculation uses `L_p(R-1)` complex correlation products, covers all
 geometry:
 
 ```text
-correlation products = 256(4-1) = 768
-unique samples covered = 256(4) = 1024
-observation duration = 1024 / 30 MHz = 34.133 us
+correlation products = 256(8-1) = 1792
+unique samples covered = 256(8) = 2048
+observation duration = 2048 / 30 MHz = 68.267 us
 correlation lag = 256 / 30 MHz = 8.533 us
 unambiguous CFO range = +/-Fs/(2Lp) = +/-58.594 kHz
 ```
@@ -659,12 +670,12 @@ and its normalized coherence is
 For the current geometry:
 
 ```text
-correlation products = M NCP = 8(128) = 1024
-selected input samples = 2048
-correlation lag = 1024 / 30 MHz = 34.133 us
-complete PRS span = 8(1024+128) = 9216 samples = 307.2 us
-raw unambiguous CFO range = +/-Fs/(2NFFT) = +/-14.648 kHz
-CFO alias interval = Fs/NFFT = 29.297 kHz
+correlation products = M NCP = 127(64) = 8128
+selected input samples = 16256
+correlation lag = 512 / 30 MHz = 17.067 us
+complete PRS span = 127(512+64) = 73152 samples = 2.4384 ms
+raw unambiguous CFO range = +/-Fs/(2NFFT) = +/-29.297 kHz
+CFO alias interval = Fs/NFFT = 58.594 kHz
 ```
 
 The CP estimate is attached to the extracted frame and used as the unwrap
@@ -718,12 +729,12 @@ the accumulated powers of the two members of every adjacent-symbol pair. The
 current geometry gives:
 
 ```text
-per-symbol pilot-channel estimates = MK = 8(896) = 7168
-adjacent-symbol products = (M-1)K = 7(896) = 6272
-adjacent-symbol separation = 1152 samples = 38.4 us
-complete PRS span = 9216 samples = 307.2 us
-raw unambiguous CFO range = +/-Fs/[2(NFFT+NCP)] = +/-13.021 kHz
-CFO alias interval = Fs/(NFFT+NCP) = 26.042 kHz
+per-symbol pilot-channel estimates = MK = 127(384) = 48768
+adjacent-symbol products = (M-1)K = 126(384) = 48384
+adjacent-symbol separation = 576 samples = 19.2 us
+complete PRS span = 73152 samples = 2.4384 ms
+raw unambiguous CFO range = +/-Fs/[2(NFFT+NCP)] = +/-26.042 kHz
+CFO alias interval = Fs/(NFFT+NCP) = 52.083 kHz
 ```
 
 Every symbol channel is then rotated to the time reference of symbol zero:
@@ -744,9 +755,9 @@ and the CFO-aligned channel used by the phase-slope estimator is
 
 | Estimate | Products | Correlation separation | Observation span | Raw CFO range | Current role |
 |---|---:|---:|---:|---:|---|
-| Preamble `hat f_p` | 768 | 256 samples | 1024 samples | +/-58.594 kHz | Disabled; acquisition gate only |
-| PRS CP `hat f_CP` | 1024 | 1024 samples | 9216-sample PRS span | +/-14.648 kHz | Channel-CFO unwrap reference |
-| PRS channel `hat f_H` | 6272 | 1152 samples | 9216-sample PRS span | +/-13.021 kHz | Pilot/data inter-symbol phase alignment |
+| Preamble `hat f_p` | 1792 | 256 samples | 2048 samples | +/-58.594 kHz | Disabled; acquisition gate only |
+| PRS CP `hat f_CP` | 8128 | 512 samples | 73152-sample PRS span | +/-29.297 kHz | Channel-CFO unwrap reference |
+| PRS channel `hat f_H` | 48384 | 576 samples | 73152-sample PRS span | +/-26.042 kHz | Pilot/data inter-symbol phase alignment |
 
 The two active estimates should be approximately equal for a stable oscillator
 and a correctly extracted frame. Differences close to `Fs/N_FFT` or
@@ -970,14 +981,15 @@ For `Fs = 30 MHz`, this becomes about `5 m`.
 
 Phase slope can in principle estimate sub-sample delay because it uses phase
 across bandwidth, not only the nearest time sample. However, the useful
-resolution depends on bandwidth, SNR, calibration, and model validity. With
-active bandwidth approximately
+resolution depends on bandwidth, SNR, calibration, and model validity. The 384
+pilot bins are interleaved across the complete 512-bin FFT, so their frequency
+support spans approximately
 
 ```math
-B \approx K\Delta f = K\frac{F_s}{N}
+B \approx N\Delta f = F_s
 ```
 
-the full-band Golay configuration `K=N=1024` gives:
+The current 512-bin configuration therefore gives:
 
 ```text
 Fs = 10 MHz: B ≈ 10 MHz

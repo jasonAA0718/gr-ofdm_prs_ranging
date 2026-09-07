@@ -87,17 +87,17 @@ class prs_ssrtt_initiator_profiling(gr.top_block):
         self.prs_timing_collector_0 = ofdm_prs_ranging.prs_timing_collector("CSV/profiling/initiator_timing_raw.csv", "CSV/profiling/initiator_timing_summary.csv", "initiator")
         self.prs_ssrtt_solver_0 = ofdm_prs_ranging.prs_ssrtt_solver(samp_rate, True)
         self.prs_source = ofdm_prs_ranging.prs_timed_burst_source(
-            samp_rate, 1024, 128, 1024, 8,
+            samp_rate, 512, 64, 512, 127,
             premble_length, premble_rep, zc_length,
             1000, 1000, 0.6,
             0.2, 0.7, 13990001, 1,
-            True, 25)
+            True, 25, 2)
         self.prs_rx_timekeeper_0 = ofdm_prs_ranging.prs_rx_timekeeper(samp_rate, 0.6)
-        self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 1024, 1024, 1.0, True)
-        self.prs_frame_detector_0 = ofdm_prs_ranging.prs_frame_detector(samp_rate, 1024, 128, 1024, 8, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 29, 1, True, 0.05, 0.0002, 0.004, 0.4, True)
-        self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 1024, 128, 1024, 8, True)
+        self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 512, 512, 1.0, True)
+        self.prs_frame_detector_0 = ofdm_prs_ranging.prs_frame_detector(samp_rate, 512, 64, 512, 127, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 29, 1, True, 0.05, 0.0002, 0.004, 0.4, True)
+        self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 512, 64, 512, 127, True)
         self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger("CSV/profiling/initiator_profiling_measurements.csv", 1, True)
-        self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 1024, 1024, 8, 13990001, True)
+        self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 512, 512, 127, 13990001, True, 2)
         self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/profiling/initiator_acquisition_v2.csv", "initiator", 1)
         self.blocks_message_strobe_0 = blocks.message_strobe(pmt.PMT_T, 500)
 

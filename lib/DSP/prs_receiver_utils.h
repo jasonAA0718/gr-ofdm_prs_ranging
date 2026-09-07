@@ -20,10 +20,10 @@ namespace ofdm_prs_ranging {
 
 struct prs_rx_config {
     double samp_rate = 10e6;
-    int fft_len = 1024;
-    int cp_len = 128;
-    int active_bins = 1024;
-    int prs_symbols = 8;
+    int fft_len = 512;
+    int cp_len = 64;
+    int active_bins = 512;
+    int prs_symbols = 127;
     int preamble_len = 128;
     int preamble_repeats = 16;
     int coarse_sync_len = 839;
@@ -33,6 +33,7 @@ struct prs_rx_config {
     uint32_t seed = 13990001;
     int coarse_zc_root = 25;
     int channel_id = 0;
+    int mc_ds_gold_code_id = 2;
 };
 
 struct prs_cfo_estimate {

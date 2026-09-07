@@ -5,7 +5,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include "golay_prs_table.h"
 #include "mc_ds_prs.h"
 #include "prs_payload_codec.h"
 #include <gnuradio/fft/fft.h>
@@ -14,65 +13,79 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <fstream>
 #include <numeric>
+#include <sstream>
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace gr {
 namespace ofdm_prs_ranging {
 
 namespace {
-constexpr int fft_len = 1024;
-constexpr int cp_len = 128;
-constexpr int prs_symbols = mc_ds_symbol_count;
-
-std::vector<gr_complex> ifft_symbol(const std::vector<gr_complex>& freq)
+std::array<int8_t, gold127_code_length> load_csv_code(int code_id)
 {
-    gr::fft::fft_complex_rev ifft(fft_len, 1);
-    std::copy(freq.begin(), freq.end(), ifft.get_inbuf());
-    ifft.execute();
-    const float scale = 1.0f / static_cast<float>(fft_len);
-    std::vector<gr_complex> time(static_cast<size_t>(fft_len));
-    for (int i = 0; i < fft_len; ++i) {
-        time[static_cast<size_t>(i)] = ifft.get_outbuf()[i] * scale;
+    std::string path = __FILE__;
+    path.replace(
+        path.find_last_of("/\\") + 1, std::string::npos, "gold127_family_bipolar.csv");
+    std::ifstream input(path);
+    if (!input.is_open()) {
+        throw std::runtime_error("cannot open " + path);
     }
-    return time;
+    std::string line;
+    for (int row = 0; row <= code_id; ++row) {
+        if (!std::getline(input, line)) {
+            throw std::runtime_error("missing Gold code row " + std::to_string(row));
+        }
+    }
+    std::array<int8_t, gold127_code_length> result{};
+    std::stringstream stream(line);
+    std::string token;
+    int column = 0;
+    while (std::getline(stream, token, ',')) {
+        if (column >= gold127_code_length) {
+            throw std::runtime_error("too many chips in Gold code row");
+        }
+        result[static_cast<size_t>(column++)] = static_cast<int8_t>(std::stoi(token));
+    }
+    if (column != gold127_code_length) {
+        throw std::runtime_error("Gold code row does not contain 127 chips");
+    }
+    return result;
 }
 
-double papr_db(const std::vector<gr_complex>& time)
+std::vector<gr_complex>
+expected_symbol(int symbol, int code_id, const prs_payload_bits& bits)
 {
-    double power = 0.0;
-    double peak_power = 0.0;
-    for (const auto& sample : time) {
-        const double sample_power = std::norm(sample);
-        power += sample_power;
-        peak_power = std::max(peak_power, sample_power);
-    }
-    return 10.0 * std::log10(peak_power / (power / time.size()));
-}
-
-std::vector<gr_complex> mc_ds_symbol(int symbol, const prs_payload_bits& bits)
-{
-    std::vector<gr_complex> freq(static_cast<size_t>(fft_len));
-    for (int fft_bin = 0; fft_bin < fft_len; ++fft_bin) {
+    std::vector<gr_complex> freq(mc_ds_fft_len);
+    const float chip = mc_ds_gold_chip(code_id, symbol);
+    for (int fft_bin = 0; fft_bin < mc_ds_fft_len; ++fft_bin) {
         if (mc_ds_is_data_bin(fft_bin)) {
             const int q = mc_ds_data_index(fft_bin);
-            const float bpsk =
-                q < prs_payload_data_bits && bits[static_cast<size_t>(q)] ? 1.0f : -1.0f;
-            freq[static_cast<size_t>(fft_bin)] =
-                mc_ds_prn_code[static_cast<size_t>(symbol)] * bpsk;
+            const uint8_t logical =
+                q < prs_payload_data_bits ? bits[static_cast<size_t>(q)] : 0U;
+            const bool one = (logical ^ mc_ds_scrambler_bit(q)) != 0U;
+            freq[static_cast<size_t>(fft_bin)] = chip * (one ? 1.0f : -1.0f);
         } else {
-            freq[static_cast<size_t>(fft_bin)] = mc_ds_pilot(symbol, fft_bin);
+            freq[static_cast<size_t>(fft_bin)] = mc_ds_pilot(symbol, fft_bin, code_id);
         }
     }
     return freq;
 }
 
-std::array<double, 3> summarize(std::vector<double> values)
+double papr_db(gr::fft::fft_complex_rev& ifft, const std::vector<gr_complex>& freq)
 {
-    const auto bounds = std::minmax_element(values.begin(), values.end());
-    const double mean =
-        std::accumulate(values.begin(), values.end(), 0.0) / values.size();
-    return { *bounds.first, mean, *bounds.second };
+    std::copy(freq.begin(), freq.end(), ifft.get_inbuf());
+    ifft.execute();
+    double power = 0.0;
+    double peak_power = 0.0;
+    for (int i = 0; i < mc_ds_fft_len; ++i) {
+        const double sample_power = std::norm(ifft.get_outbuf()[i]);
+        power += sample_power;
+        peak_power = std::max(peak_power, sample_power);
+    }
+    return 10.0 * std::log10(peak_power / (power / mc_ds_fft_len));
 }
 
 double rms(const std::vector<gr_complex>& samples, size_t start, size_t length)
@@ -85,82 +98,123 @@ double rms(const std::vector<gr_complex>& samples, size_t start, size_t length)
 }
 } // namespace
 
-BOOST_AUTO_TEST_CASE(test_golay_table_dimensions_and_csv_entries)
+BOOST_AUTO_TEST_CASE(test_gold127_table_matches_authoritative_csv)
 {
-    static_assert(golay_prs_symbol_count == 16);
-    static_assert(golay_prs_fft_len == 1024);
-    static_assert(golay_prs_table.size() == 16 * 1024);
+    static_assert(gold127_codes.size() == 129);
+    static_assert(gold127_codes[0].size() == 127);
+    for (const auto& code : gold127_codes) {
+        for (const auto chip : code) {
+            BOOST_CHECK(chip == -1 || chip == 1);
+        }
+    }
+    const auto csv_code = load_csv_code(mc_ds_default_gold_code_id);
+    BOOST_CHECK_EQUAL_COLLECTIONS(csv_code.begin(),
+                                  csv_code.end(),
+                                  gold127_codes[mc_ds_default_gold_code_id].begin(),
+                                  gold127_codes[mc_ds_default_gold_code_id].end());
+}
 
-    const auto check = [](size_t symbol, size_t fft_bin, float real, float imag) {
-        const auto& value = golay_prs_at(symbol, fft_bin);
-        BOOST_CHECK_EQUAL(value.real, real);
-        BOOST_CHECK_EQUAL(value.imag, imag);
-    };
-    check(0, 0, 1.0f, 0.0f);
-    check(0, 3, -1.0f, 0.0f);
-    check(0, 512, 1.0f, 0.0f);
-    check(0, 1023, -1.0f, 0.0f);
-    check(1, 512, -1.0f, 0.0f);
-    check(1, 1023, 1.0f, 0.0f);
-    check(6, 777, -1.0f, 0.0f);
-    check(7, 777, 1.0f, 0.0f);
-    check(14, 1000, 1.0f, 0.0f);
-    check(15, 1022, -1.0f, 0.0f);
+BOOST_AUTO_TEST_CASE(test_scrambler_and_frequency_mapping)
+{
+    static_assert(sizeof(mc_ds_data_scrambler) - 1 == 128);
+    int ones = 0;
+    int data_bins = 0;
+    int pilot_bins = 0;
+    for (int q = 0; q < mc_ds_data_bin_count; ++q) {
+        ones += mc_ds_scrambler_bit(q);
+        const uint8_t original = static_cast<uint8_t>((q * 17 + 3) & 1);
+        const uint8_t scrambled = original ^ mc_ds_scrambler_bit(q);
+        BOOST_CHECK_EQUAL(scrambled ^ mc_ds_scrambler_bit(q), original);
+    }
+    for (int k = 0; k < mc_ds_fft_len; ++k) {
+        if (mc_ds_is_data_bin(k)) {
+            ++data_bins;
+            BOOST_CHECK_EQUAL(k % 4, 3);
+        } else {
+            ++pilot_bins;
+        }
+    }
+    BOOST_CHECK_EQUAL(ones, 64);
+    BOOST_CHECK_EQUAL(data_bins, 128);
+    BOOST_CHECK_EQUAL(pilot_bins, 384);
+
+    for (int k = 0; k < mc_ds_fft_len; ++k) {
+        BOOST_CHECK_EQUAL(std::abs(mc_ds_golay.a[static_cast<size_t>(k)]), 1);
+        BOOST_CHECK_EQUAL(std::abs(mc_ds_golay.b[static_cast<size_t>(k)]), 1);
+        BOOST_CHECK_EQUAL(mc_ds_golay_pilot(0, k).real(), mc_ds_golay.a[k]);
+        BOOST_CHECK_EQUAL(mc_ds_golay_pilot(1, k).real(), mc_ds_golay.b[k]);
+    }
 }
 
 BOOST_AUTO_TEST_CASE(test_mc_ds_tx_fft_mapping)
 {
     auto source = prs_timed_burst_source::make();
     const auto frame = source->frame_samples();
-    const size_t useful_start = static_cast<size_t>(source->prs_start() + cp_len);
-
     const auto bits = serialize_packet_payload(prs_payload_info{});
-    gr::fft::fft_complex_fwd fft(fft_len, 1);
-    for (int symbol = 0; symbol < prs_symbols; ++symbol) {
-        const size_t start = useful_start + static_cast<size_t>(symbol) *
-                                                static_cast<size_t>(fft_len + cp_len);
-        std::copy(
-            frame.begin() + start, frame.begin() + start + fft_len, fft.get_inbuf());
+    gr::fft::fft_complex_fwd fft(mc_ds_fft_len, 1);
+    for (int symbol = 0; symbol < mc_ds_symbol_count; ++symbol) {
+        const size_t start = static_cast<size_t>(source->prs_start() + mc_ds_cp_len) +
+                             static_cast<size_t>(symbol) *
+                                 static_cast<size_t>(mc_ds_fft_len + mc_ds_cp_len);
+        std::copy(frame.begin() + start,
+                  frame.begin() + start + mc_ds_fft_len,
+                  fft.get_inbuf());
         fft.execute();
-        const auto expected = mc_ds_symbol(symbol, bits);
+        const auto expected = expected_symbol(symbol, mc_ds_default_gold_code_id, bits);
         const gr_complex gain = fft.get_outbuf()[0] / expected[0];
-        for (int fft_bin = 0; fft_bin < fft_len; ++fft_bin) {
-            BOOST_CHECK_SMALL(std::abs(fft.get_outbuf()[fft_bin] -
-                                       gain * expected[static_cast<size_t>(fft_bin)]),
-                              2.0e-4f);
+        for (int k = 0; k < mc_ds_fft_len; ++k) {
+            BOOST_CHECK_SMALL(
+                std::abs(fft.get_outbuf()[k] - gain * expected[static_cast<size_t>(k)]),
+                2.0e-4f);
         }
     }
 }
 
-BOOST_AUTO_TEST_CASE(test_mc_ds_papr_and_section_levels)
+BOOST_AUTO_TEST_CASE(test_scrambled_poll_papr_regression)
 {
-    const auto bits = serialize_packet_payload(prs_payload_info{});
-    std::vector<double> papr;
-    papr.reserve(prs_symbols);
-    for (int symbol = 0; symbol < prs_symbols; ++symbol) {
-        papr.push_back(papr_db(ifft_symbol(mc_ds_symbol(symbol, bits))));
+    constexpr int frame_count = 50000;
+    gr::fft::fft_complex_rev ifft(mc_ds_fft_len, 1);
+    std::vector<double> values;
+    values.reserve(frame_count * 2);
+    for (int frame_id = 0; frame_id < frame_count; ++frame_id) {
+        prs_payload_info info;
+        info.packet_type = prs_packet_type_poll;
+        info.poll_frame_id = static_cast<uint32_t>(frame_id);
+        const auto bits = serialize_packet_payload(info);
+        values.push_back(
+            papr_db(ifft, expected_symbol(0, mc_ds_default_gold_code_id, bits)));
+        values.push_back(
+            papr_db(ifft, expected_symbol(1, mc_ds_default_gold_code_id, bits)));
     }
+    std::sort(values.begin(), values.end());
+    const double mean =
+        std::accumulate(values.begin(), values.end(), 0.0) / values.size();
+    const double minimum = values.front();
+    const double p999 = values[static_cast<size_t>(std::ceil(0.999 * values.size())) - 1];
+    const double maximum = values.back();
+    BOOST_TEST_MESSAGE("Scrambled POLL PAPR dB min/mean/P99.9/max: "
+                       << minimum << " / " << mean << " / " << p999 << " / " << maximum);
+    BOOST_CHECK_GT(mean, 6.4);
+    BOOST_CHECK_LT(mean, 7.8);
+    BOOST_CHECK_LT(p999, 9.6);
+    BOOST_CHECK_LT(maximum, 10.0);
+}
 
-    const auto summary = summarize(papr);
-    BOOST_TEST_MESSAGE("MC-DS PAPR dB min/mean/max: " << summary[0] << " / " << summary[1]
-                                                      << " / " << summary[2]);
-    BOOST_CHECK(std::isfinite(summary[0]));
-    BOOST_CHECK_LE(summary[2], 15.0);
-
+BOOST_AUTO_TEST_CASE(test_frame_section_levels)
+{
     auto source = prs_timed_burst_source::make();
     const auto frame = source->frame_samples();
     const size_t preamble_start = 1000;
     const size_t preamble_length = 128 * 16;
     const size_t coarse_start = preamble_start + preamble_length;
-    const size_t prs_start = static_cast<size_t>(source->prs_start());
     const double preamble_rms = rms(frame, preamble_start, preamble_length);
     const double coarse_rms = rms(frame, coarse_start, 839);
-    const double ofdm_rms = rms(frame, prs_start, fft_len + cp_len);
+    const double ofdm_rms = rms(
+        frame, static_cast<size_t>(source->prs_start()), mc_ds_fft_len + mc_ds_cp_len);
     const auto peak =
         std::max_element(frame.begin(), frame.end(), [](const auto& a, const auto& b) {
             return std::abs(a) < std::abs(b);
         });
-
     BOOST_REQUIRE(peak != frame.end());
     BOOST_CHECK_LE(std::abs(*peak), 0.900001f);
     BOOST_CHECK_SMALL(20.0 * std::log10(preamble_rms / coarse_rms), 0.01);

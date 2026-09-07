@@ -11,6 +11,7 @@ __pycache__/
 *.csv
 *.xlsx
 !lib/DSP/golay_ofdm_1024x16.csv
+!lib/DSP/gold127_family_bipolar.csv
 *.jsonl
 
 # Raw IQ / capture files

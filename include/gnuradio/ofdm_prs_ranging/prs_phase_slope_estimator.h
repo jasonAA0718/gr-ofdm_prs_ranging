@@ -19,8 +19,8 @@ class OFDM_PRS_RANGING_API prs_phase_slope_estimator : virtual public gr::block
 public:
     typedef std::shared_ptr<prs_phase_slope_estimator> sptr;
     static sptr make(double samp_rate = 10e6,
-                     int fft_len = 1024,
-                     int active_bins = 1024,
+                     int fft_len = 512,
+                     int active_bins = 512,
                      float max_residual_rms = 1.0f,
                      bool enable_profiling = false);
 };

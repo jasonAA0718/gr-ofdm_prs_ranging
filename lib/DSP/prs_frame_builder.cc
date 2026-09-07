@@ -5,7 +5,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include "golay_prs_table.h"
 #include "mc_ds_prs.h"
 #include "prs_frame_builder.h"
 #include "prs_payload_codec.h"
@@ -52,11 +51,14 @@ void append_prs_symbols(std::vector<gr_complex>& frame,
                         const prs_frame_config& cfg,
                         const prs_payload_info& payload)
 {
-    if (cfg.fft_len != static_cast<int>(golay_prs_fft_len) ||
-        cfg.active_bins != static_cast<int>(golay_prs_fft_len) ||
-        cfg.prs_symbols != mc_ds_symbol_count) {
+    if (cfg.fft_len != mc_ds_fft_len || cfg.active_bins != mc_ds_fft_len ||
+        cfg.cp_len != mc_ds_cp_len || cfg.prs_symbols != mc_ds_symbol_count) {
         throw std::invalid_argument(
-            "MC-DS PRS requires fft_len=1024, active_bins=1024, prs_symbols=8");
+            "MC-DS PRS requires fft_len=512, cp_len=64, active_bins=512, "
+            "prs_symbols=127");
+    }
+    if (cfg.mc_ds_gold_code_id < 0 || cfg.mc_ds_gold_code_id >= gold127_family_size) {
+        throw std::invalid_argument("mc_ds_gold_code_id must be in [0, 128]");
     }
 
     const auto payload_bits = serialize_packet_payload(payload);
@@ -67,12 +69,15 @@ void append_prs_symbols(std::vector<gr_complex>& frame,
         for (int fft_bin = 0; fft_bin < cfg.fft_len; ++fft_bin) {
             if (mc_ds_is_data_bin(fft_bin)) {
                 const int data_index = mc_ds_data_index(fft_bin);
-                const bool one = data_index < prs_payload_data_bits &&
-                                 payload_bits[static_cast<size_t>(data_index)] != 0U;
+                const uint8_t logical_bit =
+                    data_index < prs_payload_data_bits
+                        ? payload_bits[static_cast<size_t>(data_index)]
+                        : 0U;
+                const bool one = (logical_bit ^ mc_ds_scrambler_bit(data_index)) != 0U;
                 const float bpsk = one ? 1.0f : -1.0f;
-                freq[fft_bin] = mc_ds_prn_code[static_cast<size_t>(sym)] * bpsk;
+                freq[fft_bin] = mc_ds_gold_chip(cfg.mc_ds_gold_code_id, sym) * bpsk;
             } else {
-                freq[fft_bin] = mc_ds_pilot(sym, fft_bin);
+                freq[fft_bin] = mc_ds_pilot(sym, fft_bin, cfg.mc_ds_gold_code_id);
             }
         }
 

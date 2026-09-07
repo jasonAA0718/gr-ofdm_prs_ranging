@@ -19,9 +19,9 @@ BOOST_AUTO_TEST_CASE(test_prs_timed_burst_source_frame_geometry)
 {
     auto src = prs_timed_burst_source::make();
     const int expected_prs_start = 1000 + 128 * 16 + 839;
-    BOOST_CHECK_EQUAL(src->frame_len(), expected_prs_start + 8 * (1024 + 128) + 1000);
+    BOOST_CHECK_EQUAL(src->frame_len(), expected_prs_start + 127 * (512 + 64) + 1000);
     BOOST_CHECK_EQUAL(src->prs_start(), expected_prs_start);
-    BOOST_CHECK_EQUAL(src->prs_len(), 8 * (1024 + 128));
+    BOOST_CHECK_EQUAL(src->prs_len(), 127 * (512 + 64));
 }
 
 BOOST_AUTO_TEST_CASE(test_prs_payload_bit_serialization_round_trip)

@@ -5,7 +5,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include "golay_prs_table.h"
 #include "mc_ds_prs.h"
 #include "prs_receiver_utils.h"
 #include <algorithm>
@@ -54,23 +53,24 @@ std::vector<gr_complex> coarse_sync_sequence(int len, int root)
 
 std::vector<gr_complex> prs_pilots(const prs_rx_config& cfg)
 {
-    if (cfg.fft_len != static_cast<int>(golay_prs_fft_len) ||
-        cfg.active_bins != static_cast<int>(golay_prs_fft_len) ||
+    if (cfg.fft_len != mc_ds_fft_len || cfg.active_bins != mc_ds_fft_len ||
         cfg.prs_symbols != mc_ds_symbol_count) {
         throw std::invalid_argument(
-            "MC-DS PRS requires fft_len=1024, active_bins=1024, prs_symbols=8");
+            "MC-DS PRS requires fft_len=512, active_bins=512, prs_symbols=127");
     }
 
     std::vector<gr_complex> pilots;
     pilots.reserve(static_cast<size_t>(cfg.prs_symbols * cfg.active_bins));
     for (int sym = 0; sym < cfg.prs_symbols; ++sym) {
         for (int fft_bin = cfg.fft_len / 2; fft_bin < cfg.fft_len; ++fft_bin) {
-            pilots.push_back(mc_ds_is_data_bin(fft_bin) ? gr_complex(0.0f, 0.0f)
-                                                        : mc_ds_pilot(sym, fft_bin));
+            pilots.push_back(mc_ds_is_data_bin(fft_bin)
+                                 ? gr_complex(0.0f, 0.0f)
+                                 : mc_ds_pilot(sym, fft_bin, cfg.mc_ds_gold_code_id));
         }
         for (int fft_bin = 0; fft_bin < cfg.fft_len / 2; ++fft_bin) {
-            pilots.push_back(mc_ds_is_data_bin(fft_bin) ? gr_complex(0.0f, 0.0f)
-                                                        : mc_ds_pilot(sym, fft_bin));
+            pilots.push_back(mc_ds_is_data_bin(fft_bin)
+                                 ? gr_complex(0.0f, 0.0f)
+                                 : mc_ds_pilot(sym, fft_bin, cfg.mc_ds_gold_code_id));
         }
     }
     return pilots;
@@ -79,8 +79,7 @@ std::vector<gr_complex> prs_pilots(const prs_rx_config& cfg)
 std::vector<float> mc_ds_pilot_frequencies(const prs_rx_config& cfg)
 {
     if (cfg.fft_len != mc_ds_fft_len || cfg.active_bins != mc_ds_fft_len) {
-        throw std::invalid_argument(
-            "MC-DS pilot frequencies require 1024 full-band bins");
+        throw std::invalid_argument("MC-DS pilot frequencies require 512 full-band bins");
     }
     const auto all = active_frequencies(cfg);
     std::vector<float> pilots;

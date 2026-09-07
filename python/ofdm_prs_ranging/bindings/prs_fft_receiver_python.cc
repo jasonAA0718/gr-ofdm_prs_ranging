@@ -9,9 +9,9 @@ void bind_prs_fft_receiver(py::module& m)
         m, "prs_fft_receiver")
         .def(py::init(&block::make),
              py::arg("samp_rate") = 10e6,
-             py::arg("fft_len") = 1024,
-             py::arg("cp_len") = 128,
-             py::arg("active_bins") = 1024,
-             py::arg("prs_symbols") = 8,
+             py::arg("fft_len") = 512,
+             py::arg("cp_len") = 64,
+             py::arg("active_bins") = 512,
+             py::arg("prs_symbols") = 127,
              py::arg("enable_profiling") = false);
 }

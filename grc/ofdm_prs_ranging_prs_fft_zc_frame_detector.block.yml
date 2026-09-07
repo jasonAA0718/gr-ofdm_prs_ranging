@@ -6,10 +6,10 @@ templates:
   make: ofdm_prs_ranging.prs_fft_zc_frame_detector(${samp_rate}, ${fft_len}, ${cp_len}, ${active_bins}, ${prs_symbols}, ${preamble_len}, ${preamble_repeats}, ${coarse_sync_len}, ${zero_guard_len}, ${tail_guard_len}, ${threshold}, ${min_frame_gap}, ${coarse_zc_root}, ${channel_id}, ${time_gating}, ${reply_delay_s}, ${window_before_s}, ${window_after_s}, ${zc_threshold}, ${correlation_fft_len}, ${zc_search_before}, ${zc_search_after}, ${cfo_compensation}, ${enable_profiling})
 parameters:
 - {id: samp_rate, label: Sample Rate, dtype: real, default: 10e6}
-- {id: fft_len, label: FFT Length, dtype: int, default: 1024}
-- {id: cp_len, label: CP Length, dtype: int, default: 128}
-- {id: active_bins, label: Active Bins, dtype: int, default: 1024}
-- {id: prs_symbols, label: PRS Symbols, dtype: int, default: 8}
+- {id: fft_len, label: FFT Length, dtype: int, default: 512}
+- {id: cp_len, label: CP Length, dtype: int, default: 64}
+- {id: active_bins, label: Active Bins, dtype: int, default: 512}
+- {id: prs_symbols, label: PRS Symbols, dtype: int, default: 127}
 - {id: preamble_len, label: Preamble Length, dtype: int, default: 128}
 - {id: preamble_repeats, label: Preamble Repeats, dtype: int, default: 16}
 - {id: coarse_sync_len, label: Coarse Sync Length, dtype: int, default: 839}

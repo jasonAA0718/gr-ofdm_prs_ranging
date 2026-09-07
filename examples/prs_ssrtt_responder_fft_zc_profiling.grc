@@ -148,15 +148,16 @@ blocks:
 - name: prs_channel_estimator_0
   id: ofdm_prs_ranging_prs_channel_estimator
   parameters:
-    active_bins: '1024'
+    active_bins: '512'
     affinity: ''
     alias: ''
     comment: ''
     enable_profiling: 'True'
-    fft_len: '1024'
+    fft_len: '512'
+    mc_ds_gold_code_id: '2'
     maxoutbuf: '0'
     minoutbuf: '0'
-    prs_symbols: '8'
+    prs_symbols: '127'
     samp_rate: samp_rate
     seed: '13990001'
   states:
@@ -187,16 +188,16 @@ blocks:
 - name: prs_fft_receiver_0
   id: ofdm_prs_ranging_prs_fft_receiver
   parameters:
-    active_bins: '1024'
+    active_bins: '512'
     affinity: ''
     alias: ''
     comment: ''
-    cp_len: '128'
+    cp_len: '64'
     enable_profiling: 'True'
-    fft_len: '1024'
+    fft_len: '512'
     maxoutbuf: '0'
     minoutbuf: '0'
-    prs_symbols: '8'
+    prs_symbols: '127'
     samp_rate: samp_rate
   states:
     bus_sink: false
@@ -208,7 +209,7 @@ blocks:
 - name: prs_frame_detector_0_0
   id: ofdm_prs_ranging_prs_fft_zc_frame_detector
   parameters:
-    active_bins: '1024'
+    active_bins: '512'
     affinity: ''
     alias: ''
     cfo_compensation: 'True'
@@ -217,15 +218,15 @@ blocks:
     coarse_zc_root: '25'
     comment: Connect UHD Source here
     correlation_fft_len: '4096'
-    cp_len: '128'
+    cp_len: '64'
     enable_profiling: 'True'
-    fft_len: '1024'
+    fft_len: '512'
     maxoutbuf: '0'
     min_frame_gap: '10000'
     minoutbuf: '0'
     preamble_len: premble_length
     preamble_repeats: premble_rep
-    prs_symbols: '8'
+    prs_symbols: '127'
     reply_delay_s: '0.05'
     samp_rate: samp_rate
     tail_guard_len: '1000'
@@ -247,12 +248,12 @@ blocks:
 - name: prs_phase_slope_estimator_0
   id: ofdm_prs_ranging_prs_phase_slope_estimator
   parameters:
-    active_bins: '1024'
+    active_bins: '512'
     affinity: ''
     alias: ''
     comment: ''
     enable_profiling: 'True'
-    fft_len: '1024'
+    fft_len: '512'
     max_residual_rms: '1.0'
     maxoutbuf: '0'
     minoutbuf: '0'
@@ -267,7 +268,7 @@ blocks:
 - name: prs_source_0
   id: ofdm_prs_ranging_prs_timed_burst_source
   parameters:
-    active_bins: '1024'
+    active_bins: '512'
     affinity: ''
     alias: ''
     attach_tx_time: 'True'
@@ -275,14 +276,15 @@ blocks:
     coarse_sync_len: zc_length
     coarse_zc_root: '29'
     comment: ''
-    cp_len: '128'
-    fft_len: '1024'
+    cp_len: '64'
+    fft_len: '512'
+    mc_ds_gold_code_id: '2'
     maxoutbuf: '0'
     minoutbuf: '0'
     pings_per_trigger: '1'
     preamble_len: premble_length
     preamble_repeats: premble_rep
-    prs_symbols: '8'
+    prs_symbols: '127'
     samp_rate: samp_rate
     seed: '13990001'
     tail_guard_len: '1000'
