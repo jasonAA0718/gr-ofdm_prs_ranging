@@ -11,7 +11,7 @@ void bind_prs_channel_estimator(py::module& m)
              py::arg("samp_rate") = 10e6,
              py::arg("fft_len") = 1024,
              py::arg("active_bins") = 1024,
-             py::arg("prs_symbols") = 16,
+             py::arg("prs_symbols") = 8,
              py::arg("seed") = 13990001,
              py::arg("enable_profiling") = false);
 }

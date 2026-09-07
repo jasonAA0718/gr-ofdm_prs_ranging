@@ -6,6 +6,7 @@
  */
 
 #include "golay_prs_table.h"
+#include "mc_ds_prs.h"
 #include "prs_payload_codec.h"
 #include <gnuradio/fft/fft.h>
 #include <gnuradio/ofdm_prs_ranging/prs_timed_burst_source.h>
@@ -14,7 +15,6 @@
 #include <array>
 #include <cmath>
 #include <numeric>
-#include <random>
 #include <vector>
 
 namespace gr {
@@ -23,7 +23,7 @@ namespace ofdm_prs_ranging {
 namespace {
 constexpr int fft_len = 1024;
 constexpr int cp_len = 128;
-constexpr int prs_symbols = 16;
+constexpr int prs_symbols = mc_ds_symbol_count;
 
 std::vector<gr_complex> ifft_symbol(const std::vector<gr_complex>& freq)
 {
@@ -50,23 +50,21 @@ double papr_db(const std::vector<gr_complex>& time)
     return 10.0 * std::log10(peak_power / (power / time.size()));
 }
 
-std::vector<gr_complex> golay_symbol(int symbol)
+std::vector<gr_complex> mc_ds_symbol(int symbol, const prs_payload_bits& bits)
 {
     std::vector<gr_complex> freq(static_cast<size_t>(fft_len));
     for (int fft_bin = 0; fft_bin < fft_len; ++fft_bin) {
-        const auto& pilot =
-            golay_prs_at(static_cast<size_t>(symbol), static_cast<size_t>(fft_bin));
-        freq[static_cast<size_t>(fft_bin)] = gr_complex(pilot.real, pilot.imag);
+        if (mc_ds_is_data_bin(fft_bin)) {
+            const int q = mc_ds_data_index(fft_bin);
+            const float bpsk =
+                q < prs_payload_data_bits && bits[static_cast<size_t>(q)] ? 1.0f : -1.0f;
+            freq[static_cast<size_t>(fft_bin)] =
+                mc_ds_prn_code[static_cast<size_t>(symbol)] * bpsk;
+        } else {
+            freq[static_cast<size_t>(fft_bin)] = mc_ds_pilot(symbol, fft_bin);
+        }
     }
     return freq;
-}
-
-gr_complex old_random_qpsk(std::mt19937& gen)
-{
-    const uint32_t bits = gen();
-    const float scale = static_cast<float>(1.0 / std::sqrt(2.0));
-    return gr_complex((bits & 0x1U) ? scale : -scale,
-                      (bits & 0x2U) ? scale : -scale);
 }
 
 std::array<double, 3> summarize(std::vector<double> values)
@@ -110,90 +108,63 @@ BOOST_AUTO_TEST_CASE(test_golay_table_dimensions_and_csv_entries)
     check(15, 1022, -1.0f, 0.0f);
 }
 
-BOOST_AUTO_TEST_CASE(test_golay_tx_fft_mapping)
+BOOST_AUTO_TEST_CASE(test_mc_ds_tx_fft_mapping)
 {
     auto source = prs_timed_burst_source::make();
     const auto frame = source->frame_samples();
-    const size_t useful_start =
-        static_cast<size_t>(source->prs_start() + cp_len);
+    const size_t useful_start = static_cast<size_t>(source->prs_start() + cp_len);
 
+    const auto bits = serialize_packet_payload(prs_payload_info{});
     gr::fft::fft_complex_fwd fft(fft_len, 1);
-    std::copy(frame.begin() + useful_start,
-              frame.begin() + useful_start + fft_len,
-              fft.get_inbuf());
-    fft.execute();
-
-    gr_complex gain(0.0f, 0.0f);
-    for (int fft_bin = 0; fft_bin < fft_len; ++fft_bin) {
-        const auto& pilot = golay_prs_at(0, static_cast<size_t>(fft_bin));
-        const gr_complex expected(pilot.real, pilot.imag);
-        gain += fft.get_outbuf()[fft_bin] / expected;
-    }
-    gain /= static_cast<float>(fft_len);
-
-    for (int fft_bin = 0; fft_bin < fft_len; ++fft_bin) {
-        const auto& pilot = golay_prs_at(0, static_cast<size_t>(fft_bin));
-        const gr_complex expected(pilot.real, pilot.imag);
-        BOOST_CHECK_SMALL(std::abs(fft.get_outbuf()[fft_bin] - gain * expected),
-                          2.0e-4f);
+    for (int symbol = 0; symbol < prs_symbols; ++symbol) {
+        const size_t start = useful_start + static_cast<size_t>(symbol) *
+                                                static_cast<size_t>(fft_len + cp_len);
+        std::copy(
+            frame.begin() + start, frame.begin() + start + fft_len, fft.get_inbuf());
+        fft.execute();
+        const auto expected = mc_ds_symbol(symbol, bits);
+        const gr_complex gain = fft.get_outbuf()[0] / expected[0];
+        for (int fft_bin = 0; fft_bin < fft_len; ++fft_bin) {
+            BOOST_CHECK_SMALL(std::abs(fft.get_outbuf()[fft_bin] -
+                                       gain * expected[static_cast<size_t>(fft_bin)]),
+                              2.0e-4f);
+        }
     }
 }
 
-BOOST_AUTO_TEST_CASE(test_golay_papr_and_section_levels)
+BOOST_AUTO_TEST_CASE(test_mc_ds_papr_and_section_levels)
 {
-    std::vector<double> golay_papr;
-    golay_papr.reserve(prs_symbols);
+    const auto bits = serialize_packet_payload(prs_payload_info{});
+    std::vector<double> papr;
+    papr.reserve(prs_symbols);
     for (int symbol = 0; symbol < prs_symbols; ++symbol) {
-        golay_papr.push_back(papr_db(ifft_symbol(golay_symbol(symbol))));
+        papr.push_back(papr_db(ifft_symbol(mc_ds_symbol(symbol, bits))));
     }
 
-    std::mt19937 gen(13990001U);
-    std::vector<double> random_papr;
-    random_papr.reserve(prs_symbols);
-    for (int symbol = 0; symbol < prs_symbols; ++symbol) {
-        std::vector<gr_complex> freq(static_cast<size_t>(fft_len),
-                                     gr_complex(0.0f, 0.0f));
-        for (int bin = -300; bin < 0; ++bin) {
-            freq[static_cast<size_t>(bin + fft_len)] = old_random_qpsk(gen);
-        }
-        for (int bin = 1; bin <= 300; ++bin) {
-            freq[static_cast<size_t>(bin)] = old_random_qpsk(gen);
-        }
-        random_papr.push_back(papr_db(ifft_symbol(freq)));
-    }
-
-    const auto golay = summarize(golay_papr);
-    const auto random = summarize(random_papr);
-    BOOST_TEST_MESSAGE("Golay PAPR dB min/mean/max: "
-                       << golay[0] << " / " << golay[1] << " / " << golay[2]);
-    BOOST_TEST_MESSAGE("Old Random-QPSK PAPR dB min/mean/max: "
-                       << random[0] << " / " << random[1] << " / " << random[2]);
-    BOOST_CHECK_LE(golay[2], 3.02);
-    BOOST_CHECK_LT(golay[2], random[0]);
+    const auto summary = summarize(papr);
+    BOOST_TEST_MESSAGE("MC-DS PAPR dB min/mean/max: " << summary[0] << " / " << summary[1]
+                                                      << " / " << summary[2]);
+    BOOST_CHECK(std::isfinite(summary[0]));
+    BOOST_CHECK_LE(summary[2], 15.0);
 
     auto source = prs_timed_burst_source::make();
     const auto frame = source->frame_samples();
     const size_t preamble_start = 1000;
     const size_t preamble_length = 128 * 16;
     const size_t coarse_start = preamble_start + preamble_length;
-    const size_t payload_start = static_cast<size_t>(
-        source->prs_start() - prs_frame_id_payload_symbols);
     const size_t prs_start = static_cast<size_t>(source->prs_start());
     const double preamble_rms = rms(frame, preamble_start, preamble_length);
     const double coarse_rms = rms(frame, coarse_start, 839);
-    const double payload_rms =
-        rms(frame, payload_start, prs_frame_id_payload_symbols);
     const double ofdm_rms = rms(frame, prs_start, fft_len + cp_len);
-    const auto peak = std::max_element(
-        frame.begin(), frame.end(), [](const auto& a, const auto& b) {
+    const auto peak =
+        std::max_element(frame.begin(), frame.end(), [](const auto& a, const auto& b) {
             return std::abs(a) < std::abs(b);
         });
 
     BOOST_REQUIRE(peak != frame.end());
     BOOST_CHECK_LE(std::abs(*peak), 0.900001f);
     BOOST_CHECK_SMALL(20.0 * std::log10(preamble_rms / coarse_rms), 0.01);
-    BOOST_CHECK_LE(20.0 * std::log10(preamble_rms / payload_rms), 3.001);
-    BOOST_CHECK_SMALL(20.0 * std::log10(payload_rms / ofdm_rms), 0.01);
+    BOOST_CHECK_CLOSE(20.0 * std::log10(preamble_rms / ofdm_rms), 3.0, 0.1);
 }
 
 } // namespace ofdm_prs_ranging

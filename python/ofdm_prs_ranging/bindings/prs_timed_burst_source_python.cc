@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(1)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(prs_timed_burst_source.h) */
-/* BINDTOOL_HEADER_FILE_HASH(75bd9f498f0fb3488896dc2dc6b6c75a)                     */
+/* BINDTOOL_HEADER_FILE_HASH(91d190c518488d7b5c6b07d14c10d33f)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -44,7 +44,7 @@ void bind_prs_timed_burst_source(py::module& m)
              py::arg("fft_len") = 1024,
              py::arg("cp_len") = 128,
              py::arg("active_bins") = 1024,
-             py::arg("prs_symbols") = 16,
+             py::arg("prs_symbols") = 8,
              py::arg("preamble_len") = 128,
              py::arg("preamble_repeats") = 16,
              py::arg("coarse_sync_len") = 839,

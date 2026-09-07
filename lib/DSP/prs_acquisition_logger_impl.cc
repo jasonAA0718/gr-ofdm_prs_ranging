@@ -81,7 +81,7 @@ prs_acquisition_logger_impl::prs_acquisition_logger_impl(const std::string& path
                   "preamble_metric,coarse_metric,zc_peak_ratio,zc_gate_offset_samples,"
                   "payload_initial_valid,payload_initial_metric,"
                   "payload_retry_valid,payload_retry_metric,payload_metric,"
-                  "cfo,preamble_cfo_hz,prs_cp_cfo_hz,"
+                  "cfo,prs_cp_cfo_hz,"
                   "prs_cp_cfo_coherence,selected_cfo_hz,payload_retry_used,"
                   "samp_rate,fft_len,cp_len,active_bins,prs_symbols,"
                   "prs_start_rel,prs_len,pdu_len\n";
@@ -141,7 +141,6 @@ void prs_acquisition_logger_impl::handle_frame(pmt::pmt_t msg)
         << ',' << dict_ref_double(meta, "payload_retry_metric", 0.0) << ','
         << dict_ref_double(meta, "payload_metric", 0.0) << ','
         << dict_ref_double(meta, "cfo", 0.0) << ','
-        << dict_ref_double(meta, "preamble_cfo_hz", 0.0) << ','
         << dict_ref_double(meta, "prs_cp_cfo_hz", 0.0) << ','
         << dict_ref_double(meta, "prs_cp_cfo_coherence", 0.0) << ','
         << dict_ref_double(meta, "selected_cfo_hz", 0.0) << ','

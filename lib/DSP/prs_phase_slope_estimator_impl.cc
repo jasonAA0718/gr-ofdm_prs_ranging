@@ -42,7 +42,7 @@ prs_phase_slope_estimator_impl::prs_phase_slope_estimator_impl(double samp_rate,
     d_cfg.samp_rate = samp_rate;
     d_cfg.fft_len = fft_len;
     d_cfg.active_bins = active_bins;
-    d_freq = active_frequencies(d_cfg);
+    d_freq = mc_ds_pilot_frequencies(d_cfg);
     message_port_register_in(pmt::mp("channel_in"));
     message_port_register_out(pmt::mp("measurement_out"));
     message_port_register_out(pmt::mp("timing_out"));
@@ -60,7 +60,8 @@ void prs_phase_slope_estimator_impl::handle_channel(pmt::pmt_t msg)
         return;
     }
     report.checkpoint("input_decode");
-    if (channel_size < static_cast<size_t>(d_cfg.active_bins)) {
+    const size_t pilot_bins = d_freq.size();
+    if (channel_size < pilot_bins) {
         meta = pmt::dict_add(meta, pmt::mp("valid"), pmt::PMT_F);
         meta = pmt::dict_add(meta, pmt::mp("error_reason"), pmt::mp("short_channel"));
         message_port_pub(pmt::mp("measurement_out"), pmt::cons(meta, pmt::PMT_NIL));
@@ -70,12 +71,12 @@ void prs_phase_slope_estimator_impl::handle_channel(pmt::pmt_t msg)
         return;
     }
 
-    const auto phase = unwrap_phase(channel, static_cast<size_t>(d_cfg.active_bins));
+    const auto phase = unwrap_phase(channel, pilot_bins);
     report.checkpoint("phase_unwrap");
     double wsum = 0.0;
     double fsum = 0.0;
     double psum = 0.0;
-    for (int k = 0; k < d_cfg.active_bins; ++k) {
+    for (size_t k = 0; k < pilot_bins; ++k) {
         const double w = std::max(1e-12, static_cast<double>(std::norm(channel[k])));
         wsum += w;
         fsum += w * d_freq[k];
@@ -87,7 +88,7 @@ void prs_phase_slope_estimator_impl::handle_channel(pmt::pmt_t msg)
 
     double num = 0.0;
     double den = 0.0;
-    for (int k = 0; k < d_cfg.active_bins; ++k) {
+    for (size_t k = 0; k < pilot_bins; ++k) {
         const double w = std::max(1e-12, static_cast<double>(std::norm(channel[k])));
         const double df = d_freq[k] - fbar;
         const double dp = phase[k] - pbar;
@@ -99,12 +100,12 @@ void prs_phase_slope_estimator_impl::handle_channel(pmt::pmt_t msg)
     const double tau = -slope / (2.0 * pi);
     report.checkpoint("weighted_regression");
     double residual_power = 0.0;
-    for (int k = 0; k < d_cfg.active_bins; ++k) {
+    for (size_t k = 0; k < pilot_bins; ++k) {
         const double predicted = pbar + slope * (d_freq[k] - fbar);
         const double err = phase[k] - predicted;
         residual_power += err * err;
     }
-    const double residual_rms = std::sqrt(residual_power / d_cfg.active_bins);
+    const double residual_rms = std::sqrt(residual_power / pilot_bins);
     const double snr = dict_ref_double(meta, "snr", 0.0);
     const double coarse_metric =
         dict_ref_double(meta, "coarse_metric", dict_ref_double(meta, "peak_metric", 0.0));

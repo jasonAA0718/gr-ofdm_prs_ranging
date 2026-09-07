@@ -6,7 +6,6 @@
  */
 
 #include "prs_frame_detector_impl.h"
-#include "prs_payload_codec.h"
 #include "prs_timing_helper.h"
 #include <gnuradio/io_signature.h>
 #include <algorithm>
@@ -547,82 +546,13 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
     auto stage_stop = report.mark();
     report.add("frame_extract", stage_start, stage_stop);
     stage_start = stage_stop;
-    gr_complex cfo_corr(0.0f, 0.0f);
-    const int preamble_start = d_cfg.zero_guard_len;
-    const int preamble_span = d_cfg.preamble_len * (d_cfg.preamble_repeats - 1);
-    for (int i = 0; i < preamble_span; ++i) {
-        cfo_corr += std::conj(frame[preamble_start + i]) *
-                    frame[preamble_start + i + d_cfg.preamble_len];
-    }
-    const double cfo_phase_increment = std::atan2(cfo_corr.imag(), cfo_corr.real()) /
-                                       static_cast<double>(d_cfg.preamble_len);
-    const double preamble_cfo_hz = cfo_phase_increment * d_cfg.samp_rate /
-                                   (2.0 * 3.141592653589793238462643383279502884);
-    stage_stop = report.mark();
-    report.add("preamble_cfo", stage_start, stage_stop);
-
-    stage_start = stage_stop;
-    const auto prs_cp_cfo =
-        estimate_prs_cp_cfo(frame.data(), frame.size(), d_cfg, preamble_cfo_hz);
+    const auto prs_cp_cfo = estimate_prs_cp_cfo(frame.data(), frame.size(), d_cfg, 0.0);
     stage_stop = report.mark();
     report.add("prs_cp_cfo", stage_start, stage_stop);
-
     stage_start = stage_stop;
-    prs_payload_info payload_info;
-    float payload_metric = 0.0f;
-    const int payload_start = d_cfg.zero_guard_len +
-                              d_cfg.preamble_len * d_cfg.preamble_repeats +
-                              d_cfg.coarse_sync_len;
-    bool frame_id_valid = decode_packet_payload(frame.data() + payload_start,
-                                                d_cfg.payload_len,
-                                                payload_info,
-                                                payload_metric,
-                                                cfo_phase_increment);
-    bool payload_retry_used = false;
-    double selected_cfo_hz = preamble_cfo_hz;
-    if (!frame_id_valid && prs_cp_cfo.valid && prs_cp_cfo.coherence >= 0.2) {
-        prs_payload_info retry_info;
-        float retry_metric = 0.0f;
-        const double retry_phase_increment = 2.0 *
-                                             3.141592653589793238462643383279502884 *
-                                             prs_cp_cfo.hz / d_cfg.samp_rate;
-        payload_retry_used = true;
-        const bool retry_valid = decode_packet_payload(frame.data() + payload_start,
-                                                       d_cfg.payload_len,
-                                                       retry_info,
-                                                       retry_metric,
-                                                       retry_phase_increment);
-        if (retry_valid || retry_metric > payload_metric) {
-            payload_info = retry_info;
-            payload_metric = retry_metric;
-            selected_cfo_hz = prs_cp_cfo.hz;
-        }
-        frame_id_valid = retry_valid;
-    }
-    stage_stop = report.mark();
-    report.add("payload_decode", stage_start, stage_stop);
-    stage_start = stage_stop;
-    const uint64_t tx_frame_id = payload_info.packet_type == prs_packet_type_response
-                                     ? payload_info.response_frame_id
-                                     : payload_info.poll_frame_id;
     const uint64_t recv_id = d_next_frame_id++;
     pmt::pmt_t meta = pmt::make_dict();
     meta = pmt::dict_add(meta, pmt::mp("recv_id"), pmt::from_uint64(recv_id));
-    meta = pmt::dict_add(meta, pmt::mp("frame_id"), pmt::from_uint64(tx_frame_id));
-    meta = pmt::dict_add(
-        meta, pmt::mp("packet_type"), pmt::from_long(payload_info.packet_type));
-    meta = pmt::dict_add(
-        meta, pmt::mp("poll_frame_id"), pmt::from_uint64(payload_info.poll_frame_id));
-    meta = pmt::dict_add(meta,
-                         pmt::mp("response_frame_id"),
-                         pmt::from_uint64(payload_info.response_frame_id));
-    meta = pmt::dict_add(meta,
-                         pmt::mp("reply_delay_samples"),
-                         pmt::from_uint64(payload_info.reply_delay_samples));
-    meta = pmt::dict_add(
-        meta, pmt::mp("frame_id_valid"), frame_id_valid ? pmt::PMT_T : pmt::PMT_F);
-    meta =
-        pmt::dict_add(meta, pmt::mp("payload_metric"), pmt::from_double(payload_metric));
     meta = pmt::dict_add(
         meta, pmt::mp("absolute_sample_index"), pmt::from_uint64(abs_start));
     meta = pmt::dict_add(meta, pmt::mp("frame_start"), pmt::from_uint64(abs_start));
@@ -633,19 +563,16 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
     meta = pmt::dict_add(
         meta, pmt::mp("coarse_zc_root"), pmt::from_long(d_cfg.coarse_zc_root));
     meta = pmt::dict_add(meta, pmt::mp("channel_id"), pmt::from_long(d_cfg.channel_id));
-    meta = pmt::dict_add(
-        meta, pmt::mp("preamble_cfo_hz"), pmt::from_double(preamble_cfo_hz));
     meta = pmt::dict_add(meta,
                          pmt::mp("prs_cp_cfo_hz"),
                          pmt::from_double(prs_cp_cfo.valid ? prs_cp_cfo.hz : 0.0));
     meta = pmt::dict_add(
         meta, pmt::mp("prs_cp_cfo_coherence"), pmt::from_double(prs_cp_cfo.coherence));
     meta = pmt::dict_add(meta,
-                         pmt::mp("payload_retry_used"),
-                         payload_retry_used ? pmt::PMT_T : pmt::PMT_F);
+                         pmt::mp("selected_cfo_hz"),
+                         pmt::from_double(prs_cp_cfo.valid ? prs_cp_cfo.hz : 0.0));
     meta = pmt::dict_add(
-        meta, pmt::mp("selected_cfo_hz"), pmt::from_double(selected_cfo_hz));
-    meta = pmt::dict_add(meta, pmt::mp("cfo"), pmt::from_double(selected_cfo_hz));
+        meta, pmt::mp("cfo"), pmt::from_double(prs_cp_cfo.valid ? prs_cp_cfo.hz : 0.0));
     meta = pmt::dict_add(meta, pmt::mp("samp_rate"), pmt::from_double(d_cfg.samp_rate));
     meta = pmt::dict_add(meta, pmt::mp("fft_len"), pmt::from_long(d_cfg.fft_len));
     meta = pmt::dict_add(meta, pmt::mp("cp_len"), pmt::from_long(d_cfg.cp_len));
@@ -658,15 +585,9 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
                                              : std::numeric_limits<double>::quiet_NaN();
     uint64_t attempt_id = 0;
     const bool have_gated_attempt = complete_attempt(frame_time, attempt_id);
-    if (!have_gated_attempt && frame_id_valid) {
-        attempt_id = payload_info.poll_frame_id;
-    }
-    if (have_gated_attempt || frame_id_valid) {
+    if (have_gated_attempt) {
         meta = pmt::dict_add(meta, pmt::mp("attempt_id"), pmt::from_uint64(attempt_id));
     }
-    meta = pmt::dict_add(meta,
-                         pmt::mp("failure_reason"),
-                         pmt::mp(frame_id_valid ? "NONE" : "PAYLOAD_CRC"));
     if (d_have_rx_time) {
         const double rx_time = frame_time;
         meta = pmt::dict_add(
@@ -686,7 +607,6 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
     stage_stop = report.mark();
     report.add("frame_pdu_build", stage_start, stage_stop);
     stage_start = stage_stop;
-    message_port_pub(pmt::mp("event_out"), pdu);
     message_port_pub(pmt::mp("frame_out"), pdu);
     stage_stop = report.mark();
     report.add("frame_pdu_publish", stage_start, stage_stop);

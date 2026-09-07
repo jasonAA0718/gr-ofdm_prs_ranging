@@ -8,6 +8,7 @@
 #ifndef INCLUDED_OFDM_PRS_RANGING_PRS_FRAME_BUILDER_H
 #define INCLUDED_OFDM_PRS_RANGING_PRS_FRAME_BUILDER_H
 
+#include "prs_payload_codec.h"
 #include <gnuradio/gr_complex.h>
 #include <cstdint>
 #include <vector>
@@ -44,6 +45,7 @@ class prs_frame_builder
 {
 public:
     static prs_frame build(const prs_frame_config& cfg);
+    static prs_frame build(const prs_frame_config& cfg, const prs_payload_info& payload);
     static void normalize_sections(std::vector<gr_complex>& samples,
                                    const prs_frame_config& cfg,
                                    int payload_start,

@@ -161,7 +161,7 @@ blocks:
     fft_len: '1024'
     maxoutbuf: '0'
     minoutbuf: '0'
-    prs_symbols: '16'
+    prs_symbols: '8'
     samp_rate: samp_rate
     seed: '13990001'
   states:
@@ -201,7 +201,7 @@ blocks:
     fft_len: '1024'
     maxoutbuf: '0'
     minoutbuf: '0'
-    prs_symbols: '16'
+    prs_symbols: '8'
     samp_rate: samp_rate
   states:
     bus_sink: false
@@ -230,7 +230,7 @@ blocks:
     minoutbuf: '0'
     preamble_len: premble_length
     preamble_repeats: premble_rep
-    prs_symbols: '16'
+    prs_symbols: '8'
     reply_delay_s: '0.05'
     samp_rate: samp_rate
     tail_guard_len: '1000'
@@ -304,7 +304,7 @@ blocks:
     pings_per_trigger: '1'
     preamble_len: premble_length
     preamble_repeats: premble_rep
-    prs_symbols: '16'
+    prs_symbols: '8'
     samp_rate: samp_rate
     seed: '13990001'
     tail_guard_len: '1000'
@@ -1355,6 +1355,7 @@ blocks:
 connections:
 - [blocks_message_strobe_0, strobe, prs_rx_timekeeper_0, trigger_in]
 - [prs_channel_estimator_0, channel_out, prs_phase_slope_estimator_0, channel_in]
+- [prs_channel_estimator_0, event_out, prs_acquisition_logger_0, frame_in]
 - [prs_channel_estimator_0, channel_out, virtual_sink_1_0_0_0_0_1, '0']
 - [prs_channel_estimator_0, timing_out, virtual_sink_1_0_0_0_0, '0']
 - [prs_csv_logger_0, timing_out, virtual_sink_1_0_0_0_0_0_0_0, '0']

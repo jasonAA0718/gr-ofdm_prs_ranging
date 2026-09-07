@@ -9,6 +9,7 @@
 #define INCLUDED_OFDM_PRS_RANGING_PRS_PAYLOAD_CODEC_H
 
 #include <gnuradio/gr_complex.h>
+#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -23,11 +24,9 @@ constexpr int prs_payload_frame_id_bits = 32;
 constexpr int prs_payload_reply_delay_bits = 32;
 constexpr int prs_payload_crc_bits = 16;
 constexpr int prs_payload_repeat = 280;
-constexpr int prs_payload_data_bits = prs_payload_packet_type_bits +
-                                      prs_payload_frame_id_bits +
-                                      prs_payload_frame_id_bits +
-                                      prs_payload_reply_delay_bits +
-                                      prs_payload_crc_bits;
+constexpr int prs_payload_data_bits =
+    prs_payload_packet_type_bits + prs_payload_frame_id_bits + prs_payload_frame_id_bits +
+    prs_payload_reply_delay_bits + prs_payload_crc_bits;
 constexpr int prs_frame_id_data_symbols = prs_payload_data_bits * prs_payload_repeat;
 constexpr int prs_frame_id_payload_symbols =
     prs_frame_id_ref_symbols + prs_frame_id_data_symbols;
@@ -38,6 +37,13 @@ struct prs_payload_info {
     uint32_t response_frame_id = 0;
     uint32_t reply_delay_samples = 0;
 };
+
+using prs_payload_bits = std::array<uint8_t, prs_payload_data_bits>;
+
+prs_payload_bits serialize_packet_payload(const prs_payload_info& info);
+bool deserialize_packet_payload(const uint8_t* bits,
+                                size_t bit_count,
+                                prs_payload_info& info);
 
 void encode_packet_payload(const prs_payload_info& info,
                            float amplitude,

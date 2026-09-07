@@ -23,11 +23,11 @@ struct prs_rx_config {
     int fft_len = 1024;
     int cp_len = 128;
     int active_bins = 1024;
-    int prs_symbols = 16;
+    int prs_symbols = 8;
     int preamble_len = 128;
     int preamble_repeats = 16;
     int coarse_sync_len = 839;
-    int payload_len = prs_frame_id_payload_symbols;
+    int payload_len = 0;
     int zero_guard_len = 1000;
     int tail_guard_len = 1000;
     uint32_t seed = 13990001;
@@ -47,6 +47,7 @@ int frame_len(const prs_rx_config& cfg);
 std::vector<gr_complex> coarse_sync_sequence(int len, int root = 25);
 std::vector<gr_complex> prs_pilots(const prs_rx_config& cfg);
 std::vector<float> active_frequencies(const prs_rx_config& cfg);
+std::vector<float> mc_ds_pilot_frequencies(const prs_rx_config& cfg);
 prs_cfo_estimate estimate_prs_cp_cfo(const gr_complex* frame,
                                      size_t frame_size,
                                      const prs_rx_config& cfg,
@@ -61,7 +62,8 @@ bool pdu_get_c32_view(const pmt::pmt_t& msg,
 pmt::pmt_t dict_add_double(pmt::pmt_t dict, const std::string& key, double value);
 pmt::pmt_t dict_add_int(pmt::pmt_t dict, const std::string& key, int64_t value);
 double dict_ref_double(const pmt::pmt_t& dict, const std::string& key, double fallback);
-uint64_t dict_ref_uint64(const pmt::pmt_t& dict, const std::string& key, uint64_t fallback);
+uint64_t
+dict_ref_uint64(const pmt::pmt_t& dict, const std::string& key, uint64_t fallback);
 
 } // namespace ofdm_prs_ranging
 } // namespace gr

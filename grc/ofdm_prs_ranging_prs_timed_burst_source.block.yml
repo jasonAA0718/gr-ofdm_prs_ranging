@@ -32,7 +32,7 @@ parameters:
 - id: prs_symbols
   label: PRS Symbols
   dtype: int
-  default: 16
+  default: 8
 - id: preamble_len
   label: Preamble Length
   dtype: int

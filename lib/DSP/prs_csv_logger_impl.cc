@@ -37,7 +37,7 @@ prs_csv_logger_impl::prs_csv_logger_impl(const std::string& path,
                   "reply_delay_samples,reply_delay_s,rtt_s,tof_s,range_m,"
                   "integer_tof_s,integer_range_m,fine_delay_s,"
                   "fine_delay_samples,phase_range_contribution_m,"
-                  "frame_id_valid,coarse_metric,payload_metric,preamble_cfo_hz,"
+                  "frame_id_valid,coarse_metric,payload_metric,"
                   "prs_cp_cfo_hz,prs_cp_cfo_coherence,selected_cfo_hz,"
                   "payload_retry_used,prs_channel_cfo_hz,residual_cfo_hz,"
                   "channel_coherence,phase_slope_rad_per_hz,phase_residual,snr,quality\n";
@@ -92,7 +92,6 @@ void prs_csv_logger_impl::handle_measurement(pmt::pmt_t msg)
            << dict_ref_double(
                   meta, "coarse_metric", dict_ref_double(meta, "peak_metric", 0.0))
            << ',' << dict_ref_double(meta, "payload_metric", 0.0) << ','
-           << dict_ref_double(meta, "preamble_cfo_hz", 0.0) << ','
            << dict_ref_double(meta, "prs_cp_cfo_hz", 0.0) << ','
            << dict_ref_double(meta, "prs_cp_cfo_coherence", 0.0) << ','
            << dict_ref_double(meta, "selected_cfo_hz", 0.0) << ','

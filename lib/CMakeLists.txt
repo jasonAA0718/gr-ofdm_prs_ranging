@@ -116,7 +116,8 @@ foreach(qa_file ${test_ofdm_prs_ranging_sources})
                                ${CMAKE_CURRENT_SOURCE_DIR}/DSP
                                ${CMAKE_CURRENT_SOURCE_DIR}/USRP
                                ${CMAKE_CURRENT_SOURCE_DIR}/Profiling)
-    if(qa_file STREQUAL "USRP/qa_prs_timed_burst_source.cc")
+    if(qa_file STREQUAL "USRP/qa_prs_timed_burst_source.cc" OR
+       qa_file STREQUAL "DSP/qa_golay_prs.cc")
         target_sources(${qa_target} PRIVATE
                        ${CMAKE_CURRENT_SOURCE_DIR}/DSP/prs_payload_codec.cc)
     endif()

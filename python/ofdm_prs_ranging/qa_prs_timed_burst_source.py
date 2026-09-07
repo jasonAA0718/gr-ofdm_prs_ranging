@@ -33,12 +33,11 @@ class qa_prs_timed_burst_source(gr_unittest.TestCase):
 
     def test_waveform_length_and_offsets(self):
         src = prs_timed_burst_source()
-        payload_len = 16 + 120 * 280
-        expected_prs_start = 1000 + 128 * 16 + 839 + payload_len
+        expected_prs_start = 1000 + 128 * 16 + 839
         self.assertEqual(
-            src.frame_len(), expected_prs_start + 16 * (1024 + 128) + 1000)
+            src.frame_len(), expected_prs_start + 8 * (1024 + 128) + 1000)
         self.assertEqual(src.prs_start(), expected_prs_start)
-        self.assertEqual(src.prs_len(), 16 * (1024 + 128))
+        self.assertEqual(src.prs_len(), 8 * (1024 + 128))
 
     def test_active_subcarrier_mapping(self):
         src = prs_timed_burst_source()

@@ -6,7 +6,6 @@
  */
 
 #include "prs_fft_zc_frame_detector_impl.h"
-#include "prs_payload_codec.h"
 #include "prs_timing_helper.h"
 #include <gnuradio/fft/fft.h>
 #include <gnuradio/io_signature.h>
@@ -18,31 +17,30 @@
 namespace gr {
 namespace ofdm_prs_ranging {
 
-prs_fft_zc_frame_detector::sptr
-prs_fft_zc_frame_detector::make(double samp_rate,
-                                int fft_len,
-                                int cp_len,
-                                int active_bins,
-                                int prs_symbols,
-                                int preamble_len,
-                                int preamble_repeats,
-                                int coarse_sync_len,
-                                int zero_guard_len,
-                                int tail_guard_len,
-                                float threshold,
-                                int min_frame_gap,
-                                int coarse_zc_root,
-                                int channel_id,
-                                bool time_gating,
-                                double reply_delay_s,
-                                double window_before_s,
-                                double window_after_s,
-                                float zc_threshold,
-                                int correlation_fft_len,
-                                int zc_search_before,
-                                int zc_search_after,
-                                bool cfo_compensation,
-                                bool enable_profiling)
+prs_fft_zc_frame_detector::sptr prs_fft_zc_frame_detector::make(double samp_rate,
+                                                                int fft_len,
+                                                                int cp_len,
+                                                                int active_bins,
+                                                                int prs_symbols,
+                                                                int preamble_len,
+                                                                int preamble_repeats,
+                                                                int coarse_sync_len,
+                                                                int zero_guard_len,
+                                                                int tail_guard_len,
+                                                                float threshold,
+                                                                int min_frame_gap,
+                                                                int coarse_zc_root,
+                                                                int channel_id,
+                                                                bool time_gating,
+                                                                double reply_delay_s,
+                                                                double window_before_s,
+                                                                double window_after_s,
+                                                                float zc_threshold,
+                                                                int correlation_fft_len,
+                                                                int zc_search_before,
+                                                                int zc_search_after,
+                                                                bool cfo_compensation,
+                                                                bool enable_profiling)
 {
     return gnuradio::make_block_sptr<prs_fft_zc_frame_detector_impl>(samp_rate,
                                                                      fft_len,
@@ -247,9 +245,10 @@ void prs_fft_zc_frame_detector_impl::handle_tx_time(const pmt::pmt_t& message)
 
 void prs_fft_zc_frame_detector_impl::handle_prs_cfo(const pmt::pmt_t& message)
 {
-    const pmt::pmt_t meta = pmt::is_dict(message)
-                                ? message
-                                : (pmt::is_pair(message) ? pmt::car(message) : pmt::PMT_NIL);
+    const pmt::pmt_t meta =
+        pmt::is_dict(message)
+            ? message
+            : (pmt::is_pair(message) ? pmt::car(message) : pmt::PMT_NIL);
     if (!pmt::is_dict(meta)) {
         return;
     }
@@ -550,8 +549,7 @@ bool prs_fft_zc_frame_detector_impl::fft_zc_search(size_t first_coarse,
                 best_metric = lobe_best_metric;
                 found_threshold_peak = true;
                 if (d_enable_profiling) {
-                    d_zc_peak_duration_ns +=
-                        profiling::elapsed_ns(stage_start, mark());
+                    d_zc_peak_duration_ns += profiling::elapsed_ns(stage_start, mark());
                 }
                 return true;
             }
@@ -612,11 +610,11 @@ bool prs_fft_zc_frame_detector_impl::fft_zc_cfo_search(size_t first_coarse,
         float candidate_metric = 0.0f;
         bool candidate_found_peak = false;
         if (!fft_zc_search(first_coarse,
-                            last_coarse,
-                            static_cast<double>(cfo_hz),
-                            candidate_coarse,
-                            candidate_metric,
-                            candidate_found_peak)) {
+                           last_coarse,
+                           static_cast<double>(cfo_hz),
+                           candidate_coarse,
+                           candidate_metric,
+                           candidate_found_peak)) {
             return false;
         }
         const bool prefer_candidate =
@@ -806,12 +804,12 @@ bool prs_fft_zc_frame_detector_impl::find_frame(size_t& frame_start_index,
     bool used_tracked_cfo = false;
     bool found_threshold_peak = false;
     if (!fft_zc_cfo_search(first_coarse,
-                            last_coarse,
-                            best_coarse,
-                            best_metric,
-                            selected_cfo_hz,
-                            used_tracked_cfo,
-                            found_threshold_peak)) {
+                           last_coarse,
+                           best_coarse,
+                           best_metric,
+                           selected_cfo_hz,
+                           used_tracked_cfo,
+                           found_threshold_peak)) {
         return false;
     }
     d_last_detection_cfo_hz = selected_cfo_hz;
@@ -877,80 +875,9 @@ void prs_fft_zc_frame_detector_impl::publish_frame(size_t frame_start_index,
     report.add("prs_cp_cfo", stage_start, stage_stop);
 
     stage_start = stage_stop;
-    prs_payload_info payload_info;
-    float payload_metric = 0.0f;
-    const int payload_start = d_cfg.zero_guard_len +
-                              d_cfg.preamble_len * d_cfg.preamble_repeats +
-                              d_cfg.coarse_sync_len;
-    const double detection_phase_increment =
-        2.0 * 3.141592653589793238462643383279502884 * d_last_detection_cfo_hz /
-        d_cfg.samp_rate;
-    bool frame_id_valid = decode_packet_payload(frame.data() + payload_start,
-                                                d_cfg.payload_len,
-                                                payload_info,
-                                                payload_metric,
-                                                detection_phase_increment);
-    const bool payload_initial_valid = frame_id_valid;
-    const float payload_initial_metric = payload_metric;
-    bool payload_retry_used = false;
-    bool payload_retry_valid = false;
-    float payload_retry_metric = 0.0f;
-    double selected_cfo_hz = d_last_detection_cfo_hz;
-    if (!frame_id_valid && prs_cp_cfo.valid && prs_cp_cfo.coherence >= 0.2) {
-        prs_payload_info retry_info;
-        float retry_metric = 0.0f;
-        const double retry_phase_increment = 2.0 *
-                                             3.141592653589793238462643383279502884 *
-                                             prs_cp_cfo.hz / d_cfg.samp_rate;
-        payload_retry_used = true;
-        payload_retry_valid = decode_packet_payload(frame.data() + payload_start,
-                                                    d_cfg.payload_len,
-                                                    retry_info,
-                                                    retry_metric,
-                                                    retry_phase_increment);
-        payload_retry_metric = retry_metric;
-        if (payload_retry_valid || retry_metric > payload_metric) {
-            payload_info = retry_info;
-            payload_metric = retry_metric;
-            selected_cfo_hz = prs_cp_cfo.hz;
-        }
-        frame_id_valid = payload_retry_valid;
-    }
-    stage_stop = report.mark();
-    report.add("payload_decode", stage_start, stage_stop);
-    stage_start = stage_stop;
-    const uint64_t tx_frame_id = payload_info.packet_type == prs_packet_type_response
-                                     ? payload_info.response_frame_id
-                                     : payload_info.poll_frame_id;
     const uint64_t recv_id = d_next_frame_id++;
     pmt::pmt_t meta = pmt::make_dict();
     meta = pmt::dict_add(meta, pmt::mp("recv_id"), pmt::from_uint64(recv_id));
-    meta = pmt::dict_add(meta, pmt::mp("frame_id"), pmt::from_uint64(tx_frame_id));
-    meta = pmt::dict_add(
-        meta, pmt::mp("packet_type"), pmt::from_long(payload_info.packet_type));
-    meta = pmt::dict_add(
-        meta, pmt::mp("poll_frame_id"), pmt::from_uint64(payload_info.poll_frame_id));
-    meta = pmt::dict_add(meta,
-                         pmt::mp("response_frame_id"),
-                         pmt::from_uint64(payload_info.response_frame_id));
-    meta = pmt::dict_add(meta,
-                         pmt::mp("reply_delay_samples"),
-                         pmt::from_uint64(payload_info.reply_delay_samples));
-    meta = pmt::dict_add(
-        meta, pmt::mp("frame_id_valid"), frame_id_valid ? pmt::PMT_T : pmt::PMT_F);
-    meta =
-        pmt::dict_add(meta, pmt::mp("payload_metric"), pmt::from_double(payload_metric));
-    meta = pmt::dict_add(meta,
-                         pmt::mp("payload_initial_valid"),
-                         payload_initial_valid ? pmt::PMT_T : pmt::PMT_F);
-    meta = pmt::dict_add(meta,
-                         pmt::mp("payload_initial_metric"),
-                         pmt::from_double(payload_initial_metric));
-    meta = pmt::dict_add(meta,
-                         pmt::mp("payload_retry_valid"),
-                         payload_retry_valid ? pmt::PMT_T : pmt::PMT_F);
-    meta = pmt::dict_add(
-        meta, pmt::mp("payload_retry_metric"), pmt::from_double(payload_retry_metric));
     meta = pmt::dict_add(
         meta, pmt::mp("absolute_sample_index"), pmt::from_uint64(abs_start));
     meta = pmt::dict_add(meta, pmt::mp("frame_start"), pmt::from_uint64(abs_start));
@@ -964,25 +891,22 @@ void prs_fft_zc_frame_detector_impl::publish_frame(size_t frame_start_index,
     meta = pmt::dict_add(
         meta, pmt::mp("coarse_zc_root"), pmt::from_long(d_cfg.coarse_zc_root));
     meta = pmt::dict_add(meta, pmt::mp("channel_id"), pmt::from_long(d_cfg.channel_id));
-    meta = pmt::dict_add(meta,
-                         pmt::mp("detection_cfo_hz"),
-                         pmt::from_double(d_last_detection_cfo_hz));
-    meta = pmt::dict_add(meta,
-                         pmt::mp("cfo_source"),
-                         pmt::mp(d_last_cfo_was_tracked
-                                     ? "PRS_FLL"
-                                     : (d_cfo_compensation ? "INITIAL_BIN" : "DISABLED")));
+    meta = pmt::dict_add(
+        meta, pmt::mp("detection_cfo_hz"), pmt::from_double(d_last_detection_cfo_hz));
+    meta =
+        pmt::dict_add(meta,
+                      pmt::mp("cfo_source"),
+                      pmt::mp(d_last_cfo_was_tracked
+                                  ? "PRS_FLL"
+                                  : (d_cfo_compensation ? "INITIAL_BIN" : "DISABLED")));
     meta = pmt::dict_add(meta,
                          pmt::mp("prs_cp_cfo_hz"),
                          pmt::from_double(prs_cp_cfo.valid ? prs_cp_cfo.hz : 0.0));
     meta = pmt::dict_add(
         meta, pmt::mp("prs_cp_cfo_coherence"), pmt::from_double(prs_cp_cfo.coherence));
-    meta = pmt::dict_add(meta,
-                         pmt::mp("payload_retry_used"),
-                         payload_retry_used ? pmt::PMT_T : pmt::PMT_F);
     meta = pmt::dict_add(
-        meta, pmt::mp("selected_cfo_hz"), pmt::from_double(selected_cfo_hz));
-    meta = pmt::dict_add(meta, pmt::mp("cfo"), pmt::from_double(selected_cfo_hz));
+        meta, pmt::mp("selected_cfo_hz"), pmt::from_double(d_last_detection_cfo_hz));
+    meta = pmt::dict_add(meta, pmt::mp("cfo"), pmt::from_double(d_last_detection_cfo_hz));
     meta = pmt::dict_add(meta, pmt::mp("samp_rate"), pmt::from_double(d_cfg.samp_rate));
     meta = pmt::dict_add(meta, pmt::mp("fft_len"), pmt::from_long(d_cfg.fft_len));
     meta = pmt::dict_add(meta, pmt::mp("cp_len"), pmt::from_long(d_cfg.cp_len));
@@ -995,15 +919,9 @@ void prs_fft_zc_frame_detector_impl::publish_frame(size_t frame_start_index,
                                              : std::numeric_limits<double>::quiet_NaN();
     uint64_t attempt_id = 0;
     const bool have_gated_attempt = complete_attempt(frame_time, attempt_id);
-    if (!have_gated_attempt && frame_id_valid) {
-        attempt_id = payload_info.poll_frame_id;
-    }
-    if (have_gated_attempt || frame_id_valid) {
+    if (have_gated_attempt) {
         meta = pmt::dict_add(meta, pmt::mp("attempt_id"), pmt::from_uint64(attempt_id));
     }
-    meta = pmt::dict_add(meta,
-                         pmt::mp("failure_reason"),
-                         pmt::mp(frame_id_valid ? "NONE" : "PAYLOAD_CRC"));
     if (d_have_rx_time) {
         const double rx_time = frame_time;
         meta = pmt::dict_add(
@@ -1023,7 +941,6 @@ void prs_fft_zc_frame_detector_impl::publish_frame(size_t frame_start_index,
     stage_stop = report.mark();
     report.add("frame_pdu_build", stage_start, stage_stop);
     stage_start = stage_stop;
-    message_port_pub(pmt::mp("event_out"), pdu);
     message_port_pub(pmt::mp("frame_out"), pdu);
     stage_stop = report.mark();
     report.add("frame_pdu_publish", stage_start, stage_stop);

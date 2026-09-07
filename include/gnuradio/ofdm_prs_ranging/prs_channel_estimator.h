@@ -21,7 +21,7 @@ public:
     static sptr make(double samp_rate = 10e6,
                      int fft_len = 1024,
                      int active_bins = 1024,
-                     int prs_symbols = 16,
+                     int prs_symbols = 8,
                      uint32_t seed = 13990001,
                      bool enable_profiling = false);
 };

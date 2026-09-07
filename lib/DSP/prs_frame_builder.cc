@@ -5,8 +5,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include "prs_frame_builder.h"
 #include "golay_prs_table.h"
+#include "mc_ds_prs.h"
+#include "prs_frame_builder.h"
 #include "prs_payload_codec.h"
 #include "prs_receiver_utils.h"
 #include <gnuradio/fft/fft.h>
@@ -47,23 +48,32 @@ void append_coarse_sync(std::vector<gr_complex>& frame, const prs_frame_config& 
     frame.insert(frame.end(), seq.begin(), seq.end());
 }
 
-void append_prs_symbols(std::vector<gr_complex>& frame, const prs_frame_config& cfg)
+void append_prs_symbols(std::vector<gr_complex>& frame,
+                        const prs_frame_config& cfg,
+                        const prs_payload_info& payload)
 {
     if (cfg.fft_len != static_cast<int>(golay_prs_fft_len) ||
         cfg.active_bins != static_cast<int>(golay_prs_fft_len) ||
-        cfg.prs_symbols != static_cast<int>(golay_prs_symbol_count)) {
+        cfg.prs_symbols != mc_ds_symbol_count) {
         throw std::invalid_argument(
-            "Golay PRS requires fft_len=1024, active_bins=1024, prs_symbols=16");
+            "MC-DS PRS requires fft_len=1024, active_bins=1024, prs_symbols=8");
     }
 
+    const auto payload_bits = serialize_packet_payload(payload);
     gr::fft::fft_complex_rev ifft(cfg.fft_len, 1);
     const float scale = 1.0f / static_cast<float>(cfg.fft_len);
     for (int sym = 0; sym < cfg.prs_symbols; ++sym) {
         auto* freq = ifft.get_inbuf();
         for (int fft_bin = 0; fft_bin < cfg.fft_len; ++fft_bin) {
-            const auto& pilot =
-                golay_prs_at(static_cast<size_t>(sym), static_cast<size_t>(fft_bin));
-            freq[fft_bin] = gr_complex(pilot.real, pilot.imag);
+            if (mc_ds_is_data_bin(fft_bin)) {
+                const int data_index = mc_ds_data_index(fft_bin);
+                const bool one = data_index < prs_payload_data_bits &&
+                                 payload_bits[static_cast<size_t>(data_index)] != 0U;
+                const float bpsk = one ? 1.0f : -1.0f;
+                freq[fft_bin] = mc_ds_prn_code[static_cast<size_t>(sym)] * bpsk;
+            } else {
+                freq[fft_bin] = mc_ds_pilot(sym, fft_bin);
+            }
         }
 
         ifft.execute();
@@ -110,14 +120,12 @@ void prs_frame_builder::normalize_sections(std::vector<gr_complex>& samples,
     const size_t preamble_length =
         static_cast<size_t>(cfg.preamble_len * cfg.preamble_repeats);
     const size_t coarse_start = preamble_start + preamble_length;
-    scale_range(
-        preamble_start, preamble_length, cfg.tx_amp * acquisition_boost);
+    scale_range(preamble_start, preamble_length, cfg.tx_amp * acquisition_boost);
     scale_range(coarse_start,
                 static_cast<size_t>(cfg.coarse_sync_len),
                 cfg.tx_amp * acquisition_boost);
-    scale_range(static_cast<size_t>(payload_start),
-                static_cast<size_t>(payload_len),
-                cfg.tx_amp);
+    scale_range(
+        static_cast<size_t>(payload_start), static_cast<size_t>(payload_len), cfg.tx_amp);
 
     const size_t ofdm_symbol_len = static_cast<size_t>(cfg.fft_len + cfg.cp_len);
     if (prs_len == cfg.prs_symbols * static_cast<int>(ofdm_symbol_len)) {
@@ -143,6 +151,12 @@ void prs_frame_builder::normalize_sections(std::vector<gr_complex>& samples,
 
 prs_frame prs_frame_builder::build(const prs_frame_config& cfg)
 {
+    return build(cfg, prs_payload_info{});
+}
+
+prs_frame prs_frame_builder::build(const prs_frame_config& cfg,
+                                   const prs_payload_info& payload)
+{
     prs_frame result;
     auto& frame = result.samples;
     frame.reserve(cfg.zero_guard_len + cfg.preamble_len * cfg.preamble_repeats +
@@ -153,13 +167,9 @@ prs_frame prs_frame_builder::build(const prs_frame_config& cfg)
     append_short_preamble(frame, cfg);
     append_coarse_sync(frame, cfg);
     result.payload_start = static_cast<int>(frame.size());
-    result.payload_len = cfg.payload_len;
-    frame.insert(frame.end(), cfg.payload_len, gr_complex(0.0f, 0.0f));
-    if (cfg.payload_len >= prs_frame_id_payload_symbols) {
-        encode_frame_id_payload(0, 1.0f, frame.begin() + result.payload_start);
-    }
+    result.payload_len = 0;
     result.prs_start = static_cast<int>(frame.size());
-    append_prs_symbols(frame, cfg);
+    append_prs_symbols(frame, cfg, payload);
     result.prs_len = static_cast<int>(frame.size()) - result.prs_start;
     frame.insert(frame.end(), cfg.tail_guard_len, gr_complex(0.0f, 0.0f));
 

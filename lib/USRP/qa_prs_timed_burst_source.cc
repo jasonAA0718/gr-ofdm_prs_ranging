@@ -18,21 +18,42 @@ namespace ofdm_prs_ranging {
 BOOST_AUTO_TEST_CASE(test_prs_timed_burst_source_frame_geometry)
 {
     auto src = prs_timed_burst_source::make();
-    const int expected_prs_start =
-        1000 + 128 * 16 + 839 + prs_frame_id_payload_symbols;
-    BOOST_CHECK_EQUAL(src->frame_len(),
-                      expected_prs_start + 16 * (1024 + 128) + 1000);
+    const int expected_prs_start = 1000 + 128 * 16 + 839;
+    BOOST_CHECK_EQUAL(src->frame_len(), expected_prs_start + 8 * (1024 + 128) + 1000);
     BOOST_CHECK_EQUAL(src->prs_start(), expected_prs_start);
-    BOOST_CHECK_EQUAL(src->prs_len(), 16 * (1024 + 128));
+    BOOST_CHECK_EQUAL(src->prs_len(), 8 * (1024 + 128));
+}
+
+BOOST_AUTO_TEST_CASE(test_prs_payload_bit_serialization_round_trip)
+{
+    prs_payload_info tx;
+    tx.packet_type = prs_packet_type_response;
+    tx.poll_frame_id = 0x12345678U;
+    tx.response_frame_id = 0x87654321U;
+    tx.reply_delay_samples = 1500000U;
+    const auto bits = serialize_packet_payload(tx);
+    BOOST_CHECK_EQUAL(bits.size(), 120U);
+
+    prs_payload_info rx;
+    BOOST_CHECK(deserialize_packet_payload(bits.data(), bits.size(), rx));
+    BOOST_CHECK_EQUAL(rx.packet_type, tx.packet_type);
+    BOOST_CHECK_EQUAL(rx.poll_frame_id, tx.poll_frame_id);
+    BOOST_CHECK_EQUAL(rx.response_frame_id, tx.response_frame_id);
+    BOOST_CHECK_EQUAL(rx.reply_delay_samples, tx.reply_delay_samples);
+
+    auto corrupt = bits;
+    corrupt[19] ^= 1U;
+    BOOST_CHECK(!deserialize_packet_payload(corrupt.data(), corrupt.size(), rx));
 }
 
 BOOST_AUTO_TEST_CASE(test_prs_timed_burst_source_amplitude_limit)
 {
     auto src = prs_timed_burst_source::make();
     const auto frame = src->frame_samples();
-    const auto peak = std::max_element(frame.begin(), frame.end(), [](const auto& a, const auto& b) {
-        return std::abs(a) < std::abs(b);
-    });
+    const auto peak =
+        std::max_element(frame.begin(), frame.end(), [](const auto& a, const auto& b) {
+            return std::abs(a) < std::abs(b);
+        });
     BOOST_REQUIRE(peak != frame.end());
     BOOST_CHECK_LE(std::abs(*peak), 0.900001f);
 }
@@ -52,12 +73,10 @@ BOOST_AUTO_TEST_CASE(test_prs_frame_id_payload_crc)
     payload[prs_frame_id_ref_symbols + prs_payload_repeat * 3] *= -1.0f;
     BOOST_CHECK(decode_frame_id_payload(
         payload.data(), static_cast<int>(payload.size()), frame_id, metric));
-    const float one_disputed_margin =
-        static_cast<float>(prs_payload_repeat - 2) /
-        static_cast<float>(prs_payload_repeat);
+    const float one_disputed_margin = static_cast<float>(prs_payload_repeat - 2) /
+                                      static_cast<float>(prs_payload_repeat);
     const float expected_metric =
-        1.0f - (1.0f - one_disputed_margin) /
-                   static_cast<float>(prs_payload_data_bits);
+        1.0f - (1.0f - one_disputed_margin) / static_cast<float>(prs_payload_data_bits);
     BOOST_CHECK_CLOSE(metric, expected_metric, 0.001f);
 
     for (int r = 0; r < prs_payload_repeat; ++r) {

@@ -22,7 +22,7 @@ public:
                      int fft_len = 1024,
                      int cp_len = 128,
                      int active_bins = 1024,
-                     int prs_symbols = 16,
+                     int prs_symbols = 8,
                      int preamble_len = 128,
                      int preamble_repeats = 16,
                      int coarse_sync_len = 839,

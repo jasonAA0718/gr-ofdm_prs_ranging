@@ -27,8 +27,8 @@ public:
 
 private:
     prs_rx_config d_cfg;
-    std::vector<gr_complex> d_pilot_reciprocals;
     std::vector<gr_complex> d_symbol_channels;
+    std::vector<gr_complex> d_full_channel;
     std::vector<gr_complex> d_channel;
     std::vector<double> d_channel_energy;
     bool d_enable_profiling;

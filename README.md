@@ -25,6 +25,7 @@ It records the current project architecture, recent implementation state, known 
 - [2026-07-28 Golay PRS and Section Scaling](#2026-07-28-golay-prs-and-section-scaling)
 - [2026-08-05 PRS CFO Refinement and Phase Diagnostics](#2026-08-05-prs-cfo-refinement-and-phase-diagnostics)
 - [2026-08-20 Processing-Time Profiling](#2026-08-20-processing-time-profiling)
+- [2026-09-05 MC-DS OFDM Payload Prototype](#2026-09-05-mc-ds-ofdm-payload-prototype)
 - [Future Work](#future-work)
   - [1. Computational Cost and Processing Latency](#1-computational-cost-and-processing-latency)
   - [2. End-to-End Update-Rate Budget](#2-end-to-end-update-rate-budget)
@@ -80,8 +81,7 @@ The current burst is a custom OFDM/PRS-like signal:
 [zero guard]
 [repeated QPSK acquisition preamble]
 [coarse ZC sync]
-[BPSK SS-TWR payload]
-[OFDM PRS-like pilot symbols]
+[8 MC-DS OFDM PRS/data symbols]
 [tail guard]
 ```
 
@@ -91,8 +91,8 @@ Default/reference frame geometry:
 zero guard:          1000 samples
 short preamble:      preamble_len * preamble_repeats
 coarse ZC sync:      coarse_sync_len samples, historically 839
-BPSK payload:        33616 samples
-OFDM PRS block:      prs_symbols * (fft_len + cp_len)
+standalone payload:  0 samples
+MC-DS OFDM block:    8 * (fft_len + cp_len) = 9216 samples
 tail guard:          1000 samples
 ```
 
@@ -102,19 +102,21 @@ Default OFDM parameters:
 fft_len      = 1024
 cp_len       = 128
 active_bins  = 1024
-prs_symbols  = 16
+prs_symbols  = 8
 pilot table  = lib/DSP/golay_prs_table.h
 ```
 
-All native FFT bins are occupied:
+All native FFT bins are occupied. Bins with `k % 8 == 7` carry 128 BPSK
+data/padding values; the other 896 bins carry known pilots:
 
 ```text
 fft_bin 0 ... 1023
 signed bins -512 ... +511
 ```
 
-The fixed table is generated from `lib/DSP/golay_ofdm_1024x16.csv`. Even-numbered
-symbols use Golay A and odd-numbered symbols use Golay B. The `seed` parameter
+The fixed table is generated from `lib/DSP/golay_ofdm_1024x16.csv`. The first
+eight rows are used: even-numbered symbols use Golay A and odd-numbered symbols
+use Golay B. The `seed` parameter
 is retained for the repeated QPSK acquisition preamble, not for OFDM PRS.
 
 The repeated acquisition preamble is deterministic QPSK and should remain
@@ -147,8 +149,10 @@ positioning filter yet.
 
 ## Payload State
 
-The packet payload is BPSK with CRC and repetition. It is currently reliable and
-should be preserved.
+The 120-bit BPSK packet and CRC format is preserved, but it is carried on 120
+OFDM data bins and repeated across eight symbols with the fixed spreading code
+`[+1,+1,+1,-1,-1,+1,-1,-1]`. Eight additional positions are zero padding.
+The old 280-samples-per-bit standalone section is no longer present.
 
 Payload fields:
 
@@ -158,7 +162,6 @@ poll_frame_id
 response_frame_id
 reply_delay_samples
 CRC-16
-280 samples per information bit
 ```
 
 `frame_id_valid=1` must only be set when CRC passes.
@@ -304,9 +307,13 @@ UHD Source
 2. five-point coarse ZC correlation refinement at offsets -2...+2
 3. frame extraction
 4. rx_time preservation
-5. payload decode
-6. metadata publication
+5. raw-frame metadata publication
 ```
+
+`prs_channel_estimator` removes the known spreading chip and Golay pilots,
+estimates channel/CFO from 896 pilot bins, despreads and equalizes the 128 data
+bins, and publishes payload CRC metadata. Only a CRC-valid POLL reaches
+responder scheduling.
 
 The repeated preamble is the continuous acquisition gate and uses `threshold`.
 After that gate passes, the detector evaluates normalized ZC correlation at the
@@ -615,6 +622,10 @@ The Random-QPSK implementation used for this comparison exists only in
 
 ## 2026-08-05 PRS CFO Refinement and Phase Diagnostics
 
+This section records the earlier standalone-payload implementation. The
+2026-09-05 MC-DS prototype supersedes its preamble-CFO payload retry and its
+16-symbol counts.
+
 The detector now estimates CFO in two stages. The repeated QPSK preamble still
 provides the original coarse estimate. A second estimate combines the cyclic
 prefix correlation from all 16 Golay OFDM symbols (`16 * 128` CP pairs). The
@@ -862,6 +873,44 @@ p99, and maximum after normal flowgraph shutdown. The UHD source/sink, RX
 timekeeper, timed burst source, acquisition logger, and timing collector itself
 are not included in the current timed-block set.
 
+## 2026-09-05 MC-DS OFDM Payload Prototype
+
+The first single-code prototype from
+`MC_DS_CDMA_BPSK_TO_OFDM_CODEX_PLAN.md` is implemented. It removes the
+33,616-sample standalone BPSK payload and changes the production waveform to
+eight 1024-bin CP-OFDM symbols. Native bins `k % 8 == 7` carry 120 serialized
+payload bits plus eight zero-padding bits; the other 896 bins retain known
+Golay pilots. All bins are multiplied by the fixed chip sequence:
+
+```text
+[+1, +1, +1, -1, -1, +1, -1, -1]
+```
+
+This sequence is documented as a fixed balanced prototype code, not as a Gold
+code. TX keeps native FFT indexing and uses no fftshift. RX removes the known
+chip before pilot division, estimates channel and inter-symbol CFO from only
+the 896 pilot bins, interpolates the channel onto each data bin, coherently
+despreads the data over eight symbols, and validates the unchanged CRC16.
+
+Payload success/failure is now published by `prs_channel_estimator`; the frame
+detectors only publish acquisition failures and accepted raw frames. The phase
+slope estimator receives a compact 896-bin channel vector. The responder is
+therefore triggered only after downstream OFDM payload CRC success.
+
+The frame airtime removed at 30 MS/s is:
+
+```text
+old standalone payload: 33616 samples = 1.12053 ms
+old 16-symbol PRS:       18432 samples = 0.61440 ms
+new 8-symbol MC-DS:       9216 samples = 0.30720 ms
+total burst reduction:   42832 samples = 1.42773 ms
+```
+
+QA reports current useful-symbol PAPR as
+`12.0163 / 12.2921 / 12.5678 dB` minimum/mean/maximum for the default POLL.
+This is substantially worse than the pure-Golay waveform and must be included
+in wired gain/clipping validation before RF conclusions are drawn.
+
 ## Future Work
 
 The next phase should quantify the engineering cost of OFDM/PRS fine ranging, reduce avoidable waveform overhead, and extend the single-responder result toward stable multi-anchor measurements. The priority is no longer only to reduce ranging variance, but to measure what computation time, airtime, and system complexity are required to obtain that improvement.
@@ -898,7 +947,10 @@ Two costs must be kept separate:
 
 The second comparison is important because an OFDM communication modem already pays for FFT processing. In that case, the incremental ranging cost is mainly CFR estimation, CFO refinement, phase extraction/unwrapping, and the weighted phase-slope fit.
 
-The current weighted phase-slope fit is a one-pass linear regression over 1024 frequency bins. It should be implemented and benchmarked as direct accumulated sums rather than a general matrix least-squares solver. Measure whether the FFT, channel estimator, complex rotations, phase extraction, or the regression itself is the actual bottleneck.
+The current weighted phase-slope fit is a one-pass linear regression over 896
+pilot frequency bins. Measure whether the FFT, channel estimator, complex
+rotations, MC-DS despreading/equalization, phase extraction, or the regression
+itself is the actual bottleneck.
 
 Use the measured total processing time to estimate the CPU-side ceiling:
 
@@ -929,11 +981,11 @@ Then estimate:
 f_update,max = 1 / T_cycle
 ```
 
-At the current 30 MS/s geometry, the waveform already contains large non-PRS overhead:
+At the current 30 MS/s prototype geometry:
 
 ```text
-BPSK payload: 33616 samples ~= 1.1205 ms
-PRS block:     18432 samples ~= 0.6144 ms
+standalone BPSK payload: 0 samples
+MC-DS OFDM block:        9216 samples ~= 0.3072 ms
 ```
 
 The current examples also use an approximately 50 ms responder reply delay. Therefore, do not attribute the present update-rate limit to the phase-slope estimator until the complete timing budget has been measured.
@@ -953,7 +1005,9 @@ The final report should show which component limits the update rate before and a
 
 ### 3. Integrate Communication Payload into OFDM
 
-The current waveform transmits the SS-TWR fields in a separate long repeated-BPSK section before the OFDM PRS block. This is reliable but inefficient in airtime. Evaluate moving the control information into one or more OFDM symbols while preserving known pilot resources required for channel and fine-delay estimation.
+The first MC-DS integrated-payload prototype is implemented. The next work is
+experimental validation against the prior repeated-BPSK baseline, not another
+waveform redesign.
 
 Current control fields that must remain protected are:
 
@@ -965,13 +1019,12 @@ reply_delay_samples
 CRC-16
 ```
 
-A first implementation should avoid redesigning the entire PRS resource map. A practical intermediate waveform is:
+A deployed prototype burst is:
 
 ```text
 [preamble]
 [coarse ZC]
-[1-2 OFDM control/data symbols]
-[Golay PRS symbols]
+[8 MC-DS OFDM PRS/data symbols]
 [tail guard]
 ```
 
@@ -987,7 +1040,8 @@ CPU processing time
 maximum update rate
 ```
 
-A later design may frequency-multiplex known pilots and data within the same OFDM symbols, but the receiver must retain enough known `X_m[k]` values to estimate `H_m[k] = Y_m[k] / X_m[k]` reliably.
+The receiver retains 896 known pilot bins for channel and phase-slope
+estimation. Multi-code and simultaneous-responder behavior remain future work.
 
 ### 4. Multi-Responder Observation Separation
 
@@ -1054,7 +1108,6 @@ Record fine-delay behavior together with:
 phase_residual
 channel_coherence
 prs_cp_cfo_coherence
-preamble_cfo_hz
 prs_cp_cfo_hz
 prs_channel_cfo_hz
 residual_cfo_hz

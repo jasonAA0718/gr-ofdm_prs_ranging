@@ -69,18 +69,69 @@ bool payload_bit(const prs_payload_info& info, uint16_t crc, int bit_index)
 }
 } // namespace
 
+prs_payload_bits serialize_packet_payload(const prs_payload_info& info)
+{
+    const uint16_t crc = crc16_ccitt(info);
+    prs_payload_bits bits{};
+    for (int bit = 0; bit < prs_payload_data_bits; ++bit) {
+        bits[static_cast<size_t>(bit)] = payload_bit(info, crc, bit) ? 1U : 0U;
+    }
+    return bits;
+}
+
+bool deserialize_packet_payload(const uint8_t* bits,
+                                size_t bit_count,
+                                prs_payload_info& info)
+{
+    info = prs_payload_info{};
+    info.packet_type = 0;
+    if (bits == nullptr || bit_count < static_cast<size_t>(prs_payload_data_bits)) {
+        return false;
+    }
+
+    uint16_t rx_crc = 0;
+    for (int bit = 0; bit < prs_payload_data_bits; ++bit) {
+        if ((bits[static_cast<size_t>(bit)] & 1U) == 0U) {
+            continue;
+        }
+        int field_bit = bit;
+        if (field_bit < prs_payload_packet_type_bits) {
+            info.packet_type |= static_cast<uint8_t>(uint8_t{ 1 } << field_bit);
+            continue;
+        }
+        field_bit -= prs_payload_packet_type_bits;
+        if (field_bit < prs_payload_frame_id_bits) {
+            info.poll_frame_id |= uint32_t{ 1 } << field_bit;
+            continue;
+        }
+        field_bit -= prs_payload_frame_id_bits;
+        if (field_bit < prs_payload_frame_id_bits) {
+            info.response_frame_id |= uint32_t{ 1 } << field_bit;
+            continue;
+        }
+        field_bit -= prs_payload_frame_id_bits;
+        if (field_bit < prs_payload_reply_delay_bits) {
+            info.reply_delay_samples |= uint32_t{ 1 } << field_bit;
+            continue;
+        }
+        field_bit -= prs_payload_reply_delay_bits;
+        rx_crc |= static_cast<uint16_t>(uint16_t{ 1 } << field_bit);
+    }
+    return rx_crc == crc16_ccitt(info);
+}
+
 void encode_packet_payload(const prs_payload_info& info,
                            float amplitude,
                            std::vector<gr_complex>::iterator out)
 {
-    const uint16_t crc = crc16_ccitt(info);
+    const auto bits = serialize_packet_payload(info);
 
     for (int i = 0; i < prs_frame_id_ref_symbols; ++i) {
         *(out++) = gr_complex(ref_sign(i) * amplitude, 0.0f);
     }
 
     for (int bit = 0; bit < prs_payload_data_bits; ++bit) {
-        const float sign = payload_bit(info, crc, bit) ? 1.0f : -1.0f;
+        const float sign = bits[static_cast<size_t>(bit)] != 0U ? 1.0f : -1.0f;
         for (int r = 0; r < prs_payload_repeat; ++r) {
             *(out++) = gr_complex(sign * amplitude, 0.0f);
         }
@@ -111,9 +162,8 @@ bool decode_packet_payload(const gr_complex* payload,
         return false;
     }
 
-    const gr_complex phase_step(
-        static_cast<float>(std::cos(-phase_increment_rad)),
-        static_cast<float>(std::sin(-phase_increment_rad)));
+    const gr_complex phase_step(static_cast<float>(std::cos(-phase_increment_rad)),
+                                static_cast<float>(std::sin(-phase_increment_rad)));
     gr_complex phase_rotation(1.0f, 0.0f);
     gr_complex ref_corr(0.0f, 0.0f);
     double ref_power = 0.0;
@@ -145,16 +195,14 @@ bool decode_packet_payload(const gr_complex* payload,
         double magnitude_sum = 0.0;
         for (int r = 0; r < prs_payload_repeat; ++r) {
             const int index = prs_frame_id_ref_symbols + bit * prs_payload_repeat + r;
-            const gr_complex corrected =
-                payload[index] * phase_rotation * correction;
+            const gr_complex corrected = payload[index] * phase_rotation * correction;
             decision_sum += corrected.real();
             magnitude_sum += std::abs(corrected.real());
             phase_rotation *= phase_step;
         }
         const bool one = decision_sum >= 0.0;
         if (magnitude_sum > 0.0) {
-            decision_margin_sum +=
-                std::min(1.0, std::abs(decision_sum) / magnitude_sum);
+            decision_margin_sum += std::min(1.0, std::abs(decision_sum) / magnitude_sum);
         }
 
         int field_bit = bit;

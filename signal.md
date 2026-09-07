@@ -12,8 +12,7 @@ The transmitted complex baseband burst is
 [zero guard]
 [repeated QPSK acquisition preamble]
 [coarse ZC sync]
-[BPSK packet payload]
-[OFDM PRS-like pilot symbols]
+[MC-DS OFDM PRS/data symbols]
 [tail guard]
 ```
 
@@ -24,11 +23,10 @@ zero_guard_len    = 1000 samples
 preamble_len      = 256 samples
 preamble_repeats  = 8
 coarse_sync_len   = 839 samples
-payload_len       = 33616 samples
 fft_len           = 1024
 cp_len            = 128
 active_bins       = 1024
-prs_symbols       = 16
+prs_symbols       = 8
 ```
 
 The OFDM PRS-like section length is
@@ -40,7 +38,7 @@ N_{\text{PRS}} = N_{\text{sym}}(N_{\text{FFT}} + N_{\text{CP}})
 For the default values:
 
 ```math
-N_{\text{PRS}} = 16(1024 + 128) = 18432
+N_{\text{PRS}} = 8(1024 + 128) = 9216
 ```
 
 ## Repeated QPSK Acquisition Preamble
@@ -122,7 +120,69 @@ Responder RESPONSE TX:   coarse_zc_root = 29
 Initiator RX detector:   coarse_zc_root = 29, channel_id = 1
 ```
 
-## BPSK Packet Payload
+## MC-DS OFDM Payload and PRS
+
+The current prototype carries the existing 120-bit SS-TWR packet inside the
+OFDM symbols. There is no standalone time-domain payload. Native FFT bins use
+a fixed seven-pilot/one-data comb:
+
+```math
+\mathcal{D}=\{k: k\bmod 8=7\},\qquad |\mathcal{D}|=128
+```
+
+The other 896 bins form the pilot set `P`. Data-bin indices `q=0...119`
+contain the serialized packet bits and `q=120...127` contain zero padding.
+Serialization remains LSB-first and the CRC16 initial value and polynomial
+remain `0xffff` and `0x1021`.
+
+| Payload field | Bits | POLL | RESPONSE |
+|---|---:|---|---|
+| `packet_type` | 8 | `1` | `2` |
+| `poll_frame_id` | 32 | New poll ID | Echoed poll ID |
+| `response_frame_id` | 32 | Zero/unused | New response ID |
+| `reply_delay_samples` | 32 | Zero/unused | Configured delay |
+| CRC16 | 16 | Enabled | Enabled |
+
+The fixed prototype spreading sequence is
+
+```math
+c[m]=[+1,+1,+1,-1,-1,+1,-1,-1],\quad 0\le m<8.
+```
+
+It is a fixed balanced prototype code, not a standards-derived Gold code. Let
+`G_m[k]` be row `m` of the existing compile-time Golay table and let `b_q` be
+the BPSK value of payload/padding bit `q`. The native-IFFT input is
+
+```math
+X_m[k]=
+\begin{cases}
+c[m]b_q, & k=8q+7 \\
+c[m]G_m[k], & k\in\mathcal{P}.
+\end{cases}
+```
+
+Every symbol repeats the same 128 data values and uses the same known chip.
+The receiver first removes `c[m]`; pilot bins remove `G_m[k]` and are averaged
+for channel estimation. Data bins are despread coherently over all eight
+symbols, equalized with linear interpolation from adjacent pilot-channel
+estimates, and hard-decided from the real sign. Only the first 120 bits enter
+packet parsing and CRC validation.
+
+The OFDM payload quality metric is the mean normalized BPSK decision margin:
+
+```math
+m_q=\frac{|\Re\{\hat D_q\}|}{|\hat D_q|+\epsilon},\qquad
+\text{payload\_metric}=\frac{1}{120}\sum_{q=0}^{119}m_q.
+```
+
+This metric is relative and dimensionless. CRC remains authoritative. The
+channel estimator publishes `failure_reason=NONE` or `PAYLOAD_CRC` after the
+OFDM payload decision; acquisition failures still originate in the detector.
+
+## Historical Standalone BPSK Payload
+
+The following section documents the waveform used for the earlier attenuation
+experiments. It is not generated or decoded by the current production path.
 
 Both POLL and RESPONSE frames contain the complete fixed-length BPSK payload:
 
@@ -365,11 +425,11 @@ fft_bin 0 ... 511    -> signed bins 0 ... +511
 fft_bin 512 ... 1023 -> signed bins -512 ... -1
 ```
 
-Measured over each useful 1024-sample IFFT output before CP, the 16 fixed Golay
-symbols have minimum/mean/maximum PAPR of
-`3.0062 / 3.0062 / 3.0062 dB`. The former 600-bin Random-QPSK construction,
-retained only in QA for comparison, measures
-`7.4209 / 8.9281 / 10.4139 dB`.
+Measured over each useful 1024-sample IFFT output before CP, the current eight
+MC-DS symbols have minimum/mean/maximum PAPR of
+`12.0163 / 12.2921 / 12.5678 dB` for the default serialized POLL. Replacing
+one bin in eight with repeated payload data destroys the earlier pure-Golay
+approximately 3 dB PAPR property. This is an important prototype limitation.
 
 The exact frequency-domain source of truth is:
 
@@ -396,15 +456,16 @@ A_next = [A, B]
 B_next = [A, -B]
 ```
 
-and assigns:
+The current prototype uses only the first eight rows and assigns:
 
 ```text
-symbols 0,2,4,...,14 -> A
-symbols 1,3,5,...,15 -> B
+symbols 0,2,4,6 -> A
+symbols 1,3,5,7 -> B
 ```
 
-TX uses `X_m[k] = table[m][k]` directly for native `k=0...1023`; there is no
-fftshift and no PRS MT19937 generation.
+TX uses native `k=0...1023` without fftshift. Pilot positions use the table
+entry multiplied by the known MC-DS chip; positions `k mod 8 = 7` use the
+spread BPSK data value. There is no OFDM PRS MT19937 generation.
 
 The time-domain OFDM symbol before cyclic prefix is
 
@@ -441,16 +502,16 @@ input.
 
 ## Channel Estimation
 
-For active subcarrier `k` of OFDM symbol `m`, the received value is modeled as
+For pilot subcarrier `k` of OFDM symbol `m`, the received value is modeled as
 
 ```math
-Y_m[k] = H[k]X_m[k] + W_m[k]
+Y_m[k] = H[k]c[m]G_m[k] + W_m[k]
 ```
 
 The per-symbol channel estimate is
 
 ```math
-\hat{H}_m[k] = \frac{Y_m[k]}{X_m[k]}
+\hat{H}_m[k] = \frac{Y_m[k]}{c[m]G_m[k]}
 ```
 
 The implementation averages over all PRS symbols:
@@ -459,19 +520,20 @@ The implementation averages over all PRS symbols:
 \hat{H}[k] =
 \frac{1}{M}
 \sum_{m=0}^{M-1}
-\frac{Y_m[k]}{X_m[k]}
+\frac{Y_m[k]}{c[m]G_m[k]}
 ```
 
-It also computes a simple SNR-like metric from the average channel power and
-residual error around the average channel estimate.
+Only the 896 pilot estimates are emitted to the phase-slope estimator. The
+implementation also computes a relative SNR-like metric from average pilot
+channel power and residual error; it is not calibrated RF power.
 
 ## CFO Estimation and Correction
 
-The receiver produces three carrier-frequency-offset estimates from different
-parts of an accepted frame:
+Three CFO methods are relevant to the design, but the current production path
+only produces the CP and pilot-channel estimates:
 
 ```text
-repeated preamble -> preamble_cfo_hz
+repeated preamble -> method documented below; currently disabled
 PRS cyclic prefix -> prs_cp_cfo_hz
 adjacent PRS channel estimates -> prs_channel_cfo_hz
 ```
@@ -492,10 +554,15 @@ The current USRP examples use:
 
 ```text
 Fs = 30 MHz, Lp = 256, R = 4
-NFFT = 1024, NCP = 128, M = 16, K = 1024
+NFFT = 1024, NCP = 128, M = 8, K = 896 pilot bins
 ```
 
 ### Repeated-Preamble CFO
+
+This method is not calculated by either current frame detector. The repeated
+preamble remains an acquisition gate only, and `preamble_cfo_hz` is no longer
+published or written to current CSV files. The equations remain here to record
+the evaluated alternative.
 
 For constant CFO `f_e`, samples in adjacent copies of the repeated preamble are
 approximately related by
@@ -531,15 +598,14 @@ correlation lag = 256 / 30 MHz = 8.533 us
 unambiguous CFO range = +/-Fs/(2Lp) = +/-58.594 kHz
 ```
 
-The preamble estimate has the widest acquisition range and is available first.
-The payload decoder initially converts it to phase increment
+The preamble method has the widest acquisition range and would be available
+first. A receiver using it would convert the estimate to phase increment
 
 ```math
 \hat\omega_p = 2\pi\frac{\hat f_p}{F_s}
 ```
 
-and derotates every BPSK payload sample before coherent combining. The known
-16-sample payload reference then removes the remaining constant phase.
+The current MC-DS payload decoder does not use this path.
 
 ### PRS Cyclic-Prefix CFO
 
@@ -554,12 +620,14 @@ C_{\text{CP}} =
 y[s_m+n]^*y[s_m+N_{\text{FFT}}+n]
 ```
 
-The raw phase is ambiguous by integer multiples of `2\pi`. The implementation
-uses the preamble CFO as its unwrap reference:
+The raw phase is ambiguous by integer multiples of `2\pi`. The standard frame
+detector currently selects the principal CP-CFO branch around zero. The FFT-ZC
+detector unwraps around its acquisition-bin CFO estimate. In the general form,
+let that reference be `hat f_ref`:
 
 ```math
 \theta_{\text{ref}} =
-2\pi\hat f_p\frac{N_{\text{FFT}}}{F_s}
+2\pi\hat f_{\text{ref}}\frac{N_{\text{FFT}}}{F_s}
 ```
 
 ```math
@@ -591,18 +659,17 @@ and its normalized coherence is
 For the current geometry:
 
 ```text
-correlation products = M NCP = 16(128) = 2048
-selected input samples = 4096
+correlation products = M NCP = 8(128) = 1024
+selected input samples = 2048
 correlation lag = 1024 / 30 MHz = 34.133 us
-complete PRS span = 16(1024+128) = 18432 samples = 614.4 us
+complete PRS span = 8(1024+128) = 9216 samples = 307.2 us
 raw unambiguous CFO range = +/-Fs/(2NFFT) = +/-14.648 kHz
 CFO alias interval = Fs/NFFT = 29.297 kHz
 ```
 
-The initial payload decode still uses `hat f_p`. If its CRC fails and
-`rho_CP >= 0.2`, the detector retries the complete payload once using
-`hat f_CP`. The CP estimate is available only after a complete frame has been
-extracted, so it cannot rescue failed preamble or ZC acquisition.
+The CP estimate is attached to the extracted frame and used as the unwrap
+reference for channel CFO. It is available only after a complete frame has
+been extracted, so it cannot rescue failed preamble or ZC acquisition.
 
 ### PRS Channel CFO
 
@@ -610,7 +677,7 @@ After the FFT and pilot division, the channel estimator retains every
 per-symbol channel estimate:
 
 ```math
-\hat H_m[k] = \frac{Y_m[k]}{X_m[k]}
+\hat H_m[k] = \frac{Y_m[k]}{c[m]G_m[k]},\quad k\in\mathcal{P}
 ```
 
 Constant CFO appears primarily as common phase evolution between adjacent PRS
@@ -637,8 +704,8 @@ C_H =
 \hat H_m[k]^*\hat H_{m+1}[k]
 ```
 
-It unwraps `angle C_H` relative to `hat f_CP`, or relative to `hat f_p` when
-the CP field is unavailable, and calculates
+It unwraps `angle C_H` relative to `hat f_CP`, or relative to the detector's
+acquisition CFO when the CP field is unavailable, and calculates
 
 ```math
 \hat f_H =
@@ -651,10 +718,10 @@ the accumulated powers of the two members of every adjacent-symbol pair. The
 current geometry gives:
 
 ```text
-per-symbol channel estimates = MK = 16(1024) = 16384
-adjacent-symbol products = (M-1)K = 15(1024) = 15360
+per-symbol pilot-channel estimates = MK = 8(896) = 7168
+adjacent-symbol products = (M-1)K = 7(896) = 6272
 adjacent-symbol separation = 1152 samples = 38.4 us
-complete PRS span = 18432 samples = 614.4 us
+complete PRS span = 9216 samples = 307.2 us
 raw unambiguous CFO range = +/-Fs/[2(NFFT+NCP)] = +/-13.021 kHz
 CFO alias interval = Fs/(NFFT+NCP) = 26.042 kHz
 ```
@@ -677,12 +744,12 @@ and the CFO-aligned channel used by the phase-slope estimator is
 
 | Estimate | Products | Correlation separation | Observation span | Raw CFO range | Current role |
 |---|---:|---:|---:|---:|---|
-| Preamble `hat f_p` | 768 | 256 samples | 1024 samples | +/-58.594 kHz | Initial payload derotation and CP unwrap reference |
-| PRS CP `hat f_CP` | 2048 | 1024 samples | 18432-sample PRS span | +/-14.648 kHz | Conditional payload retry and channel-CFO unwrap reference |
-| PRS channel `hat f_H` | 15360 | 1152 samples | 18432-sample PRS span | +/-13.021 kHz | Inter-symbol channel phase alignment before averaging |
+| Preamble `hat f_p` | 768 | 256 samples | 1024 samples | +/-58.594 kHz | Disabled; acquisition gate only |
+| PRS CP `hat f_CP` | 1024 | 1024 samples | 9216-sample PRS span | +/-14.648 kHz | Channel-CFO unwrap reference |
+| PRS channel `hat f_H` | 6272 | 1152 samples | 9216-sample PRS span | +/-13.021 kHz | Pilot/data inter-symbol phase alignment |
 
-The three estimates should be approximately equal for a stable oscillator and
-a correctly extracted frame. Differences close to `Fs/N_FFT` or
+The two active estimates should be approximately equal for a stable oscillator
+and a correctly extracted frame. Differences close to `Fs/N_FFT` or
 `Fs/(N_FFT+N_CP)` indicate a likely phase-ambiguity branch error. Low CP
 coherence points toward low SNR, incorrect timing, interference, or delay spread
 beyond the CP. High CP coherence with low channel coherence instead points
@@ -691,11 +758,9 @@ toward channel variation, SFO, ICI, or an FFT-window problem.
 The metadata used for comparison is:
 
 ```text
-preamble_cfo_hz
 prs_cp_cfo_hz
 prs_cp_cfo_coherence
 selected_cfo_hz
-payload_retry_used
 prs_channel_cfo_hz
 residual_cfo_hz
 channel_coherence
@@ -727,8 +792,8 @@ from other bins. This ICI can bias channel phase and therefore bias the final
 phase-slope delay. The present correction also does not remove SFO, phase noise,
 multipath distortion, or an incorrect integer FFT-window position.
 
-`selected_cfo_hz` records the CFO used by payload decoding; it is not the CFO
-currently applied to PRS time samples. The channel estimator always calculates
+`selected_cfo_hz` records the detector-side CFO selection; MC-DS payload
+decoding uses the downstream pilot-channel CFO estimate. The channel estimator always calculates
 and applies its inter-symbol estimate without a coherence threshold. A
 low-coherence channel CFO can therefore rotate channel symbols using an
 unreliable estimate. In addition, an invalid CP estimate is currently exported
@@ -740,7 +805,7 @@ true zero-Hz estimate using `prs_cp_cfo_hz` alone.
 The first implementation should use two correction stages:
 
 ```text
-reliable CP CFO, otherwise preamble CFO
+reliable CP CFO, otherwise detector acquisition CFO or zero
 -> continuous time-domain PRS derotation
 -> FFT and pilot division
 -> residual PRS channel CFO estimation
@@ -755,7 +820,7 @@ Select the pre-FFT estimate as
 \hat f_0 =
 \begin{cases}
 \hat f_{\text{CP}}, & \rho_{\text{CP}} \ge \rho_{\min} \\
-\hat f_p, & \text{otherwise}
+\hat f_{\text{det}}, & \text{otherwise}
 \end{cases}
 ```
 
@@ -770,7 +835,7 @@ y[n]\exp\left(-j2\pi\hat f_0\frac{n}{F_s}\right)
 
 The phase index must continue across CP-OFDM symbols rather than restart at
 zero for each useful symbol. This removes within-symbol rotation and most
-inter-symbol common phase before the FFT. It requires only `M NFFT = 16384`
+inter-symbol common phase before the FFT. It requires only `M NFFT = 8192`
 complex multiplications per frame and can use a recursively updated complex
 phasor instead of one sine/cosine evaluation per sample.
 

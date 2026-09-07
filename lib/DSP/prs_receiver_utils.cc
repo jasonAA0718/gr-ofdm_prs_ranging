@@ -5,8 +5,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include "prs_receiver_utils.h"
 #include "golay_prs_table.h"
+#include "mc_ds_prs.h"
+#include "prs_receiver_utils.h"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -24,7 +25,10 @@ int prs_start_offset(const prs_rx_config& cfg)
            cfg.coarse_sync_len + cfg.payload_len;
 }
 
-int prs_len(const prs_rx_config& cfg) { return cfg.prs_symbols * (cfg.fft_len + cfg.cp_len); }
+int prs_len(const prs_rx_config& cfg)
+{
+    return cfg.prs_symbols * (cfg.fft_len + cfg.cp_len);
+}
 
 int frame_len(const prs_rx_config& cfg)
 {
@@ -42,7 +46,8 @@ std::vector<gr_complex> coarse_sync_sequence(int len, int root)
     for (int n = 0; n < len; ++n) {
         const double phase =
             -pi * effective_root * n * (n + 1) / static_cast<double>(len);
-        seq.emplace_back(static_cast<float>(std::cos(phase)), static_cast<float>(std::sin(phase)));
+        seq.emplace_back(static_cast<float>(std::cos(phase)),
+                         static_cast<float>(std::sin(phase)));
     }
     return seq;
 }
@@ -51,23 +56,38 @@ std::vector<gr_complex> prs_pilots(const prs_rx_config& cfg)
 {
     if (cfg.fft_len != static_cast<int>(golay_prs_fft_len) ||
         cfg.active_bins != static_cast<int>(golay_prs_fft_len) ||
-        cfg.prs_symbols != static_cast<int>(golay_prs_symbol_count)) {
+        cfg.prs_symbols != mc_ds_symbol_count) {
         throw std::invalid_argument(
-            "Golay PRS requires fft_len=1024, active_bins=1024, prs_symbols=16");
+            "MC-DS PRS requires fft_len=1024, active_bins=1024, prs_symbols=8");
     }
 
     std::vector<gr_complex> pilots;
     pilots.reserve(static_cast<size_t>(cfg.prs_symbols * cfg.active_bins));
     for (int sym = 0; sym < cfg.prs_symbols; ++sym) {
         for (int fft_bin = cfg.fft_len / 2; fft_bin < cfg.fft_len; ++fft_bin) {
-            const auto& pilot =
-                golay_prs_at(static_cast<size_t>(sym), static_cast<size_t>(fft_bin));
-            pilots.emplace_back(pilot.real, pilot.imag);
+            pilots.push_back(mc_ds_is_data_bin(fft_bin) ? gr_complex(0.0f, 0.0f)
+                                                        : mc_ds_pilot(sym, fft_bin));
         }
         for (int fft_bin = 0; fft_bin < cfg.fft_len / 2; ++fft_bin) {
-            const auto& pilot =
-                golay_prs_at(static_cast<size_t>(sym), static_cast<size_t>(fft_bin));
-            pilots.emplace_back(pilot.real, pilot.imag);
+            pilots.push_back(mc_ds_is_data_bin(fft_bin) ? gr_complex(0.0f, 0.0f)
+                                                        : mc_ds_pilot(sym, fft_bin));
+        }
+    }
+    return pilots;
+}
+
+std::vector<float> mc_ds_pilot_frequencies(const prs_rx_config& cfg)
+{
+    if (cfg.fft_len != mc_ds_fft_len || cfg.active_bins != mc_ds_fft_len) {
+        throw std::invalid_argument(
+            "MC-DS pilot frequencies require 1024 full-band bins");
+    }
+    const auto all = active_frequencies(cfg);
+    std::vector<float> pilots;
+    pilots.reserve(mc_ds_pilot_bin_count);
+    for (int ordered_bin = 0; ordered_bin < cfg.active_bins; ++ordered_bin) {
+        if (!mc_ds_is_data_bin(mc_ds_ordered_to_native_bin(ordered_bin))) {
+            pilots.push_back(all[static_cast<size_t>(ordered_bin)]);
         }
     }
     return pilots;
@@ -101,8 +121,8 @@ prs_cfo_estimate estimate_prs_cp_cfo(const gr_complex* frame,
                                      double unwrap_reference_hz)
 {
     prs_cfo_estimate result;
-    if (frame == nullptr || cfg.samp_rate <= 0.0 || cfg.fft_len <= 0 ||
-        cfg.cp_len <= 0 || cfg.prs_symbols <= 0) {
+    if (frame == nullptr || cfg.samp_rate <= 0.0 || cfg.fft_len <= 0 || cfg.cp_len <= 0 ||
+        cfg.prs_symbols <= 0) {
         return result;
     }
 
@@ -116,12 +136,11 @@ prs_cfo_estimate estimate_prs_cp_cfo(const gr_complex* frame,
     double cp_power = 0.0;
     double tail_power = 0.0;
     for (int sym = 0; sym < cfg.prs_symbols; ++sym) {
-        const size_t symbol_start = static_cast<size_t>(
-            start + sym * (cfg.fft_len + cfg.cp_len));
+        const size_t symbol_start =
+            static_cast<size_t>(start + sym * (cfg.fft_len + cfg.cp_len));
         for (int n = 0; n < cfg.cp_len; ++n) {
             const auto cp = frame[symbol_start + static_cast<size_t>(n)];
-            const auto tail = frame[symbol_start +
-                                    static_cast<size_t>(cfg.fft_len + n)];
+            const auto tail = frame[symbol_start + static_cast<size_t>(cfg.fft_len + n)];
             corr += std::conj(std::complex<double>(cp.real(), cp.imag())) *
                     std::complex<double>(tail.real(), tail.imag());
             cp_power += std::norm(cp);
@@ -140,8 +159,7 @@ prs_cfo_estimate estimate_prs_cp_cfo(const gr_complex* frame,
             2.0 * pi * unwrap_reference_hz * cfg.fft_len / cfg.samp_rate;
         phase += 2.0 * pi * std::round((reference_phase - phase) / (2.0 * pi));
     }
-    result.hz = phase * cfg.samp_rate /
-                (2.0 * pi * static_cast<double>(cfg.fft_len));
+    result.hz = phase * cfg.samp_rate / (2.0 * pi * static_cast<double>(cfg.fft_len));
     result.coherence = std::min(1.0, std::abs(corr) / denom);
     result.valid = std::isfinite(result.hz) && std::isfinite(result.coherence);
     return result;
@@ -234,7 +252,8 @@ double dict_ref_double(const pmt::pmt_t& dict, const std::string& key, double fa
     return fallback;
 }
 
-uint64_t dict_ref_uint64(const pmt::pmt_t& dict, const std::string& key, uint64_t fallback)
+uint64_t
+dict_ref_uint64(const pmt::pmt_t& dict, const std::string& key, uint64_t fallback)
 {
     const auto value = pmt::dict_ref(dict, pmt::mp(key), pmt::PMT_NIL);
     if (pmt::is_uint64(value)) {
