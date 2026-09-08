@@ -90,7 +90,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [816, 40.0]
+    coordinate: [808, 48.0]
     rotation: 0
     state: enabled
 - name: samp_rate
@@ -109,12 +109,12 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '75'
+    value: '67'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [912, 40.0]
+    coordinate: [904, 48.0]
     rotation: 0
     state: enabled
 - name: zc_length
@@ -142,7 +142,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [728, 700.0]
+    coordinate: [1368, 708.0]
     rotation: 0
     state: enabled
 - name: prs_channel_estimator_0
@@ -154,8 +154,8 @@ blocks:
     comment: ''
     enable_profiling: 'True'
     fft_len: '512'
-    mc_ds_gold_code_id: '2'
     maxoutbuf: '0'
+    mc_ds_gold_code_id: '2'
     minoutbuf: '0'
     prs_symbols: '127'
     samp_rate: samp_rate
@@ -206,7 +206,7 @@ blocks:
     coordinate: [672, 488.0]
     rotation: 0
     state: enabled
-- name: prs_frame_detector_0_0
+- name: prs_frame_detector_0_0_0
   id: ofdm_prs_ranging_prs_fft_zc_frame_detector
   parameters:
     active_bins: '512'
@@ -217,9 +217,9 @@ blocks:
     coarse_sync_len: zc_length
     coarse_zc_root: '25'
     comment: Connect UHD Source here
-    correlation_fft_len: '4096'
+    correlation_fft_len: '8192'
     cp_len: '64'
-    enable_profiling: 'True'
+    enable_profiling: '0'
     fft_len: '512'
     maxoutbuf: '0'
     min_frame_gap: '10000'
@@ -227,14 +227,14 @@ blocks:
     preamble_len: premble_length
     preamble_repeats: premble_rep
     prs_symbols: '127'
-    reply_delay_s: '0.05'
+    reply_delay_s: '0.08'
     samp_rate: samp_rate
     tail_guard_len: '1000'
     threshold: '0.35'
     time_gating: 'False'
-    window_after_s: '0.004'
+    window_after_s: '0.0012'
     window_before_s: '0.0002'
-    zc_search_after: 4096-512
+    zc_search_after: 8192-512
     zc_search_before: '512'
     zc_threshold: '0.5'
     zero_guard_len: '1000'
@@ -242,7 +242,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [328, 504.0]
+    coordinate: [328, 512.0]
     rotation: 0
     state: enabled
 - name: prs_phase_slope_estimator_0
@@ -265,7 +265,7 @@ blocks:
     coordinate: [288, 1092.0]
     rotation: 0
     state: enabled
-- name: prs_source_0
+- name: prs_source
   id: ofdm_prs_ranging_prs_timed_burst_source
   parameters:
     active_bins: '512'
@@ -278,8 +278,8 @@ blocks:
     comment: ''
     cp_len: '64'
     fft_len: '512'
-    mc_ds_gold_code_id: '2'
     maxoutbuf: '0'
+    mc_ds_gold_code_id: '2'
     minoutbuf: '0'
     pings_per_trigger: '1'
     preamble_len: premble_length
@@ -288,7 +288,7 @@ blocks:
     samp_rate: samp_rate
     seed: '13990001'
     tail_guard_len: '1000'
-    tx_amp: '0.1'
+    tx_amp: '0.7'
     tx_lead_time: '0.6'
     zero_guard_len: '1000'
   states:
@@ -1277,25 +1277,25 @@ connections:
 - [prs_csv_logger_0, timing_out, virtual_sink_1_0_0_0_0_0_0_0, '0']
 - [prs_fft_receiver_0, symbols_out, prs_channel_estimator_0, symbols_in]
 - [prs_fft_receiver_0, timing_out, virtual_sink_1_0_0_0, '0']
-- [prs_frame_detector_0_0, event_out, prs_acquisition_logger_0, frame_in]
-- [prs_frame_detector_0_0, frame_out, prs_fft_receiver_0, frame_in]
-- [prs_frame_detector_0_0, timing_out, virtual_sink_1_0_0, '0']
+- [prs_frame_detector_0_0_0, event_out, prs_acquisition_logger_0, frame_in]
+- [prs_frame_detector_0_0_0, frame_out, prs_fft_receiver_0, frame_in]
+- [prs_frame_detector_0_0_0, timing_out, virtual_sink_1_0_0, '0']
 - [prs_phase_slope_estimator_0, measurement_out, prs_csv_logger_0, measurement_in]
 - [prs_phase_slope_estimator_0, measurement_out, prs_ssrtt_responder_0, measurement_in]
 - [prs_phase_slope_estimator_0, timing_out, virtual_sink_1_0_0_0_0_0, '0']
-- [prs_source_0, '0', uhd_usrp_sink_0, '0']
-- [prs_source_0, tx_time_out, virtual_sink_0_0, '0']
+- [prs_source, '0', uhd_usrp_sink_0, '0']
+- [prs_source, tx_time_out, virtual_sink_0_0, '0']
 - [prs_ssrtt_responder_0, timing_out, virtual_sink_1_0_0_0_0_0_0, '0']
 - [prs_ssrtt_responder_0, trigger_out, virtual_sink_0, '0']
-- [uhd_usrp_source_0_0, '0', prs_frame_detector_0_0, '0']
-- [virtual_source_0, '0', prs_source_0, trigger]
+- [uhd_usrp_source_0_0, '0', prs_frame_detector_0_0_0, '0']
+- [virtual_source_0, '0', prs_source, trigger]
 - [virtual_source_1_0_0, '0', prs_timing_collector_0, timing_in]
 - [virtual_source_1_0_0_0, '0', prs_timing_collector_0, timing_in]
 - [virtual_source_1_0_0_0_1, '0', prs_timing_collector_0, timing_in]
 - [virtual_source_1_0_0_0_1_0, '0', prs_timing_collector_0, timing_in]
 - [virtual_source_1_0_0_0_1_0_0, '0', prs_timing_collector_0, timing_in]
 - [virtual_source_1_0_0_0_1_0_0_0, '0', prs_timing_collector_0, timing_in]
-- [virtual_source_1_0_0_0_1_0_0_0_0, '0', prs_frame_detector_0_0, prs_cfo_in]
+- [virtual_source_1_0_0_0_1_0_0_0_0, '0', prs_frame_detector_0_0_0, prs_cfo_in]
 - [virtual_source_1_0_0_0_1_0_0_0_0, '0', prs_phase_slope_estimator_0, channel_in]
 
 metadata:

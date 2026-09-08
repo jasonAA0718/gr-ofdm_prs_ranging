@@ -36,12 +36,12 @@ class prs_ssrtt_initiator(gr.top_block):
         ##################################################
         # Variables
         ##################################################
-        self.zc_length = zc_length = 2401
-        self.tx_gain = tx_gain = 75
+        self.zc_length = zc_length = 1999
+        self.tx_gain = tx_gain = 72
         self.samp_rate = samp_rate = 30e6
-        self.rx_gain = rx_gain = 60
-        self.premble_rep = premble_rep = 8
-        self.premble_length = premble_length = 256
+        self.rx_gain = rx_gain = 70
+        self.premble_rep = premble_rep = 16
+        self.premble_length = premble_length = 512
         self.center_freq = center_freq = 1060e6
 
         ##################################################
@@ -63,6 +63,7 @@ class prs_ssrtt_initiator(gr.top_block):
         self.uhd_usrp_source_0_0.set_center_freq(center_freq, 0)
         self.uhd_usrp_source_0_0.set_antenna("RX2", 0)
         self.uhd_usrp_source_0_0.set_bandwidth(samp_rate, 0)
+        self.uhd_usrp_source_0_0.set_rx_agc(False, 0)
         self.uhd_usrp_source_0_0.set_gain(rx_gain, 0)
         self.uhd_usrp_source_0_0.set_min_output_buffer(1048576)
         self.uhd_usrp_sink_0 = uhd.usrp_sink(
@@ -88,17 +89,17 @@ class prs_ssrtt_initiator(gr.top_block):
         self.prs_source = ofdm_prs_ranging.prs_timed_burst_source(
             samp_rate, 512, 64, 512, 127,
             premble_length, premble_rep, zc_length,
-            1000, 1000, 0.6,
-            0.2, 0.5, 13990001, 1,
+            1000, 1000, 0.1,
+            0.1, 0.7, 13990001, 5,
             True, 25, 2)
-        self.prs_rx_timekeeper_0 = ofdm_prs_ranging.prs_rx_timekeeper(samp_rate, 0.6)
+        self.prs_rx_timekeeper_0 = ofdm_prs_ranging.prs_rx_timekeeper(samp_rate, 0.1)
         self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 512, 512, 1.0, False)
-        self.prs_frame_detector_0_0 = ofdm_prs_ranging.prs_fft_zc_frame_detector(samp_rate, 512, 64, 512, 127, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 10000, 29, 1, True, 0.05, 0.0002, 0.005, 0.4, 4096, 512, (4096-512), True, False)
+        self.prs_frame_detector_0_0 = ofdm_prs_ranging.prs_fft_zc_frame_detector(samp_rate, 512, 64, 512, 127, premble_length, premble_rep, zc_length, 1000, 1000, 0.35, 1000, 29, 1, 1, 0.05, 0.0005, 0.010, 0.4, 4096, 256, (4096-256), True, False)
         self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 512, 64, 512, 127, False)
         self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger("CSV/obs.csv", 1, False)
         self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 512, 512, 127, 13990001, False, 2)
         self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/initiator_acquisition.csv", "initiator", 1)
-        self.blocks_message_strobe_0 = blocks.message_strobe(pmt.PMT_T, 200)
+        self.blocks_message_strobe_0 = blocks.message_strobe(pmt.PMT_T, 250)
 
 
         ##################################################

@@ -73,12 +73,12 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '60'
+    value: '70'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [792, 40.0]
+    coordinate: [816, 40.0]
     rotation: 0
     state: enabled
 - name: samp_rate
@@ -97,12 +97,12 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '60'
+    value: '64'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [888, 40.0]
+    coordinate: [912, 40.0]
     rotation: 0
     state: enabled
 - name: zc_length
@@ -126,7 +126,7 @@ blocks:
     maxoutbuf: '0'
     minoutbuf: '0'
     msg: pmt.PMT_T
-    period: '200'
+    period: '750'
   states:
     bus_sink: false
     bus_source: false
@@ -159,8 +159,8 @@ blocks:
     comment: ''
     enable_profiling: 'True'
     fft_len: '512'
-    mc_ds_gold_code_id: '2'
     maxoutbuf: '0'
+    mc_ds_gold_code_id: '2'
     minoutbuf: '0'
     prs_symbols: '127'
     samp_rate: samp_rate
@@ -224,10 +224,10 @@ blocks:
     comment: Connect UHD Source here
     correlation_fft_len: '4096'
     cp_len: '64'
-    enable_profiling: 'True'
+    enable_profiling: 'False'
     fft_len: '512'
     maxoutbuf: '0'
-    min_frame_gap: '10000'
+    min_frame_gap: '1000'
     minoutbuf: '0'
     preamble_len: premble_length
     preamble_repeats: premble_rep
@@ -236,18 +236,18 @@ blocks:
     samp_rate: samp_rate
     tail_guard_len: '1000'
     threshold: '0.35'
-    time_gating: 'True'
-    window_after_s: '0.005'
-    window_before_s: '0.0002'
-    zc_search_after: 4096-512
-    zc_search_before: '512'
+    time_gating: '1'
+    window_after_s: '0.010'
+    window_before_s: '0.0005'
+    zc_search_after: 4096-256
+    zc_search_before: '256'
     zc_threshold: '0.4'
     zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [408, 596.0]
+    coordinate: [408, 604.0]
     rotation: 0
     state: enabled
 - name: prs_phase_slope_estimator_0
@@ -287,7 +287,7 @@ blocks:
     coordinate: [408, 448.0]
     rotation: 0
     state: enabled
-- name: prs_source_0
+- name: prs_source
   id: ofdm_prs_ranging_prs_timed_burst_source
   parameters:
     active_bins: '512'
@@ -300,8 +300,8 @@ blocks:
     comment: ''
     cp_len: '64'
     fft_len: '512'
-    mc_ds_gold_code_id: '2'
     maxoutbuf: '0'
+    mc_ds_gold_code_id: '2'
     minoutbuf: '0'
     pings_per_trigger: '1'
     preamble_len: premble_length
@@ -310,14 +310,14 @@ blocks:
     samp_rate: samp_rate
     seed: '13990001'
     tail_guard_len: '1000'
-    tx_amp: '0.1'
-    tx_lead_time: '0.6'
+    tx_amp: '0.7'
+    tx_lead_time: '0.5'
     zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [752, 320.0]
+    coordinate: [752, 304.0]
     rotation: 0
     state: enabled
 - name: prs_ssrtt_solver_0
@@ -1103,7 +1103,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [816, 688.0]
+    coordinate: [808, 688.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_1_0_0
@@ -1357,8 +1357,8 @@ blocks:
 connections:
 - [blocks_message_strobe_0, strobe, prs_rx_timekeeper_0, trigger_in]
 - [prs_channel_estimator_0, channel_out, prs_phase_slope_estimator_0, channel_in]
-- [prs_channel_estimator_0, event_out, prs_acquisition_logger_0, frame_in]
 - [prs_channel_estimator_0, channel_out, virtual_sink_1_0_0_0_0_1, '0']
+- [prs_channel_estimator_0, event_out, prs_acquisition_logger_0, frame_in]
 - [prs_channel_estimator_0, timing_out, virtual_sink_1_0_0_0_0, '0']
 - [prs_csv_logger_0, timing_out, virtual_sink_1_0_0_0_0_0_0_0, '0']
 - [prs_fft_receiver_0, symbols_out, prs_channel_estimator_0, symbols_in]
@@ -1368,9 +1368,9 @@ connections:
 - [prs_frame_detector_0_0, timing_out, virtual_sink_1_0_0, '0']
 - [prs_phase_slope_estimator_0, measurement_out, prs_ssrtt_solver_0, measurement_in]
 - [prs_phase_slope_estimator_0, timing_out, virtual_sink_1_0_0_0_0_0, '0']
-- [prs_rx_timekeeper_0, timed_trigger_out, prs_source_0, trigger]
-- [prs_source_0, '0', uhd_usrp_sink_0, '0']
-- [prs_source_0, tx_time_out, virtual_sink_1, '0']
+- [prs_rx_timekeeper_0, timed_trigger_out, prs_source, trigger]
+- [prs_source, '0', uhd_usrp_sink_0, '0']
+- [prs_source, tx_time_out, virtual_sink_1, '0']
 - [prs_ssrtt_solver_0, ssrtt_out, prs_csv_logger_0, measurement_in]
 - [prs_ssrtt_solver_0, timing_out, virtual_sink_1_0_0_0_0_0_0, '0']
 - [uhd_usrp_source_0_0, '0', virtual_sink_0, '0']
