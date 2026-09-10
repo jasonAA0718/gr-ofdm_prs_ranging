@@ -100,9 +100,14 @@ void prs_frame_builder::normalize_sections(std::vector<gr_complex>& samples,
                                            int prs_start,
                                            int prs_len)
 {
-    constexpr float acquisition_boost = 1.4125375446f; // 3 dB in amplitude.
+    /*
+    Normalize the OFDM sections to the target amplitude, 
+    and then limit the peak amplitude to avoid clipping.
+    */
     constexpr float peak_limit = 0.9f;
+    const float preamble_amp = 0.95;
 
+    // Lambda to scale a range of samples to a target RMS amplitude
     const auto scale_range = [&samples](size_t start, size_t length, float target_rms) {
         if (length == 0 || start + length > samples.size()) {
             return;
@@ -120,36 +125,38 @@ void prs_frame_builder::normalize_sections(std::vector<gr_complex>& samples,
             samples[i] *= scale;
         }
     };
-
+    // Scale the preamble and coarse sync sections to the target amplitude
     const size_t preamble_start = static_cast<size_t>(cfg.zero_guard_len);
-    const size_t preamble_length =
-        static_cast<size_t>(cfg.preamble_len * cfg.preamble_repeats);
+    const size_t preamble_length = static_cast<size_t>(cfg.preamble_len * cfg.preamble_repeats);
     const size_t coarse_start = preamble_start + preamble_length;
-    scale_range(preamble_start, preamble_length, cfg.tx_amp * acquisition_boost);
-    scale_range(coarse_start,
-                static_cast<size_t>(cfg.coarse_sync_len),
-                cfg.tx_amp * acquisition_boost);
-    scale_range(
-        static_cast<size_t>(payload_start), static_cast<size_t>(payload_len), cfg.tx_amp);
+    const size_t coarse_sync_len = static_cast<size_t>(cfg.coarse_sync_len);
 
+    for (size_t i = preamble_start; i < coarse_start + coarse_sync_len; ++i) 
+        samples[i] *= preamble_amp;
+
+    // Scale the PRS section to the target amplitude
     const size_t ofdm_symbol_len = static_cast<size_t>(cfg.fft_len + cfg.cp_len);
     if (prs_len == cfg.prs_symbols * static_cast<int>(ofdm_symbol_len)) {
         for (int sym = 0; sym < cfg.prs_symbols; ++sym) {
-            scale_range(static_cast<size_t>(prs_start) +
-                            static_cast<size_t>(sym) * ofdm_symbol_len,
+            scale_range(static_cast<size_t>(prs_start) + static_cast<size_t>(sym) * ofdm_symbol_len,
                         ofdm_symbol_len,
                         cfg.tx_amp);
         }
     }
-
+    // Ensure the PRS peak  is limited to the target amplitude
     float peak = 0.0f;
-    for (const auto& sample : samples) {
-        peak = std::max(peak, std::abs(sample));
-    }
-    if (peak > peak_limit) {
-        const float scale = peak_limit / peak;
-        for (auto& sample : samples) {
-            sample *= scale;
+    // Find the peak amplitude in the PRS section
+    if (prs_start >= 0 && prs_len > 0) {
+        const size_t start  = static_cast<size_t>(prs_start);
+        const size_t length = static_cast<size_t>(prs_len);
+        if(start < samples.size() && length <= samples.size() - start)
+            for (size_t i = start; i < start+length; ++i)
+                peak = std::max(peak,std::abs(samples[i])); 
+        if (peak > peak_limit) {
+            const float scale = peak_limit / peak;
+            for (size_t i = start; i < start+length; ++i) {
+                samples[i] *= scale;
+            }
         }
     }
 }

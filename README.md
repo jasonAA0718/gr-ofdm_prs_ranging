@@ -605,15 +605,20 @@ but is unused.
 Transmit scaling now uses:
 
 ```text
-Payload RMS:      tx_amp
-OFDM-symbol RMS:  tx_amp
-Preamble RMS:     tx_amp + 3 dB
-ZC RMS:           tx_amp + 3 dB
-Final burst peak: <= 0.9 through one common scale
+Repeated-preamble RMS:       0.95
+ZC coarse-sync RMS:          0.95
+Requested CP+OFDM-symbol RMS: tx_amp
+Final OFDM-section peak:     <= 0.9
 ```
 
-Dynamic BPSK payload contents are written at unit amplitude before section
-normalization, so payload insertion can no longer undo the amplitude policy.
+The repeated preamble and ZC are constant-envelope sequences and are scaled
+independently of `tx_amp`. Each complete OFDM symbol, including its cyclic
+prefix, is first normalized to `tx_amp`. If any OFDM sample then exceeds `0.9`,
+one additional uniform scale is applied only to the complete OFDM section; the
+preamble and ZC remain at `0.95`. Consequently, `tx_amp` is the requested OFDM
+RMS, while the effective OFDM RMS can be lower when the peak limiter activates.
+The payload and pilots share this OFDM scaling because the payload is carried
+on OFDM data bins rather than in a separate time-domain section.
 
 The QA measurement over the useful 1024-sample IFFT portion (before CP) is:
 

@@ -388,21 +388,31 @@ transmits 56 times as much energy per information bit:
 This is additional transmitted energy and airtime, not coding gain at fixed
 `Eb/N0`.
 
-The attenuation result was recorded before section RMS equalization. The
-current transmitter now applies:
+The attenuation result was recorded before the current section-amplitude
+policy. The transmitter now applies:
 
 ```text
-Payload RMS      = tx_amp
-OFDM-symbol RMS  = tx_amp
-Preamble RMS     = tx_amp + 3 dB
-ZC RMS           = tx_amp + 3 dB
-Final peak       <= 0.9
+Repeated-preamble RMS        = 0.95
+ZC coarse-sync RMS           = 0.95
+Requested CP+OFDM-symbol RMS = tx_amp
+Final OFDM-section peak      <= 0.9
 ```
 
-The dynamic payload is written before this normalization and one common final
-peak scale is applied to the complete burst. Both current examples use
-`tx_amp = 0.6`. The attenuation experiment must therefore be repeated before
-attributing the earlier 20 dB separation to the updated waveform.
+The repeated preamble and ZC are constant-envelope sequences and their scaling
+is independent of `tx_amp`. Each CP-plus-OFDM symbol is first normalized to
+`tx_amp`. Let `A_peak` be the largest OFDM magnitude after that normalization.
+The complete OFDM section is then multiplied by
+
+```math
+g_{OFDM} = \min\left(1,\frac{0.9}{A_{peak}}\right).
+```
+
+This limiter does not scale the preamble or ZC. The effective OFDM RMS is
+therefore `tx_amp * g_OFDM` and can be lower than the requested value. Payload
+and pilot subcarriers share the same scale because the payload is embedded in
+the OFDM symbols; there is no separate time-domain payload section. The
+attenuation experiment must therefore be interpreted using the effective OFDM
+RMS rather than `tx_amp` alone.
 
 Assuming independent decoded-bit errors and that CRC detects them, a 50% packet
 failure rate across 120 bits corresponds approximately to:

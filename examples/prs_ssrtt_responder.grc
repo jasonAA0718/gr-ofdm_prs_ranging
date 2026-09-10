@@ -86,7 +86,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '70'
+    value: '60'
   states:
     bus_sink: false
     bus_source: false
@@ -110,7 +110,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '75'
+    value: '60'
   states:
     bus_sink: false
     bus_source: false
