@@ -35,3 +35,6 @@ captures/*
 .vscode/
 .idea/
 build/
+
+# Local development roadmap
+Agenda.md

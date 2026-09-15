@@ -16,13 +16,9 @@ The transmitted complex baseband burst is
 [tail guard]
 ```
 
-Using the common defaults:
+At 30 MS/s, the enforced current OFDM geometry and default code selection are:
 
 ```text
-zero_guard_len    = 1000 samples
-preamble_len      = 256 samples
-preamble_repeats  = 8
-coarse_sync_len   = 839 samples
 fft_len           = 512
 cp_len            = 64
 active_bins       = 512
@@ -30,16 +26,35 @@ prs_symbols       = 127
 Gold code ID      = 2
 ```
 
+The code ID is configurable; 512 bins, CP 64, and 127 symbols are enforced by
+the current transmitter. The sample rate is configurable as well; numerical
+examples in this document use 30 MS/s.
+
 The OFDM PRS-like section length is
 
 ```math
 N_{\text{PRS}} = N_{\text{sym}}(N_{\text{FFT}} + N_{\text{CP}})
 ```
 
-For the default values:
+For these OFDM values:
 
 ```math
 N_{\text{PRS}} = 127(512 + 64) = 73152
+```
+
+Acquisition geometry is configurable and must match the peer transmitter.
+The working-tree main examples differ: initiator period/repeats/ZC length
+are 512/33/2001, responder values are 512/16/1999. The FFT-ZC profiling pair
+uses 256/4/419. All four use 30 MS/s and carrier 1060 MHz; these are example
+settings, not immutable waveform requirements. The main initiator uses
+100-sample zero and tail guards, while the responder and profiling examples
+use 1000 samples each. These differences also affect the timestamp reference.
+
+For zero guard length `N_g`, preamble period `L_p`, repetitions `R`,
+ZC length `N_z`, and tail guard `N_t`:
+
+```math
+N_{frame}=N_g+L_pR+N_z+M(N+N_{CP})+N_t.
 ```
 
 ## Repeated QPSK Acquisition Preamble
@@ -56,11 +71,14 @@ p[n] \in \left\{\frac{1+j}{\sqrt{2}}, \frac{1-j}{\sqrt{2}},
 The transmitted repeated preamble is
 
 ```math
-x_p[n + rL_p] = p[n],
+x_p[n + rL_p] = 0.95p[n],
 \quad 0 \le n < L_p,\quad 0 \le r < R
 ```
 
-where `R = preamble_repeats`.
+where `R = preamble_repeats`. TX seeds `std::mt19937` with
+`seed ^ 0x5a17U`, takes one generator output per period sample, and maps bits
+0 and 1 to the real/imaginary signs of unit QPSK. The same period is copied
+`R` times; normalization then multiplies it by 0.95.
 
 The detector uses repeated-period self-correlation:
 
@@ -80,7 +98,15 @@ M_p[m] =
 ```
 
 This is a cheap first-stage acquisition gate. It does not need to know the exact
-QPSK values, only that adjacent preamble periods are repeated.
+QPSK values, only that adjacent preamble periods are repeated. It is not an
+accurate boundary estimator: partial overlap can pass the gate.
+
+The local detector updates correlation and the two energies as a rolling
+window. It compares squared correlation against `threshold^2 * E1 * E2`
+before taking the square root. With nonpositive denominator the metric is
+zero; there is no added epsilon floor in this normalization. The gate threshold
+is configurable (0.35 in the supplied examples), distinct from ZC threshold.
+Uniform amplitude scaling cancels ideally, but noise and distortion do not.
 
 ## Coarse ZC Sync
 
@@ -92,7 +118,8 @@ z_u[n] = \exp\left(-j\pi u\frac{n(n+1)}{N_z}\right),
 \quad 0 \le n < N_z
 ```
 
-The receiver computes the normalized coarse correlation
+The transmitted ZC is multiplied by 0.95; the receiver uses the unit-magnitude
+reference above. It computes the normalized coarse correlation
 
 ```math
 C_z[m] = \sum_{n=0}^{N_z-1} y[m+n] z_u[n]^*
@@ -104,7 +131,7 @@ M_z[m] =
 {\sqrt{N_z \sum_{n=0}^{N_z-1}|y[m+n]|^2}}
 ```
 
-The repeated preamble first gates a proposed frame location using the preamble
+In the local `prs_frame_detector`, the repeated preamble first gates a proposed frame location using the preamble
 threshold. The detector then evaluates `M_z` at offsets `-2...+2` around the
 predicted ZC boundary, selects the strongest valid offset, and accepts it only
 when it passes the separate ZC threshold. The selected offset corrects both the
@@ -112,7 +139,7 @@ frame start and coarse-sync index. A threshold-passing edge maximum recenters
 the five-point window once before acceptance. Configurable roots continue to
 separate channels/responders.
 
-Example channel plan:
+A historical single-responder root convention is:
 
 ```text
 Initiator POLL TX:       coarse_zc_root = 25
@@ -120,6 +147,72 @@ Responder RX detector:   coarse_zc_root = 25
 Responder RESPONSE TX:   coarse_zc_root = 29
 Initiator RX detector:   coarse_zc_root = 29, channel_id = 1
 ```
+
+
+### FFT-ZC Detector
+
+All supplied GRCs currently select the separate `prs_fft_zc_frame_detector`.
+It implements linear matched filtering with a reversed conjugate ZC kernel:
+
+```math
+h[n]=z_u[N_z-1-n]^*,\qquad
+r=\operatorname{IFFT}(\operatorname{FFT}(y)\operatorname{FFT}(h)).
+```
+
+For correlation FFT size `F`, each block supplies at most `F-N_z+1`
+candidate positions and overlaps the next input by `N_z-1` samples.
+Only outputs at `N_z-1+i` are used, with IFFT scaling `1/F`.
+Each candidate has rolling input-energy normalization using the same
+`M_z` formula; this avoids circular wrap contamination of accepted outputs.
+
+In continuous mode, a preamble gate predicts ZC start at gate index plus
+`L_p R`. `zc_search_before/after` bound the search around that prediction.
+In time-gated mode, the ZC search spans the buffered scheduled response
+interval; the global preamble maximum is diagnostic and does not restrict
+the ZC search. `zc_gate_offset_samples` is selected ZC index minus predicted
+ZC index, and need not be near zero.
+
+Candidates are visited in time order. The accepted point is the maximum
+within the first contiguous lobe at or above `zc_threshold`, not the global
+maximum over all paths. There is no peak-ratio threshold. A lobe reaching the
+end of the available search can be accepted without observing its falling edge.
+Example ZC thresholds are 0.4 at the initiator and 0.5 at the responder.
+
+Optional CFO compensation applies only to matched-filter input copies.
+With no tracked CFO it searches -300 through +300 Hz in 100 Hz steps.
+A finite channel-CFO feedback value with `channel_coherence >= 0.2` becomes
+the next acquisition reference. Metadata uses `INITIAL_BIN`, `PRS_FLL`,
+or `DISABLED`. This feedback does not derotate the raw PRS frame sent to
+the FFT receiver. Within the bootstrap bank, accepted threshold peaks take
+priority, then earlier candidate indices, then larger metric at the same index.
+For the profiling ZC length 419, the observation lasts only 13.967 us at
+30 MS/s; 100 Hz hypotheses are very close compared with its reciprocal span
+of approximately 71.6 kHz. The bank is an acquisition aid, not a precise
+first-frame frequency measurement.
+
+### Frame and Timestamp Reference
+
+For a selected ZC start sample `n_z`, both detectors derive:
+
+```math
+n_{frame}=n_z-N_g-L_pR,\qquad
+n_{PRS}=n_z+N_z.
+```
+
+The extracted vector includes the configured zero guard, preamble, ZC, OFDM
+section, and tail guard. `frame_start` and `coarse_peak` are absolute
+sample indices; `coarse_peak` denotes ZC start, not the convolution-output
+index `N_z-1` samples later. `prs_start_rel` is the OFDM CP start relative
+to the extracted frame. `rx_time` is reconstructed for that frame start
+from UHD tags and sample offset. Metadata includes `preamble_metric`,
+`coarse_metric`, and CP-CFO diagnostics. `peak_metric` is a legacy alias
+accepted by some downstream readers, not a separate estimator.
+
+Detectors require a complete configured frame before publishing `frame_out`.
+Minimum-frame-gap checks and consumed-frame buffer drops suppress duplicates.
+Time-gated expiry can instead publish acquisition failure metadata on
+`event_out`. Successful raw frames proceed to the channel estimator for CRC;
+detector success alone does not imply payload success.
 
 ## MC-DS OFDM Payload and PRS
 
@@ -153,8 +246,10 @@ After serialization, CRC generation, and padding, TX XORs this exact fixed
 
 It has 64 zeros and 64 ones. If `u_q` is the logical payload or padding bit and
 `s_q` is the scrambler bit, `b_q=2(u_q\mathbin{\mathrm{XOR}}s_q)-1` under the
-project's `0 -> -1`, `1 -> +1` BPSK convention. CRC covers only the original
-120 logical bits.
+project's `0 -> -1`, `1 -> +1` BPSK convention. CRC is computed over the first 104 logical information bits; its 16-bit
+value completes the 120-bit packet. Scrambling and padding are outside CRC
+coverage. The CRC update consumes packet type followed by each 32-bit field
+in least-significant-byte order; the transmitted fields and CRC are LSB-first.
 
 Let `c_i[m]` be chip `m` from row `i` of
 `lib/DSP/gold127_family_bipolar.csv`, where row index equals `code_id`. The
@@ -188,7 +283,7 @@ or otherwise separable resources.
 The OFDM payload quality metric is the mean normalized BPSK decision margin:
 
 ```math
-m_q=\frac{|\Re\{\hat D_q\}|}{|\hat D_q|+\epsilon},\qquad
+m_q=\frac{|\Re\{\hat D_q\}|}{\max(10^{-12},|\hat D_q|)},\qquad
 \text{payload\_metric}=\frac{1}{120}\sum_{q=0}^{119}m_q.
 ```
 
@@ -196,240 +291,29 @@ This metric is relative and dimensionless. CRC remains authoritative. The
 channel estimator publishes `failure_reason=NONE` or `PAYLOAD_CRC` after the
 OFDM payload decision; acquisition failures still originate in the detector.
 
-## Historical Standalone BPSK Payload
+## Section Normalization
 
-The following section documents the waveform used for the earlier attenuation
-experiments. It is not generated or decoded by the current production path.
-
-Both POLL and RESPONSE frames contain the complete fixed-length BPSK payload:
-
-```text
-[16 reference samples]
-[8-bit packet type, repeated 280 samples/bit]
-[32-bit poll frame ID, repeated 280 samples/bit]
-[32-bit response frame ID, repeated 280 samples/bit]
-[32-bit reply delay, repeated 280 samples/bit]
-[16-bit CRC, repeated 280 samples/bit]
-```
-
-The payload geometry is:
-
-| Part | Information bits | Samples per bit | Payload samples | Sample offsets |
-|---|---:|---:|---:|---:|
-| Known BPSK reference | N/A | 1 per reference sign | 16 | 0-15 |
-| Packet type | 8 | 280 | 2240 | 16-2255 |
-| Poll frame ID | 32 | 280 | 8960 | 2256-11215 |
-| Response frame ID | 32 | 280 | 8960 | 11216-20175 |
-| Reply delay samples | 32 | 280 | 8960 | 20176-29135 |
-| CRC16 | 16 | 280 | 4480 | 29136-33615 |
-| **Total** | **120 protected bits** |  | **33616 samples** | **0-33615** |
-
-At `Fs = 30 MS/s`:
-
-```text
-one BPSK sample                    = 33.333 ns
-one repeated information bit      = 280 samples = 9.333 us
-16-sample reference duration      = 0.533 us
-33600 repeated data/CRC samples   = 1120.000 us
-complete 33616-sample payload     = 1120.533 us
-uncoded information-bit rate      = 30 MS/s / 280 = 107.143 kbit/s
-```
-
-There is no separate pulse-shaping stage inside the payload encoder. One real
-BPSK value is written into each complex baseband sample:
-
-```text
-bit 0 -> -amplitude + j0
-bit 1 -> +amplitude + j0
-```
-
-Every information bit is encoded as 280 identical consecutive samples. After
-CFO and common-phase correction, the decoder sums the real values of all 280
-samples and decides the bit from the sign of that coherent sum. Sample
-magnitude is retained instead of being discarded by hard voting.
-
-The 16 known reference signs are:
-
-```text
-+ + + - - + - + - - - + - + + -
-```
-
-They estimate one common payload phase. All integer fields, including the
-transmitted CRC value, are serialized least-significant bit first. CRC16 uses
-initial value `0xffff` and polynomial `0x1021`. It covers these decoded fields:
-
-```text
-packet_type
-poll_frame_id
-response_frame_id
-reply_delay_samples
-```
-
-The three 32-bit fields enter the CRC one byte at a time, least-significant byte
-first.
-
-### POLL and RESPONSE Content
-
-Both packet types occupy all 33616 samples. An unused field is transmitted as
-zero; it is not physically omitted.
-
-| Payload field | Initiator POLL | Responder RESPONSE |
-|---|---|---|
-| `packet_type` | `1` (`POLL`), enabled | `2` (`RESPONSE`), enabled |
-| `poll_frame_id` | New initiator poll ID, enabled | Echo of the decoded POLL ID, enabled |
-| `response_frame_id` | `0`, **not used for POLL** | New responder response ID, enabled |
-| `reply_delay_samples` | `0`, **not used for POLL** | Configured responder delay, enabled |
-| `CRC16` | Enabled; covers type, poll ID and the two zero fields | Enabled; covers all four populated fields |
-
-The responder only schedules a RESPONSE after the received POLL payload passes
-CRC and has `packet_type = POLL`. Therefore:
-
-```text
-POLL payload CRC failure at responder
-    -> responder sends no RESPONSE
-    -> initiator can later report NO_PREAMBLE for that attempt
-
-RESPONSE payload CRC failure at initiator
-    -> initiator reports PAYLOAD_CRC
-    -> no valid SS-TWR result is produced
-```
-
-### Payload Metric
-
-The packet payload starts with `Nref = 16` known reference symbols. The
-remaining `B = 120` data and CRC bits are each repeated `R = 280` times.
-The repeated-preamble CFO estimate is initially converted to phase increment
-`\hat{\omega}=2\pi\hat{f}_e/F_s` and applied to every payload sample. If this
-decode fails CRC, the conditional CP-CFO retry is performed as described in
-the consolidated CFO chapter below.
+`prs_frame_builder::normalize_sections()` multiplies the generated unit
+preamble and ZC by 0.95. For each CP-plus-OFDM symbol it measures
 
 ```math
-\tilde{y}[i] = y[i]\exp(-j\hat{\omega}i)
+r_m=\sqrt{\frac{1}{N+N_{CP}}\sum_n |x_m[n]|^2},
+\qquad a_m=\frac{\text{tx\_amp}}{r_m}.
 ```
 
-For derotated reference samples `yref[i]` and expected real BPSK signs `a[i]`,
-the decoder calculates
+It scales each symbol by `a_m`, measures the largest resulting OFDM
+magnitude `A_peak`, and scales only the complete OFDM section by
 
 ```math
-C_{\text{ref}} = \sum_{i=0}^{N_{\text{ref}}-1} y_{\text{ref}}[i]a[i]
+g_{OFDM}=\min\left(1,\frac{0.9}{A_{peak}}\right).
 ```
 
-```math
-M_{\text{ref}} =
-\min\left(
-1,
-\frac{|C_{\text{ref}}|}
-{\sqrt{N_{\text{ref}}\sum_i|y_{\text{ref}}[i]|^2}}
-\right)
-```
-
-It uses `conj(Cref) / |Cref|` to remove the remaining common payload phase.
-Let `z[b,r]` be corrected sample `r` of bit `b`. The coherent decision is
-
-```math
-S[b] = \sum_{r=0}^{R-1}\Re\{z[b,r]\}
-```
-
-The decoded bit is one when `S[b] >= 0` and zero otherwise. Its normalized
-decision margin is
-
-```math
-m[b] =
-\frac{|S[b]|}
-{\sum_{r=0}^{R-1}|\Re\{z[b,r]\}|}
-```
-
-The average decision metric and reported payload metric are
-
-```math
-M_{\text{decision}} = \frac{1}{B}\sum_{b=0}^{B-1}m[b]
-```
-
-```math
-\text{payload metric} = \min(M_{\text{ref}}, M_{\text{decision}})
-```
-
-`payload_metric` is in `[0, 1]` and measures reference correlation plus
-coherent-decision consistency. It is not SNR, dBFS, or CRC probability. Payload
-validity is a separate condition:
-
-```text
-frame_id_valid = received CRC16 matches the CRC16 recomputed from decoded fields
-```
-
-There is no payload-metric acceptance threshold in the current decoder. A high
-`payload_metric` does not override a CRC failure.
-
-The decision metric measures consistency, not correctness. A coherently
-combined bit can still have a high margin and the wrong sign; CRC remains the
-validity check.
-
-### Attenuation Result Interpretation
-
-The reported attenuation experiment produced approximately:
-
-```text
-75 dB attenuation: payload CRC failure reaches about 50% packet failure
-95 dB attenuation: repeated-preamble/ZC acquisition begins to fail
-```
-
-This ordering is consistent with the implementation. Acquisition integrates a
-768-pair repeated-preamble correlation and then a 419-sample coherent ZC
-correlation. The payload now coherently combines 280 samples per bit, and CRC
-detects errors across 120 decoded bits.
-
-At unchanged per-sample amplitude, increasing from 5 to 280 samples per bit
-transmits 56 times as much energy per information bit:
-
-```math
-10\log_{10}(280/5) = 17.48\ \text{dB}
-```
-
-This is additional transmitted energy and airtime, not coding gain at fixed
-`Eb/N0`.
-
-The attenuation result was recorded before the current section-amplitude
-policy. The transmitter now applies:
-
-```text
-Repeated-preamble RMS        = 0.95
-ZC coarse-sync RMS           = 0.95
-Requested CP+OFDM-symbol RMS = tx_amp
-Final OFDM-section peak      <= 0.9
-```
-
-The repeated preamble and ZC are constant-envelope sequences and their scaling
-is independent of `tx_amp`. Each CP-plus-OFDM symbol is first normalized to
-`tx_amp`. Let `A_peak` be the largest OFDM magnitude after that normalization.
-The complete OFDM section is then multiplied by
-
-```math
-g_{OFDM} = \min\left(1,\frac{0.9}{A_{peak}}\right).
-```
-
-This limiter does not scale the preamble or ZC. The effective OFDM RMS is
-therefore `tx_amp * g_OFDM` and can be lower than the requested value. Payload
-and pilot subcarriers share the same scale because the payload is embedded in
-the OFDM symbols; there is no separate time-domain payload section. The
-attenuation experiment must therefore be interpreted using the effective OFDM
-RMS rather than `tx_amp` alone.
-
-Assuming independent decoded-bit errors and that CRC detects them, a 50% packet
-failure rate across 120 bits corresponds approximately to:
-
-```math
-P_b \simeq 1 - (1 - 0.5)^{1/120} \simeq 0.00576
-```
-
-Thus only about `0.58%` post-combining decoded-bit error probability can already
-produce `50%` packet failure. This estimate is illustrative: burst errors,
-phase-estimation errors, clipping, and correlated interference violate the
-independent-error assumption.
-
-The measured `20 dB` separation is an experimental relative attenuation result,
-not an absolute receiver sensitivity or calibrated link-budget value. It does,
-however, identify the current BPSK payload/CRC stage as the first observed
-digital failure layer before acquisition loss.
+The effective CP-plus-symbol RMS is `tx_amp * g_OFDM`; preamble and ZC
+remain at 0.95. Guards remain zero. This is uniform gain reduction, not
+sample clipping. TX amplitude is not calibrated dBm. There is no standalone
+payload amplitude setting. Positive real scaling preserves CP copying and
+phase, but symbol-dependent normalization is included in the effective channel
+seen by RX because pilot division does not explicitly remove `a_m`.
 
 ## OFDM PRS-Like Symbol
 
@@ -521,32 +405,75 @@ while each reference is still indexed from the native table. TX and RX
 therefore use identical `(symbol, fft_bin)` entries without reordering the IFFT
 input.
 
-## Channel Estimation
+## Channel Estimation and Payload Decoding
 
-For pilot subcarrier `k` of OFDM symbol `m`, the received value is modeled as
-
-```math
-Y_m[k] = H[k]c[m]G_m[k] + W_m[k]
-```
-
-The per-symbol channel estimate is
+On pilot bins, RX divides the FFT output by the unit known reference:
 
 ```math
-\hat{H}_m[k] = \frac{Y_m[k]}{c[m]G_m[k]}
+\hat H_m[k]=\frac{Y_m[k]}{c_i[m]G_m[k]},\quad k\in\mathcal P.
 ```
 
-The implementation averages over all PRS symbols:
+This effective channel includes transmit scaling, RF response, residual timing
+and CFO effects. Under a static single-path model it is approximately channel
+gain times a linear delay phase, but the implementation does not fit a
+multipath tap model or the paper-style OPA low/high-frequency estimator.
+
+The channel CFO calculation below gives one symbol rotation
+`r_m = exp(-j 2 pi hat f_H m T_sym)`. RX multiplies each pilot estimate by
+that rotation, then averages all 127 symbols:
 
 ```math
-\hat{H}[k] =
-\frac{1}{M}
-\sum_{m=0}^{M-1}
-\frac{Y_m[k]}{c[m]G_m[k]}
+\tilde H_m[k]=r_m\hat H_m[k],\qquad
+\bar H[k]=\frac{1}{M}\sum_m\tilde H_m[k].
 ```
 
-Only the 384 pilot estimates are emitted to the phase-slope estimator. The
-implementation also computes a relative SNR-like metric from average pilot
-channel power and residual error; it is not calibrated RF power.
+Only 384 pilot bins, in increasing signed-frequency order, are sent to the
+phase estimator. No single OFDM symbol is privileged as the only regression
+input; symbol zero is the phase reference for alignment.
+
+For data bin `k=4q+3`, the decoder computes
+
+```math
+D_q=\frac{1}{M}\sum_m Y_m[k]c_i[m]r_m.
+```
+
+Its interpolated channel is `(bar H[k-1]+bar H[k+1])/2`, except native
+bin 511 uses only bin 510. With channel power above `1e-12`, equalization
+is `D_q * conj(H_interp) / |H_interp|^2`; otherwise the equalized value is
+zero. The hard bit is one if the equalized real part is nonnegative, zero
+otherwise. RX descrambles, removes eight padding bits, and compares the
+received CRC with the recomputed CRC over the 104 information bits.
+
+`frame_id_valid` reports that CRC comparison, not a phase-fit test or packet
+type check. The channel estimator publishes payload outcomes on `event_out`
+and the channel on `channel_out`. SS-TWR then checks POLL/RESPONSE type.
+Legacy retry fields are populated with false/zero; there is no current
+CP-based payload retry.
+
+### SNR and Coherence
+
+The logged `snr` is derived from the same pilot samples after phase alignment:
+
+```math
+P_s=\frac{1}{K_p}\sum_{k\in\mathcal P}|\bar H[k]|^2,
+```
+
+```math
+P_e=\frac{1}{K_pM}\sum_{k\in\mathcal P}
+\max\left(0,\sum_m|\tilde H_m[k]|^2-M|\bar H[k]|^2\right),
+\quad K_p=384,
+```
+
+```math
+\mathrm{snr}=10\log_{10}\frac{P_s+10^{-12}}{P_e+10^{-12}}.
+```
+
+The residual equals symbol-to-symbol error around the averaged channel, up to
+roundoff. No noise-only guard samples or payload bins enter this estimate.
+It approximates pilot SNR under a static channel and independent additive
+noise; channel variation, residual CFO/ICI, reference mismatch and amplitude
+variation also count as error. It is distinct from adjacent-symbol
+`channel_coherence`, and neither is calibrated absolute RX power.
 
 ## CFO Estimation and Correction
 
@@ -568,15 +495,17 @@ R     = number of preamble repetitions
 NFFT  = FFT length
 NCP   = cyclic-prefix length
 M     = number of PRS symbols
-K     = number of active PRS bins
+K     = number of pilot bins used for channel CFO
 ```
 
-The current USRP examples use:
+The shared OFDM geometry is:
 
 ```text
-Fs = 30 MHz, Lp = 256, R = 8
+Fs = 30 MHz
 NFFT = 512, NCP = 64, M = 127, K = 384 pilot bins
 ```
+
+Preamble counts below use the matched profiling pair: Lp=256, R=4.
 
 ### Repeated-Preamble CFO
 
@@ -593,7 +522,7 @@ y[n+L_p] \approx y[n]
 \exp\left(j2\pi f_e\frac{L_p}{F_s}\right)
 ```
 
-After frame extraction, the detector accumulates
+The historical estimator accumulated
 
 ```math
 C_p^{(f)} =
@@ -608,13 +537,12 @@ and estimates
 ```
 
 This calculation uses `L_p(R-1)` complex correlation products, covers all
-`L_pR` preamble samples, and has correlation lag `L_p`. With the current USRP
-geometry:
+`L_pR` preamble samples, and has correlation lag `L_p`. For the profiling preamble geometry (if this disabled method were used):
 
 ```text
-correlation products = 256(8-1) = 1792
-unique samples covered = 256(8) = 2048
-observation duration = 2048 / 30 MHz = 68.267 us
+correlation products = 256(4-1) = 768
+unique samples covered = 256(4) = 1024
+observation duration = 1024 / 30 MHz = 34.133 us
 correlation lag = 256 / 30 MHz = 8.533 us
 unambiguous CFO range = +/-Fs/(2Lp) = +/-58.594 kHz
 ```
@@ -765,7 +693,7 @@ and the CFO-aligned channel used by the phase-slope estimator is
 
 | Estimate | Products | Correlation separation | Observation span | Raw CFO range | Current role |
 |---|---:|---:|---:|---:|---|
-| Preamble `hat f_p` | 1792 | 256 samples | 2048 samples | +/-58.594 kHz | Disabled; acquisition gate only |
+| Preamble `hat f_p` | 768 | 256 samples | 1024 samples | +/-58.594 kHz | Disabled; acquisition gate only |
 | PRS CP `hat f_CP` | 8128 | 512 samples | 73152-sample PRS span | +/-29.297 kHz | Channel-CFO unwrap reference |
 | PRS channel `hat f_H` | 48384 | 576 samples | 73152-sample PRS span | +/-26.042 kHz | Pilot/data inter-symbol phase alignment |
 
@@ -794,9 +722,8 @@ correction.
 ### Warning: Current PRS ICI Is Not Removed
 
 > **Warning:** The current FFT receiver does not derotate raw PRS time samples
-> before the FFT. Preamble and CP CFO are used for payload decoding and phase
-> unwrapping, while `hat f_H` is applied only to channel estimates after the
-> FFT.
+> before the FFT. CP CFO supplies the channel-CFO unwrap reference; `hat f_H`
+> aligns pilot channels and data after FFT. Preamble CFO is disabled.
 
 Post-FFT channel rotation removes common phase evolution between OFDM symbols,
 but it cannot reverse leakage that CFO has already produced between subcarriers.
@@ -820,69 +747,6 @@ low-coherence channel CFO can therefore rotate channel symbols using an
 unreliable estimate. In addition, an invalid CP estimate is currently exported
 as finite value zero, so downstream code cannot distinguish invalid CP from a
 true zero-Hz estimate using `prs_cp_cfo_hz` alone.
-
-### Recommended First Implementation
-
-The first implementation should use two correction stages:
-
-```text
-reliable CP CFO, otherwise detector acquisition CFO or zero
--> continuous time-domain PRS derotation
--> FFT and pilot division
--> residual PRS channel CFO estimation
--> residual inter-symbol channel rotation
--> channel averaging
--> phase-slope delay estimation
-```
-
-Select the pre-FFT estimate as
-
-```math
-\hat f_0 =
-\begin{cases}
-\hat f_{\text{CP}}, & \rho_{\text{CP}} \ge \rho_{\min} \\
-\hat f_{\text{det}}, & \text{otherwise}
-\end{cases}
-```
-
-with an initial `rho_min` in the range `0.3...0.5`. Before each FFT, derotate
-the useful PRS samples using a continuous sample index measured from the start
-of the PRS section:
-
-```math
-\tilde y[n] =
-y[n]\exp\left(-j2\pi\hat f_0\frac{n}{F_s}\right)
-```
-
-The phase index must continue across CP-OFDM symbols rather than restart at
-zero for each useful symbol. This removes within-symbol rotation and most
-inter-symbol common phase before the FFT. It requires only `M NFFT = 8192`
-complex multiplications per frame and can use a recursively updated complex
-phasor instead of one sine/cosine evaluation per sample.
-
-After pre-FFT correction, the adjacent-channel estimator measures residual CFO,
-not total CFO. Its unwrap reference must therefore change from `hat f_CP` to
-zero. Define
-
-```math
-\hat f_{\text{total}} = \hat f_0 + \hat f_{\text{res}}
-```
-
-and use `hat f_res` for the remaining inter-symbol channel rotation. Suggested
-metadata is:
-
-```text
-prs_time_cfo_applied_hz
-prs_residual_cfo_hz
-prs_total_cfo_hz
-prs_cp_cfo_valid
-```
-
-If the residual is still large enough to cause meaningful ICI, an optional
-second pass can repeat the PRS derotation and FFT using `hat f_total`. The
-recommended first implementation is the single pre-FFT correction plus
-residual channel rotation; it addresses the existing ICI problem with much
-less computation than a two-pass receiver.
 
 ## Phase-Slope Delay Estimation
 
@@ -914,7 +778,7 @@ Then it performs weighted linear regression:
 with weight
 
 ```math
-w_k = |\hat{H}[k]|^2
+w_k = \max(10^{-12},|\hat{H}[k]|^2)
 ```
 
 The estimated fine delay is
@@ -940,77 +804,277 @@ phase_residual
 quality
 ```
 
-## Why Phase-Slope Does Not Currently Improve `range_m`
-
-The present SS-RTT `range_m` is computed from timestamps:
-
-```math
-RTT = T_4 - T_1 - T_{\text{reply}}
-```
+The fitted slope is the weighted covariance divided by weighted frequency
+variance. The fit residual is unweighted across the 384 bins. The code defines
+quality using coarse ZC metric, residual limit, and the pilot residual SNR:
 
 ```math
-ToF = \frac{RTT - T_{\text{cal}}}{2}
+Q=\max(0,M_z)
+\max\left(0,1-\frac{\epsilon_{rms}}{\max(10^{-6},\epsilon_{max})}\right)
+\operatorname{clip}\left(\frac{\mathrm{snr}+10}{40},0,1\right).
 ```
+
+`valid` is set by `phase_residual <= max_residual_rms` only.
+It does not enforce CRC, an SNR threshold, or a half-sample delay bound.
+`coarse_delay=(coarse_peak-frame_start)/Fs` is the configured internal
+frame-to-ZC offset, not a propagation-delay estimate.
+
+## Integer Timing and Fine Delay
+
+The detector-selected frame start sets the FFT window. For effective arrival
+delay `tau_arrival` and the corresponding coarse timing selection
+`tau_selected`, the remaining phase slope represents approximately
 
 ```math
-range = c \cdot ToF
+\tau_{fine}\simeq\tau_{arrival}-\tau_{selected}.
 ```
 
-The `fine_delay` from phase slope is measured and logged, but it is not currently
-fused into the SS-RTT range calculation.
+Integer delay is removed by shifting the extracted time window, not by
+subtracting a large delay inside the regression. A one-sample change of the
+selected boundary can change the fine estimate by roughly the opposite sample.
+Multipath, RF group delay, CFO/ICI and FFT-window errors can spoil this model;
+the implementation does not guarantee `fine_delay` lies within +/-0.5 sample.
 
-Even if fused, phase-slope delay is not automatically better in the current
-hardware setup because it includes more than propagation delay:
+The live SS-TWR solver calculates
+
+```math
+\mathrm{RTT}=T_4-T_1-T_{reply},\qquad
+R_{integer}=\frac{c}{2}(\mathrm{RTT}-T_{cal}),
+```
+
+with `T_cal = 1.159952546762614e-05 s` hard-coded in the solver.
+It publishes this as both `range_m` and `integer_range_m`. The RESPONSE
+fine-delay contribution `c * fine_delay / 2` is logged separately.
+The code does not receive the responder's POLL fine estimate in the control
+payload, so it cannot form a live bidirectional fine correction.
+
+For matched directional logs, the offline correction under consistent
+timestamp/reference conventions is
+
+```math
+R_{corrected}=R_{integer}
++\frac{c}{2}(\tau_{IR,fine}+\tau_{RI,fine}).
+```
+
+Here IR is POLL reception at the responder and RI is RESPONSE reception at
+the initiator. Each link is estimated separately; the live receiver does not
+jointly fit both channels. Historical offline measurements are recorded in
+README.md, not evidence of an implemented online fusion block.
+
+At 30 MS/s, one sample is 33.333 ns and one integer RTT range increment is
+approximately 4.997 m. A phase fit can resolve a residual below one sample,
+but low standard deviation does not establish absolute accuracy. Full-band
+pilot support spans approximately 30 MHz; the rough 1/bandwidth scale is not
+a hard lower bound on delay precision for a known waveform.
+
+## Implementation References
+
+| Processing | Source |
+|---|---|
+| Waveform construction and section scaling | [prs_frame_builder.cc](lib/DSP/prs_frame_builder.cc) |
+| Bin comb, scrambler, Golay and Gold indexing | [mc_ds_prs.h](lib/DSP/mc_ds_prs.h) |
+| Packet serialization and CRC | [prs_payload_codec.cc](lib/DSP/prs_payload_codec.cc) |
+| Local / FFT-ZC acquisition | [local detector](lib/DSP/prs_frame_detector_impl.cc), [FFT-ZC detector](lib/DSP/prs_fft_zc_frame_detector_impl.cc) |
+| CP CFO, frequency axes, phase unwrap | [prs_receiver_utils.cc](lib/DSP/prs_receiver_utils.cc) |
+| FFT, channel/payload, phase fit | [FFT receiver](lib/DSP/prs_fft_receiver_impl.cc), [channel estimator](lib/DSP/prs_channel_estimator_impl.cc), [phase estimator](lib/DSP/prs_phase_slope_estimator_impl.cc) |
+| Timestamp range | [prs_ssrtt_solver_impl.cc](lib/USRP/prs_ssrtt_solver_impl.cc) |
+
+## Historical Standalone BPSK Payload
+
+The following section documents the waveform used for the earlier attenuation
+experiments. It is not generated or decoded by the current production path.
+
+Both POLL and RESPONSE frames contain the complete fixed-length BPSK payload:
 
 ```text
-measured phase slope =
-  propagation delay
-+ TX/RX RF group delay
-+ analog filter group delay
-+ antenna/cable delay
-+ residual coarse timing offset
-+ residual CFO/SFO phase error
-+ multipath phase distortion
-+ USRP channel-dependent phase behavior
+[16 reference samples]
+[8-bit packet type, repeated 280 samples/bit]
+[32-bit poll frame ID, repeated 280 samples/bit]
+[32-bit response frame ID, repeated 280 samples/bit]
+[32-bit reply delay, repeated 280 samples/bit]
+[16-bit CRC, repeated 280 samples/bit]
 ```
 
-The issue is not simply that sample range resolution is larger than carrier
-phase resolution. A sample at `Fs = 10 MHz` is
+The payload geometry is:
 
-```math
-T_s = 100 ns
-```
+| Part | Information bits | Samples per bit | Payload samples | Sample offsets |
+|---|---:|---:|---:|---:|
+| Known BPSK reference | N/A | 1 per reference sign | 16 | 0-15 |
+| Packet type | 8 | 280 | 2240 | 16-2255 |
+| Poll frame ID | 32 | 280 | 8960 | 2256-11215 |
+| Response frame ID | 32 | 280 | 8960 | 11216-20175 |
+| Reply delay samples | 32 | 280 | 8960 | 20176-29135 |
+| CRC16 | 16 | 280 | 4480 | 29136-33615 |
+| **Total** | **104 information + 16 CRC bits** |  | **33616 samples** | **0-33615** |
 
-For two-way RTT, one sample corresponds to
-
-```math
-\Delta R_{\text{sample}} = \frac{cT_s}{2} \approx 15 m
-```
-
-For `Fs = 30 MHz`, this becomes about `5 m`.
-
-Phase slope can in principle estimate sub-sample delay because it uses phase
-across bandwidth, not only the nearest time sample. However, the useful
-resolution depends on bandwidth, SNR, calibration, and model validity. The 384
-pilot bins are interleaved across the complete 512-bin FFT, so their frequency
-support spans approximately
-
-```math
-B \approx N\Delta f = F_s
-```
-
-The current 512-bin configuration therefore gives:
+At `Fs = 30 MS/s`:
 
 ```text
-Fs = 10 MHz: B ≈ 10 MHz
-Fs = 30 MHz: B ≈ 30 MHz
+one BPSK sample                    = 33.333 ns
+one repeated information bit      = 280 samples = 9.333 us
+16-sample reference duration      = 0.533 us
+33600 repeated data/CRC samples   = 1120.000 us
+complete 33616-sample payload     = 1120.533 us
+uncoded information-bit rate      = 30 MS/s / 280 = 107.143 kbit/s
 ```
 
-The rough delay discrimination scale is on the order of `1/B`, which corresponds
-to tens of meters unless SNR and calibration are good enough for sub-bin
-super-resolution. In this project, the uncalibrated RF/clock/group-delay terms
-are currently larger than the fine propagation phase term being sought.
+There is no separate pulse-shaping stage inside the payload encoder. One real
+BPSK value is written into each complex baseband sample:
 
-Therefore, phase-slope is useful today as a quality/channel diagnostic, but the
-stable absolute range is still dominated by SS-RTT timestamping and empirical
-calibration.
+```text
+bit 0 -> -amplitude + j0
+bit 1 -> +amplitude + j0
+```
+
+Every information bit is encoded as 280 identical consecutive samples. After
+CFO and common-phase correction, the decoder sums the real values of all 280
+samples and decides the bit from the sign of that coherent sum. Sample
+magnitude is retained instead of being discarded by hard voting.
+
+The 16 known reference signs are:
+
+```text
++ + + - - + - + - - - + - + + -
+```
+
+They estimate one common payload phase. All integer fields, including the
+transmitted CRC value, are serialized least-significant bit first. CRC16 uses
+initial value `0xffff` and polynomial `0x1021`. It covers these decoded fields:
+
+```text
+packet_type
+poll_frame_id
+response_frame_id
+reply_delay_samples
+```
+
+The three 32-bit fields enter the CRC one byte at a time, least-significant byte
+first.
+
+### POLL and RESPONSE Content
+
+Both packet types occupy all 33616 samples. An unused field is transmitted as
+zero; it is not physically omitted.
+
+| Payload field | Initiator POLL | Responder RESPONSE |
+|---|---|---|
+| `packet_type` | `1` (`POLL`), enabled | `2` (`RESPONSE`), enabled |
+| `poll_frame_id` | New initiator poll ID, enabled | Echo of the decoded POLL ID, enabled |
+| `response_frame_id` | `0`, **not used for POLL** | New responder response ID, enabled |
+| `reply_delay_samples` | `0`, **not used for POLL** | Configured responder delay, enabled |
+| `CRC16` | Enabled; covers type, poll ID and the two zero fields | Enabled; covers all four populated fields |
+
+The responder only schedules a RESPONSE after the received POLL payload passes
+CRC and has `packet_type = POLL`. Therefore:
+
+```text
+POLL payload CRC failure at responder
+    -> responder sends no RESPONSE
+    -> initiator can later report NO_PREAMBLE for that attempt
+
+RESPONSE payload CRC failure at initiator
+    -> initiator reports PAYLOAD_CRC
+    -> no valid SS-TWR result is produced
+```
+
+### Payload Metric
+
+The packet payload starts with `Nref = 16` known reference symbols. The
+remaining `B = 120` data and CRC bits are each repeated `R = 280` times.
+In the earlier preamble-CFO variant, the estimate was initially converted to phase increment
+`\hat{\omega}=2\pi\hat{f}_e/F_s` and applied to every payload sample. If this
+decode failed CRC, a CP-CFO retry could be attempted. Neither operation is
+part of the current OFDM payload decoder.
+
+```math
+\tilde{y}[i] = y[i]\exp(-j\hat{\omega}i)
+```
+
+For derotated reference samples `yref[i]` and expected real BPSK signs `a[i]`,
+the decoder calculates
+
+```math
+C_{\text{ref}} = \sum_{i=0}^{N_{\text{ref}}-1} y_{\text{ref}}[i]a[i]
+```
+
+```math
+M_{\text{ref}} =
+\min\left(
+1,
+\frac{|C_{\text{ref}}|}
+{\sqrt{N_{\text{ref}}\sum_i|y_{\text{ref}}[i]|^2}}
+\right)
+```
+
+It uses `conj(Cref) / |Cref|` to remove the remaining common payload phase.
+Let `z[b,r]` be corrected sample `r` of bit `b`. The coherent decision is
+
+```math
+S[b] = \sum_{r=0}^{R-1}\Re\{z[b,r]\}
+```
+
+The decoded bit is one when `S[b] >= 0` and zero otherwise. Its normalized
+decision margin is
+
+```math
+m[b] =
+\frac{|S[b]|}
+{\sum_{r=0}^{R-1}|\Re\{z[b,r]\}|}
+```
+
+The average decision metric and reported payload metric are
+
+```math
+M_{\text{decision}} = \frac{1}{B}\sum_{b=0}^{B-1}m[b]
+```
+
+```math
+\text{payload metric} = \min(M_{\text{ref}}, M_{\text{decision}})
+```
+
+`payload_metric` is in `[0, 1]` and measures reference correlation plus
+coherent-decision consistency. It is not SNR, dBFS, or CRC probability. Payload
+validity is a separate condition:
+
+```text
+frame_id_valid = received CRC16 matches the CRC16 recomputed from decoded fields
+```
+
+This historical decoder had no payload-metric acceptance threshold. A high
+`payload_metric` does not override a CRC failure.
+
+The decision metric measures consistency, not correctness. A coherently
+combined bit can still have a high margin and the wrong sign; CRC remains the
+validity check.
+
+### Historical Energy and CRC Interpretation
+
+At unchanged per-sample amplitude, increasing from 5 to 280 samples per bit
+transmits 56 times as much energy per information bit:
+
+```math
+10\log_{10}(280/5) = 17.48\ \text{dB}
+```
+
+This is additional transmitted energy and airtime, not coding gain at fixed
+`Eb/N0`.
+
+The attenuation results and their interpretation are recorded in README.md's
+Experimental History. They predate the current integrated payload and scaling.
+
+Assuming independent decoded-bit errors and that CRC detects them, a 50% packet
+failure rate across 120 bits corresponds approximately to:
+
+```math
+P_b \simeq 1 - (1 - 0.5)^{1/120} \simeq 0.00576
+```
+
+Thus only about `0.58%` post-combining decoded-bit error probability can already
+produce `50%` packet failure. This estimate is illustrative: burst errors,
+phase-estimation errors, clipping, and correlated interference violate the
+independent-error assumption.
+
+The measured `20 dB` separation is an experimental relative attenuation result,
+not an absolute receiver sensitivity or calibrated link-budget value. It does,
+however, identify the historical BPSK payload/CRC stage as the first observed
+digital failure layer before acquisition loss.

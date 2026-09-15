@@ -50,7 +50,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '512'
+    value: '128'
   states:
     bus_sink: false
     bus_source: false
@@ -62,7 +62,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '16'
+    value: '43'
   states:
     bus_sink: false
     bus_source: false
@@ -98,7 +98,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '60'
+    value: '25'
   states:
     bus_sink: false
     bus_source: false
@@ -106,11 +106,32 @@ blocks:
     coordinate: [880, 40.0]
     rotation: 0
     state: enabled
+- name: tx_gain
+  id: variable_qtgui_range
+  parameters:
+    comment: ''
+    gui_hint: ''
+    label: ''
+    min_len: '200'
+    orient: QtCore.Qt.Horizontal
+    rangeType: float
+    start: '-20'
+    step: '1'
+    stop: '60'
+    value: '2'
+    widget: counter_slider
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [976, 40.0]
+    rotation: 0
+    state: disabled
 - name: zc_length
   id: variable
   parameters:
     comment: ''
-    value: '1999'
+    value: '877'
   states:
     bus_sink: false
     bus_source: false
@@ -163,7 +184,7 @@ blocks:
     maxoutbuf: '0'
     minoutbuf: '0'
     msg: pmt.PMT_T
-    period: '250'
+    period: '750'
   states:
     bus_sink: false
     bus_source: false
@@ -264,7 +285,7 @@ blocks:
     enable_profiling: 'False'
     fft_len: '512'
     maxoutbuf: '0'
-    min_frame_gap: '1000'
+    min_frame_gap: '10000'
     minoutbuf: '0'
     preamble_len: premble_length
     preamble_repeats: premble_rep
@@ -272,13 +293,13 @@ blocks:
     reply_delay_s: '0.05'
     samp_rate: samp_rate
     tail_guard_len: '1000'
-    threshold: '0.35'
+    threshold: '0.07'
     time_gating: '1'
     window_after_s: '0.010'
     window_before_s: '0.0005'
-    zc_search_after: 4096-256
-    zc_search_before: '256'
-    zc_threshold: '0.4'
+    zc_search_after: 4096-512
+    zc_search_before: '512'
+    zc_threshold: '0.2'
     zero_guard_len: '1000'
   states:
     bus_sink: false
@@ -340,16 +361,16 @@ blocks:
     maxoutbuf: '0'
     mc_ds_gold_code_id: '2'
     minoutbuf: '0'
-    pings_per_trigger: '5'
+    pings_per_trigger: '1'
     preamble_len: premble_length
     preamble_repeats: premble_rep
     prs_symbols: '127'
     samp_rate: samp_rate
     seed: '13990001'
-    tail_guard_len: '1000'
+    tail_guard_len: '100'
     tx_amp: '0.7'
     tx_lead_time: '0.1'
-    zero_guard_len: '1000'
+    zero_guard_len: '100'
   states:
     bus_sink: false
     bus_source: false
