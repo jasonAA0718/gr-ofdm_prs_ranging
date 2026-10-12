@@ -18,6 +18,8 @@ set(ofdm_prs_ranging_dsp_sources
     DSP/prs_fft_receiver_impl.cc
     DSP/prs_fft_zc_frame_detector_impl.cc
     DSP/prs_frame_detector_impl.cc
+    DSP/prs_window_capture_impl.cc
+    DSP/prs_zc_frame_sync_impl.cc
     DSP/prs_frame_builder.cc
     DSP/prs_phase_slope_estimator_impl.cc
     DSP/prs_payload_codec.cc
@@ -54,7 +56,8 @@ endif(NOT ofdm_prs_ranging_sources)
 add_library(gnuradio-ofdm_prs_ranging SHARED ${ofdm_prs_ranging_sources})
 target_link_libraries(gnuradio-ofdm_prs_ranging
                       gnuradio::gnuradio-runtime
-                      gnuradio::gnuradio-fft)
+                      gnuradio::gnuradio-fft
+                      Volk::volk)
 if(OFDM_PRS_RANGING_ENABLE_DEBUG_LOGS)
     target_compile_definitions(gnuradio-ofdm_prs_ranging
                                PRIVATE OFDM_PRS_RANGING_ENABLE_DEBUG_LOGS)

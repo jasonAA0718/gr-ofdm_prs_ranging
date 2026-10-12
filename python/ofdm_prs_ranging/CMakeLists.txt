@@ -41,9 +41,15 @@ add_custom_target(
 GR_ADD_TEST(qa_prs_timed_burst_source ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_prs_timed_burst_source.py)
 GR_ADD_TEST(qa_prs_receiver ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_prs_receiver.py)
 GR_ADD_TEST(qa_prs_fft_zc_detector ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_prs_fft_zc_detector.py)
+GR_ADD_TEST(qa_prs_window_capture ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_prs_window_capture.py)
+GR_ADD_TEST(qa_prs_zc_frame_sync ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_prs_zc_frame_sync.py)
 GR_ADD_TEST(qa_prs_text_ui ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_prs_text_ui.py)
 GR_ADD_TEST(qa_prs_timing_collector ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_prs_timing_collector.py)
 set_tests_properties(qa_prs_receiver
                      PROPERTIES ENVIRONMENT "HOME=/tmp;XDG_CACHE_HOME=/tmp")
 set_tests_properties(qa_prs_fft_zc_detector
+                     PROPERTIES ENVIRONMENT "HOME=/tmp;XDG_CACHE_HOME=/tmp")
+set_tests_properties(qa_prs_window_capture
+                     PROPERTIES ENVIRONMENT "HOME=/tmp;XDG_CACHE_HOME=/tmp")
+set_tests_properties(qa_prs_zc_frame_sync
                      PROPERTIES ENVIRONMENT "HOME=/tmp;XDG_CACHE_HOME=/tmp")

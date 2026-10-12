@@ -62,7 +62,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '43'
+    value: '17'
   states:
     bus_sink: false
     bus_source: false
@@ -74,19 +74,19 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: int(0.05*samp_rate)
+    value: int(0.031*samp_rate)
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [320, 40.0]
+    coordinate: [328, 40.0]
     rotation: 0
     state: enabled
 - name: rx_gain
   id: variable
   parameters:
     comment: ''
-    value: '60'
+    value: '48'
   states:
     bus_sink: false
     bus_source: false
@@ -98,7 +98,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: int(30e6)
+    value: '30000000'
   states:
     bus_sink: false
     bus_source: false
@@ -110,7 +110,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '25'
+    value: '61'
   states:
     bus_sink: false
     bus_source: false
@@ -118,11 +118,32 @@ blocks:
     coordinate: [912, 40.0]
     rotation: 0
     state: enabled
+- name: tx_gain
+  id: variable_qtgui_range
+  parameters:
+    comment: ''
+    gui_hint: ''
+    label: ''
+    min_len: '200'
+    orient: QtCore.Qt.Horizontal
+    rangeType: float
+    start: '45'
+    step: '1'
+    stop: '80'
+    value: '45'
+    widget: counter_slider
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1008, 28.0]
+    rotation: 0
+    state: disabled
 - name: zc_length
   id: variable
   parameters:
     comment: ''
-    value: '877'
+    value: '819'
   states:
     bus_sink: false
     bus_source: false
@@ -145,7 +166,24 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [224, 596.0]
+    coordinate: [272, 612.0]
+    rotation: 0
+    state: disabled
+- name: blocks_null_sink_0
+  id: blocks_null_sink
+  parameters:
+    affinity: ''
+    alias: ''
+    bus_structure_sink: '[[0,],]'
+    comment: ''
+    num_inputs: '1'
+    type: complex
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [608, 304.0]
     rotation: 0
     state: disabled
 - name: prs_acquisition_logger_0
@@ -161,7 +199,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1648, 756.0]
+    coordinate: [1688, 756.0]
     rotation: 0
     state: enabled
 - name: prs_channel_estimator_0
@@ -183,7 +221,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1304, 512.0]
+    coordinate: [1296, 552.0]
     rotation: 0
     state: enabled
 - name: prs_csv_logger_0
@@ -249,19 +287,19 @@ blocks:
     reply_delay_s: '0.05'
     samp_rate: samp_rate
     tail_guard_len: '1000'
-    threshold: '0.05'
+    threshold: '0.15'
     time_gating: 'False'
     window_after_s: '1'
     window_before_s: '1'
     zc_search_after: 4096-512
     zc_search_before: '512'
-    zc_threshold: '0.12'
+    zc_threshold: '0.35'
     zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [400, 584.0]
+    coordinate: [440, 612.0]
     rotation: 0
     state: enabled
 - name: prs_phase_slope_estimator_0
@@ -291,7 +329,7 @@ blocks:
     affinity: ''
     alias: ''
     attach_tx_time: 'True'
-    burst_period: '0.2'
+    burst_period: '0.1'
     coarse_sync_len: zc_length
     coarse_zc_root: '29'
     comment: ''
@@ -306,15 +344,15 @@ blocks:
     prs_symbols: '127'
     samp_rate: samp_rate
     seed: '13990001'
-    tail_guard_len: '100'
+    tail_guard_len: '1000'
     tx_amp: '0.7'
-    tx_lead_time: '0.6'
-    zero_guard_len: '100'
+    tx_lead_time: '0.1'
+    zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [344, 192.0]
+    coordinate: [288, 216.0]
     rotation: 0
     state: enabled
 - name: prs_ssrtt_responder_0
@@ -464,7 +502,7 @@ blocks:
     clock_source6: ''
     clock_source7: ''
     comment: ''
-    dev_addr: '"serial=34D0563"'
+    dev_addr: '"serial=34D0564"'
     dev_args: ''
     gain0: tx_gain
     gain1: '0'
@@ -596,14 +634,12 @@ blocks:
     lo_source8: internal
     lo_source9: internal
     maxoutbuf: '0'
-    minoutbuf: '1048576
-
-      '
+    minoutbuf: '1048576'
     nchan: '1'
     num_mboards: '1'
     otw: ''
     samp_rate: samp_rate
-    sd_spec0: A:A
+    sd_spec0: A:B
     sd_spec1: ''
     sd_spec2: ''
     sd_spec3: ''
@@ -637,7 +673,7 @@ blocks:
   parameters:
     affinity: ''
     alias: ''
-    ant0: '"RX2"'
+    ant0: '"TX/RX"'
     ant1: '"RX2"'
     ant10: '"RX2"'
     ant11: '"RX2"'
@@ -807,7 +843,7 @@ blocks:
     dc_offs_enb7: default
     dc_offs_enb8: default
     dc_offs_enb9: default
-    dev_addr: '"serial=34D0563"'
+    dev_addr: '"serial=34D0564"'
     dev_args: '"recv_buff_size=20000000,num_recv_frames=700"'
     gain0: rx_gain
     gain1: '0'
@@ -1006,7 +1042,7 @@ blocks:
     nchan: '1'
     num_mboards: '1'
     otw: ''
-    rx_agc0: Enabled
+    rx_agc0: Default
     rx_agc1: Default
     rx_agc10: Default
     rx_agc11: Default
@@ -1091,7 +1127,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [632, 360.0]
+    coordinate: [600, 448.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_1_0_0_0_0_1
@@ -1117,7 +1153,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [720, 664.0]
+    coordinate: [784, 728.0]
     rotation: 0
     state: enabled
 - name: virtual_source_0
@@ -1182,7 +1218,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [88, 984.0]
+    coordinate: [80, 1024.0]
     rotation: 0
     state: enabled
 
@@ -1195,6 +1231,7 @@ connections:
 - [prs_phase_slope_estimator_0, measurement_out, prs_csv_logger_0, measurement_in]
 - [prs_phase_slope_estimator_0, measurement_out, prs_ssrtt_responder_0, measurement_in]
 - [prs_phase_slope_estimator_0, measurement_out, prs_text_ui_0, measurement_in]
+- [prs_source, '0', blocks_null_sink_0, '0']
 - [prs_source, '0', uhd_usrp_sink_0, '0']
 - [prs_source, tx_time_out, virtual_sink_0_0, '0']
 - [prs_ssrtt_responder_0, trigger_out, virtual_sink_0, '0']

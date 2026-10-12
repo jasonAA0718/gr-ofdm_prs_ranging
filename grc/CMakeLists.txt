@@ -13,6 +13,8 @@ install(FILES
     ofdm_prs_ranging_prs_timed_burst_source.block.yml
     ofdm_prs_ranging_prs_frame_detector.block.yml
     ofdm_prs_ranging_prs_fft_zc_frame_detector.block.yml
+    ofdm_prs_ranging_prs_window_capture.block.yml
+    ofdm_prs_ranging_prs_zc_frame_sync.block.yml
     ofdm_prs_ranging_prs_fft_receiver.block.yml
     ofdm_prs_ranging_prs_channel_estimator.block.yml
     ofdm_prs_ranging_prs_phase_slope_estimator.block.yml

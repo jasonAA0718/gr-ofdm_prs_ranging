@@ -1,0 +1,33 @@
+id: ofdm_prs_ranging_prs_window_capture
+label: PRS Window Capture
+category: '[ofdm_prs_ranging]'
+templates:
+  imports: from gnuradio import ofdm_prs_ranging
+  make: ofdm_prs_ranging.prs_window_capture(${samp_rate}, ${fft_len}, ${cp_len}, ${active_bins}, ${prs_symbols}, ${preamble_len}, ${preamble_repeats}, ${coarse_sync_len}, ${zero_guard_len}, ${tail_guard_len}, ${threshold}, ${min_frame_gap}, ${candidate_margin_before}, ${candidate_margin_after}, ${queue_depth}, ${acquisition_enabled}, ${enable_profiling})
+parameters:
+- {id: samp_rate, label: Sample Rate, dtype: real, default: 30e6}
+- {id: fft_len, label: FFT Length, dtype: int, default: 512}
+- {id: cp_len, label: CP Length, dtype: int, default: 64}
+- {id: active_bins, label: Active Bins, dtype: int, default: 512}
+- {id: prs_symbols, label: PRS Symbols, dtype: int, default: 127}
+- {id: preamble_len, label: Preamble Length, dtype: int, default: 128}
+- {id: preamble_repeats, label: Preamble Repeats, dtype: int, default: 17}
+- {id: coarse_sync_len, label: ZC Length, dtype: int, default: 819}
+- {id: zero_guard_len, label: Zero Guard Length, dtype: int, default: 1000}
+- {id: tail_guard_len, label: Tail Guard Length, dtype: int, default: 1000}
+- {id: threshold, label: Preamble Threshold, dtype: real, default: 0.09}
+- {id: min_frame_gap, label: Minimum Frame Gap, dtype: int, default: 10000}
+- {id: candidate_margin_before, label: Candidate Margin Before, dtype: int, default: 4096}
+- {id: candidate_margin_after, label: Candidate Margin After, dtype: int, default: 4096}
+- {id: queue_depth, label: Candidate Queue Depth, dtype: int, default: 3}
+- {id: acquisition_enabled, label: Acquisition Enabled, dtype: bool, default: 'True'}
+- {id: enable_profiling, label: Enable Profiling, dtype: bool, default: 'False'}
+inputs:
+- {label: in, domain: stream, dtype: complex}
+- {label: window_in, domain: message, optional: true}
+- {label: slot_release, domain: message, optional: true}
+outputs:
+- {label: candidate_out, domain: message}
+- {label: event_out, domain: message, optional: true}
+- {label: timing_out, domain: message, optional: true}
+file_format: 1
