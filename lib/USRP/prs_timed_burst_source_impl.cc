@@ -187,7 +187,7 @@ void prs_timed_burst_source_impl::validate_parameters() const
         throw std::invalid_argument("frame lengths must be positive");
     }
     if (d_tx_amp <= 0.0f || d_tx_amp > 1.0f) {
-        throw std::invalid_argument("tx_amp must be in (0, 1.0]");
+        throw std::invalid_argument("tx_amp must be in (0, 1.0f]");
     }
     if (d_pings_per_trigger <= 0) {
         throw std::invalid_argument("pings_per_trigger must be positive");

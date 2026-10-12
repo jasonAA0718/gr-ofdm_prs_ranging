@@ -98,7 +98,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: 10e6
+    value: '30000000'
   states:
     bus_sink: false
     bus_source: false
@@ -305,13 +305,21 @@ blocks:
     reply_delay_s: Reply_Delay
     samp_rate: samp_rate
     tail_guard_len: '1000'
+<<<<<<< Updated upstream
     threshold: '0.15'
+=======
+    threshold: '0.5'
+>>>>>>> Stashed changes
     time_gating: '1'
     window_after_s: '0.0077'
     window_before_s: '0.00166'
     zc_search_after: 4096-512
     zc_search_before: '512'
+<<<<<<< Updated upstream
     zc_threshold: '0.3'
+=======
+    zc_threshold: '0.5'
+>>>>>>> Stashed changes
     zero_guard_len: '1000'
   states:
     bus_sink: false
@@ -707,7 +715,7 @@ blocks:
   parameters:
     affinity: ''
     alias: ''
-    ant0: '"RX2"'
+    ant0: '"TX/RX"'
     ant1: '"RX2"'
     ant10: '"RX2"'
     ant11: '"RX2"'
@@ -1109,7 +1117,7 @@ blocks:
     rx_agc8: Default
     rx_agc9: Default
     samp_rate: samp_rate
-    sd_spec0: A:B
+    sd_spec0: A:A
     sd_spec1: ''
     sd_spec2: ''
     sd_spec3: ''

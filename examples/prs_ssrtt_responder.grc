@@ -1075,7 +1075,7 @@ blocks:
     rx_agc8: Default
     rx_agc9: Default
     samp_rate: samp_rate
-    sd_spec0: A:B
+    sd_spec0: A:A
     sd_spec1: ''
     sd_spec2: ''
     sd_spec3: ''
