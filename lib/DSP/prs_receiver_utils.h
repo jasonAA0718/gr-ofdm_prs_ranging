@@ -9,6 +9,7 @@
 #define INCLUDED_OFDM_PRS_RANGING_PRS_RECEIVER_UTILS_H
 
 #include "prs_payload_codec.h"
+#include "prs_phy_geometry.h"
 #include <gnuradio/gr_complex.h>
 #include <pmt/pmt.h>
 #include <cstdint>
@@ -28,8 +29,6 @@ struct prs_rx_config {
     int preamble_repeats = 16;
     int coarse_sync_len = 839;
     int payload_len = 0;
-    int zero_guard_len = 1000;
-    int tail_guard_len = 1000;
     uint32_t seed = 13990001;
     int coarse_zc_root = 25;
     int channel_id = 0;

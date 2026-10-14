@@ -73,8 +73,6 @@ prs_zc_frame_sync::sptr prs_zc_frame_sync::make(double samp_rate,
                                                 int preamble_len,
                                                 int preamble_repeats,
                                                 int coarse_sync_len,
-                                                int zero_guard_len,
-                                                int tail_guard_len,
                                                 float preamble_threshold,
                                                 float zc_threshold,
                                                 int coarse_zc_root,
@@ -89,8 +87,6 @@ prs_zc_frame_sync::sptr prs_zc_frame_sync::make(double samp_rate,
                                                              preamble_len,
                                                              preamble_repeats,
                                                              coarse_sync_len,
-                                                             zero_guard_len,
-                                                             tail_guard_len,
                                                              preamble_threshold,
                                                              zc_threshold,
                                                              coarse_zc_root,
@@ -106,8 +102,6 @@ prs_zc_frame_sync_impl::prs_zc_frame_sync_impl(double samp_rate,
                                                int preamble_len,
                                                int preamble_repeats,
                                                int coarse_sync_len,
-                                               int zero_guard_len,
-                                               int tail_guard_len,
                                                float preamble_threshold,
                                                float zc_threshold,
                                                int coarse_zc_root,
@@ -123,7 +117,7 @@ prs_zc_frame_sync_impl::prs_zc_frame_sync_impl(double samp_rate,
 {
     if (samp_rate <= 0.0 || fft_len <= 0 || cp_len < 0 || active_bins <= 0 ||
         prs_symbols <= 0 || preamble_len <= 0 || preamble_repeats < 2 ||
-        coarse_sync_len <= 0 || zero_guard_len < 0 || tail_guard_len < 0) {
+        coarse_sync_len <= 0) {
         throw std::invalid_argument("invalid PRS ZC frame-sync geometry");
     }
     if (preamble_threshold <= 0.0f || preamble_threshold > 1.0f || zc_threshold <= 0.0f ||
@@ -139,8 +133,6 @@ prs_zc_frame_sync_impl::prs_zc_frame_sync_impl(double samp_rate,
     d_cfg.preamble_len = preamble_len;
     d_cfg.preamble_repeats = preamble_repeats;
     d_cfg.coarse_sync_len = coarse_sync_len;
-    d_cfg.zero_guard_len = zero_guard_len;
-    d_cfg.tail_guard_len = tail_guard_len;
     d_cfg.coarse_zc_root = coarse_zc_root;
     d_cfg.channel_id = channel_id;
     d_coarse = coarse_sync_sequence(coarse_sync_len, coarse_zc_root);
@@ -182,8 +174,8 @@ bool prs_zc_frame_sync_impl::metadata_matches_geometry(const pmt::pmt_t& meta) c
            metadata_int_matches(meta, "preamble_len", d_cfg.preamble_len) &&
            metadata_int_matches(meta, "preamble_repeats", d_cfg.preamble_repeats) &&
            metadata_int_matches(meta, "coarse_sync_len", d_cfg.coarse_sync_len) &&
-           metadata_int_matches(meta, "zero_guard_len", d_cfg.zero_guard_len) &&
-           metadata_int_matches(meta, "tail_guard_len", d_cfg.tail_guard_len);
+           metadata_int_matches(meta, "zero_guard_len", phy::leading_guard_samples) &&
+           metadata_int_matches(meta, "tail_guard_len", phy::tail_guard_samples);
 }
 
 prs_zc_frame_sync_impl::cfo_reference
@@ -391,7 +383,7 @@ void prs_zc_frame_sync_impl::handle_candidate(const pmt::pmt_t& message)
             dict_ref_uint64(input_meta, "zc_search_start_offset", missing_bound);
         const uint64_t search_end_u64 =
             dict_ref_uint64(input_meta, "zc_search_end_offset", missing_bound);
-        const size_t coarse_rel = static_cast<size_t>(d_cfg.zero_guard_len) +
+        const size_t coarse_rel = static_cast<size_t>(phy::leading_guard_samples) +
                                   static_cast<size_t>(d_cfg.preamble_len) *
                                       static_cast<size_t>(d_cfg.preamble_repeats);
         const size_t flen = static_cast<size_t>(frame_len(d_cfg));

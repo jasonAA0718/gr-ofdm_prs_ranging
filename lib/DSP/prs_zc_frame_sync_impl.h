@@ -28,8 +28,6 @@ public:
                            int preamble_len,
                            int preamble_repeats,
                            int coarse_sync_len,
-                           int zero_guard_len,
-                           int tail_guard_len,
                            float preamble_threshold,
                            float zc_threshold,
                            int coarse_zc_root,

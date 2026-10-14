@@ -20,8 +20,7 @@ constexpr double pi = 3.141592653589793238462643383279502884;
 
 int prs_start_offset(const prs_rx_config& cfg)
 {
-    return cfg.zero_guard_len + cfg.preamble_len * cfg.preamble_repeats +
-           cfg.coarse_sync_len + cfg.payload_len;
+    return phy::prs_start_samples(cfg.preamble_len, cfg.preamble_repeats, cfg.coarse_sync_len) + cfg.payload_len;
 }
 
 int prs_len(const prs_rx_config& cfg)
@@ -31,7 +30,8 @@ int prs_len(const prs_rx_config& cfg)
 
 int frame_len(const prs_rx_config& cfg)
 {
-    return prs_start_offset(cfg) + prs_len(cfg) + cfg.tail_guard_len;
+    return phy::frame_samples(cfg.preamble_len, cfg.preamble_repeats, cfg.coarse_sync_len,
+                              cfg.fft_len, cfg.cp_len, cfg.prs_symbols) + cfg.payload_len;
 }
 
 std::vector<gr_complex> coarse_sync_sequence(int len, int root)

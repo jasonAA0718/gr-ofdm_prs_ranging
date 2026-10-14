@@ -26,8 +26,6 @@ public:
                             int preamble_len,
                             int preamble_repeats,
                             int coarse_sync_len,
-                            int zero_guard_len,
-                            int tail_guard_len,
                             float threshold,
                             int min_frame_gap,
                             int coarse_zc_root,

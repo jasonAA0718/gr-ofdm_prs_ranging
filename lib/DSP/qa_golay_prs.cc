@@ -117,6 +117,9 @@ BOOST_AUTO_TEST_CASE(test_gold127_table_matches_authoritative_csv)
 BOOST_AUTO_TEST_CASE(test_scrambler_and_frequency_mapping)
 {
     static_assert(sizeof(mc_ds_data_scrambler) - 1 == 128);
+    BOOST_CHECK_EQUAL(std::string(mc_ds_data_scrambler),
+                      "1101110100111011011101111000111100101011000010000110100011100101"
+                      "0011001111010100001010011100101010111100010101000110100000111000");
     int ones = 0;
     int data_bins = 0;
     int pilot_bins = 0;
@@ -151,6 +154,8 @@ BOOST_AUTO_TEST_CASE(test_mc_ds_tx_fft_mapping)
     auto source = prs_timed_burst_source::make();
     const auto frame = source->frame_samples();
     const auto bits = serialize_packet_payload(prs_payload_info{});
+    BOOST_CHECK_EQUAL(bits.size(), 80);
+    BOOST_CHECK_EQUAL(mc_ds_data_bin_count - bits.size(), 48);
     gr::fft::fft_complex_fwd fft(mc_ds_fft_len, 1);
     for (int symbol = 0; symbol < mc_ds_symbol_count; ++symbol) {
         const size_t start = static_cast<size_t>(source->prs_start() + mc_ds_cp_len) +
@@ -179,7 +184,7 @@ BOOST_AUTO_TEST_CASE(test_scrambled_poll_papr_regression)
     for (int frame_id = 0; frame_id < frame_count; ++frame_id) {
         prs_payload_info info;
         info.packet_type = prs_packet_type_poll;
-        info.poll_frame_id = static_cast<uint32_t>(frame_id);
+        info.poll_id = static_cast<uint32_t>(frame_id);
         const auto bits = serialize_packet_payload(info);
         values.push_back(
             papr_db(ifft, expected_symbol(0, mc_ds_default_gold_code_id, bits)));

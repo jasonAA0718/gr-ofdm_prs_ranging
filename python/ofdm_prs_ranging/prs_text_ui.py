@@ -124,7 +124,7 @@ class prs_text_ui(gr.basic_block):
             return
         packet_type = _integer(meta, "packet_type")
         poll_id = _integer(
-            meta, "poll_frame_id", _integer(meta, "frame_id"))
+            meta, "poll_id", _integer(meta, "frame_id"))
         now = self._clock()
         with self._lock:
             if self._role == "initiator" and packet_type == POLL:
@@ -146,7 +146,7 @@ class prs_text_ui(gr.basic_block):
         if packet_type != expected:
             return
         poll_id = _integer(
-            meta, "poll_frame_id", _integer(meta, "frame_id"))
+            meta, "poll_id", _integer(meta, "frame_id"))
         with self._lock:
             self._last_rx_time = self._clock()
             if self._role == "responder":
@@ -163,7 +163,7 @@ class prs_text_ui(gr.basic_block):
             return
 
         poll_id = _integer(
-            meta, "poll_frame_id", _integer(meta, "frame_id"))
+            meta, "poll_id", _integer(meta, "frame_id"))
         snr = _number(meta, "snr", math.nan)
         range_m = _number(meta, "range_m", math.nan)
         with self._lock:

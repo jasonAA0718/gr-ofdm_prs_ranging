@@ -60,8 +60,6 @@ prs_window_capture::sptr prs_window_capture::make(double samp_rate,
                                                   int preamble_len,
                                                   int preamble_repeats,
                                                   int coarse_sync_len,
-                                                  int zero_guard_len,
-                                                  int tail_guard_len,
                                                   float threshold,
                                                   int min_frame_gap,
                                                   int candidate_margin_before,
@@ -78,8 +76,6 @@ prs_window_capture::sptr prs_window_capture::make(double samp_rate,
                                                               preamble_len,
                                                               preamble_repeats,
                                                               coarse_sync_len,
-                                                              zero_guard_len,
-                                                              tail_guard_len,
                                                               threshold,
                                                               min_frame_gap,
                                                               candidate_margin_before,
@@ -97,8 +93,6 @@ prs_window_capture_impl::prs_window_capture_impl(double samp_rate,
                                                  int preamble_len,
                                                  int preamble_repeats,
                                                  int coarse_sync_len,
-                                                 int zero_guard_len,
-                                                 int tail_guard_len,
                                                  float threshold,
                                                  int min_frame_gap,
                                                  int candidate_margin_before,
@@ -149,7 +143,7 @@ prs_window_capture_impl::prs_window_capture_impl(double samp_rate,
 {
     if (samp_rate <= 0.0 || fft_len <= 0 || cp_len < 0 || active_bins <= 0 ||
         prs_symbols <= 0 || preamble_len <= 0 || preamble_repeats < 2 ||
-        coarse_sync_len <= 0 || zero_guard_len < 0 || tail_guard_len < 0) {
+        coarse_sync_len <= 0) {
         throw std::invalid_argument("invalid PRS window-capture geometry");
     }
     if (threshold <= 0.0f || threshold > 1.0f) {
@@ -168,12 +162,10 @@ prs_window_capture_impl::prs_window_capture_impl(double samp_rate,
     d_cfg.preamble_len = preamble_len;
     d_cfg.preamble_repeats = preamble_repeats;
     d_cfg.coarse_sync_len = coarse_sync_len;
-    d_cfg.zero_guard_len = zero_guard_len;
-    d_cfg.tail_guard_len = tail_guard_len;
 
     const size_t preamble_total =
         static_cast<size_t>(preamble_len) * static_cast<size_t>(preamble_repeats);
-    const size_t history = static_cast<size_t>(zero_guard_len) + preamble_total +
+    const size_t history = static_cast<size_t>(phy::leading_guard_samples) + preamble_total +
                            static_cast<size_t>(candidate_margin_before);
     const size_t required_ring_size = history + preamble_total + 64U;
     size_t ring_size = 1U;
@@ -625,7 +617,7 @@ bool prs_window_capture_impl::start_candidate(uint64_t crossing_index,
 {
     const uint64_t preamble_total = static_cast<uint64_t>(d_cfg.preamble_len) *
                                     static_cast<uint64_t>(d_cfg.preamble_repeats);
-    const uint64_t history = static_cast<uint64_t>(d_cfg.zero_guard_len) +
+    const uint64_t history = static_cast<uint64_t>(phy::leading_guard_samples) +
                              preamble_total + static_cast<uint64_t>(d_margin_before);
     if (crossing_index < history) {
         return false;
@@ -635,7 +627,7 @@ bool prs_window_capture_impl::start_candidate(uint64_t crossing_index,
     const uint64_t future = preamble_total +
                             static_cast<uint64_t>(d_cfg.coarse_sync_len) +
                             static_cast<uint64_t>(prs_len(d_cfg)) +
-                            static_cast<uint64_t>(d_cfg.tail_guard_len) +
+                            static_cast<uint64_t>(phy::tail_guard_samples) +
                             static_cast<uint64_t>(d_margin_after);
     if (crossing_index > std::numeric_limits<uint64_t>::max() - future) {
         return false;
@@ -727,16 +719,16 @@ pmt::pmt_t prs_window_capture_impl::candidate_metadata(uint64_t candidate_id,
     meta = pmt::dict_add(
         meta, pmt::mp("coarse_sync_len"), pmt::from_long(d_cfg.coarse_sync_len));
     meta = pmt::dict_add(
-        meta, pmt::mp("zero_guard_len"), pmt::from_long(d_cfg.zero_guard_len));
+        meta, pmt::mp("zero_guard_len"), pmt::from_long(phy::leading_guard_samples));
     meta = pmt::dict_add(
-        meta, pmt::mp("tail_guard_len"), pmt::from_long(d_cfg.tail_guard_len));
+        meta, pmt::mp("tail_guard_len"), pmt::from_long(phy::tail_guard_samples));
 
-    const uint64_t coarse_rel = static_cast<uint64_t>(d_cfg.zero_guard_len) +
+    const uint64_t coarse_rel = static_cast<uint64_t>(phy::leading_guard_samples) +
                                 static_cast<uint64_t>(d_cfg.preamble_len) *
                                     static_cast<uint64_t>(d_cfg.preamble_repeats);
     const uint64_t samples_after_zc = static_cast<uint64_t>(d_cfg.coarse_sync_len) +
                                       static_cast<uint64_t>(prs_len(d_cfg)) +
-                                      static_cast<uint64_t>(d_cfg.tail_guard_len);
+                                      static_cast<uint64_t>(phy::tail_guard_samples);
     const uint64_t search_end = d_candidate_samples.size() >= samples_after_zc
                                     ? d_candidate_samples.size() - samples_after_zc
                                     : 0;
@@ -868,7 +860,7 @@ int prs_window_capture_impl::general_work(int noutput_items,
 
     const uint64_t preamble_total = static_cast<uint64_t>(d_cfg.preamble_len) *
                                     static_cast<uint64_t>(d_cfg.preamble_repeats);
-    const uint64_t candidate_history = static_cast<uint64_t>(d_cfg.zero_guard_len) +
+    const uint64_t candidate_history = static_cast<uint64_t>(phy::leading_guard_samples) +
                                        preamble_total +
                                        static_cast<uint64_t>(d_margin_before);
     const size_t ring_capacity = d_ring_mask + 1U;

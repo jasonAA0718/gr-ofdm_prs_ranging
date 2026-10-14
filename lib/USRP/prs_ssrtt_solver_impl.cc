@@ -6,11 +6,13 @@
  */
 
 #include "prs_payload_codec.h"
+#include "prs_protocol_metadata.h"
 #include "prs_receiver_utils.h"
 #include "prs_ssrtt_solver_impl.h"
 #include "prs_timing_helper.h"
 #include <gnuradio/io_signature.h>
 #include <cmath>
+#include <stdexcept>
 
 namespace gr {
 namespace ofdm_prs_ranging {
@@ -44,6 +46,7 @@ prs_ssrtt_solver_impl::prs_ssrtt_solver_impl(double samp_rate, bool enable_profi
       d_samp_rate(samp_rate),
       d_enable_profiling(enable_profiling)
 {
+    if (!std::isfinite(samp_rate) || samp_rate <= 0) throw std::invalid_argument("invalid solver sample rate");
     message_port_register_in(pmt::mp("tx_time_in"));
     message_port_register_in(pmt::mp("measurement_in"));
     message_port_register_out(pmt::mp("ssrtt_out"));
@@ -65,11 +68,12 @@ void prs_ssrtt_solver_impl::handle_tx_time(pmt::pmt_t msg)
     if (packet_type != prs_packet_type_poll) {
         return;
     }
-    const uint64_t poll_frame_id =
-        dict_ref_uint64(msg, "poll_frame_id", dict_ref_uint64(msg, "frame_id", 0));
+    uint64_t poll_id = 0;
+    if (!bounded_uint(msg, "poll_id", 65536, 65535, poll_id)) return;
     const double t1 = dict_ref_double(msg, "tx_time_secs", 0.0) +
                       dict_ref_double(msg, "tx_time_frac", 0.0);
-    d_poll_tx_times[poll_frame_id] = t1;
+    if (!std::isfinite(t1)) return;
+    d_poll_tx_times[poll_id] = t1;
     report.checkpoint("tx_time_store");
     if (report.enabled()) {
         message_port_pub(pmt::mp("timing_out"), report.finish(msg));
@@ -90,8 +94,11 @@ void prs_ssrtt_solver_impl::handle_measurement(pmt::pmt_t msg)
         return;
     }
 
-    const uint64_t poll_frame_id = dict_ref_uint64(meta, "poll_frame_id", 0);
-    const auto found = d_poll_tx_times.find(poll_frame_id);
+    uint64_t poll_id = 0, anchor_id = 0, reply_delay_samples = 0;
+    if (!bounded_uint(meta, "poll_id", 65536, 65535, poll_id) ||
+        !bounded_uint(meta, "anchor_id", 8, 7, anchor_id) ||
+        !bounded_uint(meta, "reply_delay_samples", 0x1000000, 0xffffff, reply_delay_samples)) return;
+    const auto found = d_poll_tx_times.find(poll_id);
     if (found == d_poll_tx_times.end()) {
         return;
     }
@@ -102,12 +109,19 @@ void prs_ssrtt_solver_impl::handle_measurement(pmt::pmt_t msg)
         return;
     }
 
-    const uint64_t reply_delay_samples = dict_ref_uint64(meta, "reply_delay_samples", 0);
     const double reply_delay_s = static_cast<double>(reply_delay_samples) / d_samp_rate;
     const double rtt_s = t4 - t1 - reply_delay_s;
     const double tof_s = (rtt_s + 4.841619800497349e-5)/ 2.0; // the processing delay of the response packet;
     const double range_m = tof_s * c_mps;
-    const double response_fine_delay_s = dict_ref_double(meta, "fine_delay", 0.0);
+    const double poll_fine_samples = dict_ref_double(meta, "poll_fine_delay_samples", NAN);
+    const double response_fine_samples = dict_ref_double(meta, "fine_delay_samples", NAN);
+    const bool fine_valid = metadata_true(meta, "fine_delay_valid") &&
+        metadata_true(meta, "valid") && std::isfinite(poll_fine_samples) &&
+        std::isfinite(response_fine_samples);
+    const double correction_m = fine_valid
+        ? c_mps / (2.0 * d_samp_rate) * (poll_fine_samples + response_fine_samples) : NAN;
+    const double corrected_range_m = fine_valid ? range_m + correction_m : NAN;
+    const double response_fine_delay_s = response_fine_samples / d_samp_rate;
     const double response_phase_range_correction_m = 0.5 * c_mps * response_fine_delay_s;
     report.checkpoint("ssrtt_calculation");
 
@@ -125,6 +139,12 @@ void prs_ssrtt_solver_impl::handle_measurement(pmt::pmt_t msg)
     meta = pmt::dict_add(meta,
                          pmt::mp("response_phase_range_correction_m"),
                          pmt::from_double(response_phase_range_correction_m));
+    meta = pmt::dict_add(meta, pmt::mp("measurement_timestamp"), pmt::from_double(t4));
+    meta = pmt::dict_add(meta, pmt::mp("poll_fine_delay_samples"), pmt::from_double(poll_fine_samples));
+    meta = pmt::dict_add(meta, pmt::mp("response_fine_delay_samples"), pmt::from_double(response_fine_samples));
+    meta = pmt::dict_add(meta, pmt::mp("fine_range_correction_m"), pmt::from_double(correction_m));
+    meta = pmt::dict_add(meta, pmt::mp("corrected_range_m"), pmt::from_double(corrected_range_m));
+    meta = pmt::dict_add(meta, pmt::mp("fine_correction_valid"), fine_valid ? pmt::PMT_T : pmt::PMT_F);
     auto stage_stop = report.mark();
     report.add("metadata_build", stage_start, stage_stop);
 

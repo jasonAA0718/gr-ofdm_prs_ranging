@@ -1,12 +1,12 @@
 # OFDM PRS / SS-TWR Ranging
 
 GNU Radio OOT blocks for USRP/UHD burst ranging using a custom OFDM PRS-like
-waveform. The immediate system measures a single POLL/RESPONSE link; the
+waveform. The current system supports a single POLL/RESPONSE link; the
 long-term goal is positioning with multiple anchors. It is not a
 standards-complete LTE/NR PRS implementation.
 
-This overview was reconciled with the source and working-tree examples on
-2026-09-14. [signal.md](signal.md) is the detailed waveform and DSP reference.
+Packet, geometry and one-anchor ranging sections were updated for Phase B.
+The historical sections retain their original provenance. [signal.md](signal.md) is the detailed waveform and DSP reference.
 Roadmap, proposed changes, and outstanding experiments are in local
 `Agenda.md`, intentionally excluded from Git.
 
@@ -15,7 +15,7 @@ Roadmap, proposed changes, and outstanding experiments are in local
 The current waveform combines 127 Gold-spread OFDM symbols with a repeated
 QPSK acquisition preamble and coarse ZC synchronization. Every OFDM symbol
 has 512 bins and a 64-sample CP: 384 pilot bins and 128 data/padding bins.
-The 120-bit control packet, including CRC, is carried inside OFDM. There is
+The 80-bit packet v2, including CRC, is carried inside OFDM. There is
 no standalone time-domain BPSK payload in the current receiver chain.
 
 | Capability | Implementation status |
@@ -23,12 +23,13 @@ no standalone time-domain BPSK payload in the current receiver chain.
 | Timed POLL/RESPONSE SS-TWR | Implemented using UHD sample timestamps and timed TX |
 | Integrated OFDM payload | Implemented; 512 bins, 127 Gold chips, fixed data scrambler |
 | Local-ZC detector | Available as `prs_frame_detector` |
-| FFT-ZC detector | Available as `prs_fft_zc_frame_detector`; selected by all four supplied GRCs |
+| FFT-ZC detector | Available as `prs_fft_zc_frame_detector`; selected by the main and profiling GRCs |
 | CFO handling | CP estimate plus post-FFT pilot/data phase alignment; optional FFT-ZC CFO feedback |
 | Fine delay | Weighted phase-slope estimate from the averaged 384 pilot bins |
-| Live range | Timestamp SS-TWR with hard-coded calibration; fine delay logged separately |
+| Live range | Integer timestamp SS-TWR plus separate bidirectional corrected range when both fine estimates are valid |
 | Profiling | Optional instrumentation in existing blocks and a timing collector |
-| Multi-anchor operation | Association primitives exist; simultaneous separation/positioning not verified |
+| Anchor identity | Packet-level anchor ID 0–7; responder POLL fine delay transported in RESPONSE |
+| Multi-anchor operation | Cycle/slot management and positioning not implemented |
 | DS-TWR, clock-skew correction, pre-FFT PRS CFO correction | Not implemented |
 
 The FFT-ZC algorithm remains experimental in accuracy terms even though the
@@ -62,10 +63,11 @@ inter-symbol CFO, aligns and averages pilot channels, and despreads/equalizes
 the data before CRC checking. The phase estimator receives the compact
 384-bin channel vector.
 
-Only CRC-valid packets with the appropriate packet type reach SS-TWR processing.
+Only CRC/reserved-valid packets with the appropriate packet type reach SS-TWR processing.
 The responder additionally requires a finite receive timestamp. Phase-fit
-`valid` and payload `frame_id_valid` are distinct: the SS-TWR blocks check
-payload validity, not a phase-quality acceptance policy.
+`valid` and payload `frame_id_valid` are distinct. Integer ranging requires
+packet validity; bidirectional correction additionally requires both directional
+fine estimates to be valid and finite.
 
 Initiator TX timing is decoupled from receiver processing:
 
@@ -100,58 +102,47 @@ normalized to requested RMS `tx_amp`, then the complete OFDM section is
 uniformly reduced if needed to limit its peak magnitude to 0.9. That limiter
 does not scale acquisition sections. Payload and pilots share the OFDM scale.
 
-The working-tree GRC configuration is an experiment snapshot, not a single
-synchronized reference pair:
+Leading and tail guards are internal fixed 1000-sample PHY constants shared by
+TX and RX. Guard constructor arguments and GRC controls have been removed;
+external positional callers must remove the former ninth and tenth arguments.
+No ignored compatibility arguments are retained. Rebuild/reinstall consumers.
 
-| GRC pair/member | Sample rate | Carrier | Preamble period / repeats | ZC length | Zero / tail guard |
-|---|---:|---:|---:|---:|---:|
-| Main initiator | 30 MS/s | 1060 MHz | 512 / 33 | 2001 | 100 / 100 |
-| Main responder | 30 MS/s | 1060 MHz | 512 / 16 | 1999 | 1000 / 1000 |
-| FFT-ZC profiling pair | 30 MS/s | 1060 MHz | 256 / 4 | 419 | 1000 / 1000 |
+The main examples use 128/17/819 preamble period/repeats/ZC, 31 ms replies,
+and 30 MS/s at 1060 MHz. The profiling pair uses 256/4/419 and 50 ms replies.
+Runtime gain, thresholds, delays, receive margins and strobe settings remain
+configurable. The user's main initiator threshold selections are preserved.
+The split acquisition example and committed responder Python use
+`window_capture -> zc_frame_sync`; its preamble CFO corrects ZC-search scratch
+samples while the downstream FFT receives original samples. Monolithic paths
+retain disabled preamble CFO. No acquisition redesign was made in Phase B.
 
-The main initiator and responder geometries differ. This review does not infer
-which configuration was intended or modify either. Both responder GRCs
-schedule a 50 ms reply delay; the initiators gate around 50 ms with a 0.5 ms
-early and 10 ms late margin. Responder detector `reply_delay_s=0.08` is inactive
-because its time gating is disabled. Strobe interval and burst-source
-`burst_period` are different controls, not interchangeable update-rate claims.
-
-Unique response ZC roots and `channel_id` provide acquisition association.
-Gold-code selection supplies a spreading reference, not authentication.
-A wrong code can leave a common scalar in channel and data that cancels during
-equalization; CRC failure is not guaranteed solely by code mismatch.
-Independent overlapping-anchor ranging has not been established.
+Responder `anchor_id` is appended after the existing profiling argument.
+Packet identity is authoritative; channel labels, ZC roots and Gold codes do
+not substitute for anchor identity or establish overlapping-response separation.
+All modified measurement/profiling CSV identity columns now use `poll_id` and
+`anchor_id`; use new output files rather than appending to old-schema CSVs.
 
 ## Ranging and Diagnostics
 
 The live solver uses POLL TX time T1, RESPONSE RX time T4, and the responder's
-reported reply delay. It calculates:
+reported reply delay. It retains the existing additive hard-coded calibration and publishes integer
+range alongside a separate corrected range. The RESPONSE carries the responder's
+POLL phase estimate, and the initiator adds both directional residuals only when
+their validity/finite checks pass. Invalid correction produces NaN, leaving
+integer range available. Exact packet, Q10 and range equations are in
+[signal.md](signal.md). No clock-skew compensation or FINAL packet is present.
 
-```text
-rtt_s = T4 - T1 - reply_delay_samples / samp_rate
-tof_s = (rtt_s - 1.159952546762614e-05) / 2
-range_m = integer_range_m = 299792458 * tof_s
-```
-
-The calibration term is hard-coded in `lib/USRP/prs_ssrtt_solver_impl.cc`,
-not a currently exposed calibration setting. RESPONSE scheduling uses the
-responder's own clock; no clock-skew compensation or FINAL packet is present.
-
-Fine delay is relative to the detector-selected FFT window. It is not the full
-absolute propagation time and is not restricted by code to half a sample.
-The live solver logs the received RESPONSE contribution
-`299792458 * fine_delay / 2` separately. Bidirectional correction requires
-matched POLL and RESPONSE measurements; it is not added to live `range_m`.
-See the timestamp/fine-delay discussion in [signal.md](signal.md).
+Fine delay is relative to the detector-selected FFT window, not absolute ToF,
+and is not restricted to half a sample. Software QA does not validate RF accuracy.
 
 Acquisition logging joins detector failures with downstream payload outcomes.
-The principal IDs are `attempt_id`, `poll_frame_id`, and
-`response_frame_id`. Internal metadata still contains compatibility IDs;
+The principal IDs are `attempt_id`, `poll_id`, and
+`anchor_id`. Internal metadata still contains compatibility IDs;
 CRC-failed decoded IDs should not be trusted as packet identities.
 
 | Failure reason | Meaning |
 |---|---|
-| `NONE` | Payload CRC passed |
+| `NONE` | Packet CRC and reserved bits passed |
 | `PAYLOAD_CRC` | Downstream payload decode failed; also used for short symbol input |
 | `NO_PREAMBLE` | Gated attempt expired without a recorded preamble gate |
 | `ZC_SYNC` | Recorded preamble candidate without accepted ZC confirmation |
@@ -304,3 +295,16 @@ Those assertions conflict with the implemented 0.95 acquisition amplitude and
 independent OFDM limiter; the test needs a separate implementation/QA update.
 Public constructor changes require corresponding headers, bindings, GRC YAML,
 examples, and focused QA updates.
+
+Phase B software verification: the build passes and the full registered suite
+passes 8/11 targets. Packet v2, Q10 bounds/validity, PMT trigger rejection, fixed
+guards, synthetic one-anchor transport and bidirectional correction pass. The
+old whole-frame 0.9 amplitude assertions still conflict with unchanged 0.95
+acquisition sections. The required v2 POLL bit pattern also changes the existing
+PAPR regression: P99.9 9.7167 dB and maximum 10.1913 dB exceed its old 9.6/10.0
+limits. An isolated re-run of the original v1 codec/PAPR benchmark gave
+P99.9 8.9338 dB and maximum 9.5733 dB, confirming this is a v2 regression.
+Those limits and waveform scaling were not changed to make QA green.
+The obsolete subtractive-calibration/1-us synthetic assertions were reconciled
+with the unchanged additive source expression in the updated ranging QA.
+No RF validation, multi-anchor cycle manager or positioning is claimed.

@@ -19,8 +19,9 @@ class OFDM_PRS_RANGING_API prs_ssrtt_responder : virtual public gr::block
 public:
     typedef std::shared_ptr<prs_ssrtt_responder> sptr;
     static sptr make(double samp_rate = 10e6,
-                     uint32_t reply_delay_samples = 50000,
-                     bool enable_profiling = false);
+                     uint64_t reply_delay_samples = 50000,
+                     bool enable_profiling = false,
+                     uint64_t anchor_id = 0);
 };
 
 } // namespace ofdm_prs_ranging

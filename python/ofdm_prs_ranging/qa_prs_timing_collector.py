@@ -29,7 +29,7 @@ def timing_message():
     message = pmt.dict_add(
         message, pmt.intern("handler_duration_ns"), pmt.from_uint64(18000))
     message = pmt.dict_add(message, pmt.intern("attempt_id"), pmt.from_uint64(7))
-    message = pmt.dict_add(message, pmt.intern("poll_frame_id"), pmt.from_uint64(7))
+    message = pmt.dict_add(message, pmt.intern("poll_id"), pmt.from_uint64(7))
     message = pmt.dict_add(message, pmt.intern("valid"), pmt.PMT_T)
     return pmt.dict_add(message, pmt.intern("stages"), stages)
 

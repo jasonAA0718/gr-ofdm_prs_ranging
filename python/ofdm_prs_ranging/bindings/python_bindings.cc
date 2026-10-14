@@ -8,6 +8,7 @@
  */
 
 #include <pybind11/pybind11.h>
+#include "prs_phy_geometry.h"
 
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <numpy/arrayobject.h>
@@ -57,6 +58,8 @@ PYBIND11_MODULE(ofdm_prs_ranging_python, m)
     // Initialize the numpy C API
     // (otherwise we will see segmentation faults)
     init_numpy();
+    m.attr("PHY_LEADING_GUARD_SAMPLES") = gr::ofdm_prs_ranging::phy::leading_guard_samples;
+    m.attr("PHY_TAIL_GUARD_SAMPLES") = gr::ofdm_prs_ranging::phy::tail_guard_samples;
 
     // Allow access to base block methods
     py::module::import("gnuradio.gr");

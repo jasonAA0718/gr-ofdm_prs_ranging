@@ -16,8 +16,6 @@ void bind_prs_zc_frame_sync(py::module& m)
              py::arg("preamble_len") = 128,
              py::arg("preamble_repeats") = 17,
              py::arg("coarse_sync_len") = 819,
-             py::arg("zero_guard_len") = 1000,
-             py::arg("tail_guard_len") = 1000,
              py::arg("preamble_threshold") = 0.09f,
              py::arg("zc_threshold") = 0.35f,
              py::arg("coarse_zc_root") = 25,

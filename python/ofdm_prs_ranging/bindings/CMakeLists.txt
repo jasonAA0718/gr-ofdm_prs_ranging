@@ -47,6 +47,8 @@ list(APPEND ofdm_prs_ranging_python_files
 
 gr_pybind_make_oot(ofdm_prs_ranging ../../.. gr::ofdm_prs_ranging "${ofdm_prs_ranging_python_files}")
 
+target_include_directories(ofdm_prs_ranging_python PRIVATE ${PROJECT_SOURCE_DIR}/lib/DSP)
+
 # copy bindings extension for use in QA test module
 add_custom_command(
     TARGET ofdm_prs_ranging_python

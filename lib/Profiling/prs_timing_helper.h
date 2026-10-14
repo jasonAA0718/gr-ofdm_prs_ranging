@@ -114,7 +114,7 @@ public:
         result = pmt::dict_add(result, pmt::mp("stages"), stages);
 
         static const char* keys[] = {
-            "attempt_id", "poll_frame_id", "response_frame_id", "frame_id", "packet_type"
+            "attempt_id", "poll_id", "anchor_id", "frame_id", "packet_type"
         };
         for (const auto* key_name : keys) {
             const auto key = pmt::mp(key_name);

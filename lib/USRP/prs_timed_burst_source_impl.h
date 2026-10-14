@@ -28,8 +28,6 @@ private:
     int d_preamble_len;
     int d_preamble_repeats;
     int d_coarse_sync_len;
-    int d_zero_guard_len;
-    int d_tail_guard_len;
     double d_tx_lead_time;
     double d_burst_period;
     float d_tx_amp;
@@ -72,8 +70,6 @@ public:
                                 int preamble_len,
                                 int preamble_repeats,
                                 int coarse_sync_len,
-                                int zero_guard_len,
-                                int tail_guard_len,
                                 double tx_lead_time,
                                 double burst_period,
                                 float tx_amp,

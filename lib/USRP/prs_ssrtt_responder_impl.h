@@ -18,12 +18,14 @@ class prs_ssrtt_responder_impl : public prs_ssrtt_responder
 {
 public:
     prs_ssrtt_responder_impl(double samp_rate,
-                             uint32_t reply_delay_samples,
-                             bool enable_profiling);
+                             uint64_t reply_delay_samples,
+                             bool enable_profiling,
+                             uint64_t anchor_id);
 
 private:
     double d_samp_rate;
-    uint32_t d_reply_delay_samples;
+    uint64_t d_reply_delay_samples;
+    uint64_t d_anchor_id;
     bool d_enable_profiling;
 
     void handle_measurement(pmt::pmt_t msg);

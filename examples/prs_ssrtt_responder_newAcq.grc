@@ -203,9 +203,7 @@ blocks:
     prs_symbols: '127'
     queue_depth: '2'
     samp_rate: 30e6
-    tail_guard_len: '1000'
     threshold: '0.09'
-    zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
@@ -233,9 +231,7 @@ blocks:
     preamble_threshold: '0.15'
     prs_symbols: '127'
     samp_rate: 30e6
-    tail_guard_len: '1000'
     zc_threshold: '0.35'
-    zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
@@ -362,10 +358,8 @@ blocks:
     prs_symbols: '127'
     samp_rate: samp_rate
     seed: '13990001'
-    tail_guard_len: '1000'
     tx_amp: '0.7'
     tx_lead_time: '0.1'
-    zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
@@ -378,6 +372,7 @@ blocks:
   parameters:
     affinity: ''
     alias: ''
+    anchor_id: '0'
     comment: ''
     enable_profiling: '0'
     maxoutbuf: '0'
@@ -1184,7 +1179,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1192, 784.0]
+    coordinate: [1208, 848.0]
     rotation: 0
     state: enabled
 - name: virtual_source_0

@@ -33,8 +33,8 @@ private:
         std::string block;
         std::string stage;
         uint64_t attempt_id;
-        uint64_t poll_frame_id;
-        uint64_t response_frame_id;
+        uint64_t poll_id;
+        uint64_t anchor_id;
         uint64_t frame_id;
         uint64_t packet_type;
         bool valid;

@@ -229,7 +229,6 @@ blocks:
     prs_symbols: '127'
     reply_delay_s: '0.08'
     samp_rate: samp_rate
-    tail_guard_len: '1000'
     threshold: '0.35'
     time_gating: 'False'
     window_after_s: '0.0012'
@@ -237,7 +236,6 @@ blocks:
     zc_search_after: 8192-512
     zc_search_before: '512'
     zc_threshold: '0.5'
-    zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
@@ -287,10 +285,8 @@ blocks:
     prs_symbols: '127'
     samp_rate: samp_rate
     seed: '13990001'
-    tail_guard_len: '1000'
     tx_amp: '0.7'
     tx_lead_time: '0.6'
-    zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
@@ -301,6 +297,7 @@ blocks:
 - name: prs_ssrtt_responder_0
   id: ofdm_prs_ranging_prs_ssrtt_responder
   parameters:
+    anchor_id: '0'
     affinity: ''
     alias: ''
     comment: ''

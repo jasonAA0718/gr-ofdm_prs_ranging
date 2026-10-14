@@ -16,8 +16,6 @@ void bind_prs_frame_detector(py::module& m)
              py::arg("preamble_len") = 128,
              py::arg("preamble_repeats") = 16,
              py::arg("coarse_sync_len") = 839,
-             py::arg("zero_guard_len") = 1000,
-             py::arg("tail_guard_len") = 1000,
              py::arg("threshold") = 0.35f,
              py::arg("min_frame_gap") = 10000,
              py::arg("coarse_zc_root") = 25,

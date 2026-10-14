@@ -3,7 +3,7 @@ label: PRS ZC Frame Sync
 category: '[ofdm_prs_ranging]'
 templates:
   imports: from gnuradio import ofdm_prs_ranging
-  make: ofdm_prs_ranging.prs_zc_frame_sync(${samp_rate}, ${fft_len}, ${cp_len}, ${active_bins}, ${prs_symbols}, ${preamble_len}, ${preamble_repeats}, ${coarse_sync_len}, ${zero_guard_len}, ${tail_guard_len}, ${preamble_threshold}, ${zc_threshold}, ${coarse_zc_root}, ${channel_id}, ${enable_profiling})
+  make: ofdm_prs_ranging.prs_zc_frame_sync(${samp_rate}, ${fft_len}, ${cp_len}, ${active_bins}, ${prs_symbols}, ${preamble_len}, ${preamble_repeats}, ${coarse_sync_len}, ${preamble_threshold}, ${zc_threshold}, ${coarse_zc_root}, ${channel_id}, ${enable_profiling})
 parameters:
 - {id: samp_rate, label: Sample Rate, dtype: real, default: 30e6}
 - {id: fft_len, label: FFT Length, dtype: int, default: 512}
@@ -13,8 +13,6 @@ parameters:
 - {id: preamble_len, label: Preamble Length, dtype: int, default: 128}
 - {id: preamble_repeats, label: Preamble Repeats, dtype: int, default: 17}
 - {id: coarse_sync_len, label: ZC Length, dtype: int, default: 819}
-- {id: zero_guard_len, label: Zero Guard Length, dtype: int, default: 1000}
-- {id: tail_guard_len, label: Tail Guard Length, dtype: int, default: 1000}
 - {id: preamble_threshold, label: Preamble Threshold, dtype: real, default: 0.09}
 - {id: zc_threshold, label: ZC Threshold, dtype: real, default: 0.35}
 - {id: coarse_zc_root, label: Coarse ZC Root, dtype: int, default: 25}

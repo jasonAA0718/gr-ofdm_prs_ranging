@@ -76,8 +76,8 @@ prs_acquisition_logger_impl::prs_acquisition_logger_impl(const std::string& path
 {
     if (!append || d_file.tellp() == 0) {
         d_file << "log_time_unix,node,attempt_id,failure_reason,channel_id,coarse_zc_"
-                  "root,packet_type,poll_frame_id,"
-                  "response_frame_id,reply_delay_samples,frame_id_valid,rx_time,"
+                  "root,packet_type,poll_id,"
+                  "anchor_id,reply_delay_samples,frame_id_valid,rx_time,"
                   "preamble_metric,coarse_metric,zc_peak_ratio,zc_gate_offset_samples,"
                   "payload_initial_valid,payload_initial_metric,"
                   "payload_retry_valid,payload_retry_metric,payload_metric,"
@@ -120,8 +120,8 @@ void prs_acquisition_logger_impl::handle_frame(pmt::pmt_t msg)
         << dict_ref_uint64(meta, "channel_id", 0) << ','
         << dict_ref_uint64(meta, "coarse_zc_root", 25) << ','
         << dict_ref_uint64(meta, "packet_type", 0) << ','
-        << dict_ref_uint64(meta, "poll_frame_id", 0) << ','
-        << dict_ref_uint64(meta, "response_frame_id", 0) << ','
+        << dict_ref_uint64(meta, "poll_id", 0) << ','
+        << dict_ref_uint64(meta, "anchor_id", 0) << ','
         << dict_ref_uint64(meta, "reply_delay_samples", 0) << ','
         << (pmt::to_bool(pmt::dict_ref(meta, pmt::mp("frame_id_valid"), pmt::PMT_F)) ? 1
                                                                                      : 0)

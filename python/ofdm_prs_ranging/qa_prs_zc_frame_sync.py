@@ -15,8 +15,8 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
     L = 16
     R = 5
     NZ = 31
-    NG = 20
-    NT = 20
+    NG = ofdm_prs_ranging.PHY_LEADING_GUARD_SAMPLES
+    NT = ofdm_prs_ranging.PHY_TAIL_GUARD_SAMPLES
     ROOT = 7
     CHANNEL = 4
     PREAMBLE_THRESHOLD = 0.8
@@ -40,8 +40,6 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
             self.L,
             self.R,
             self.NZ,
-            self.NG,
-            self.NT,
             self.PREAMBLE_THRESHOLD,
             self.ZC_THRESHOLD,
             self.ROOT,
@@ -307,7 +305,7 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
     def test_window_capture_to_zc_sync_path(self):
         frame_start = 500
         frame = self._frame()
-        stream = numpy.zeros(1200, dtype=numpy.complex64)
+        stream = numpy.zeros(frame_start + len(frame) + 2000, dtype=numpy.complex64)
         stream[frame_start:frame_start + len(frame)] = frame
         rx_tag = gr.tag_t()
         rx_tag.offset = 0
@@ -318,12 +316,12 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
         throttle = blocks.throttle(gr.sizeof_gr_complex, self.FS, True)
         capture = ofdm_prs_ranging.prs_window_capture(
             self.FS, self.FFT, self.CP, self.ACTIVE, self.NSYM, self.L, self.R,
-            self.NZ, self.NG, self.NT, self.PREAMBLE_THRESHOLD, 300, 64, 64,
+            self.NZ, self.PREAMBLE_THRESHOLD, 300, 64, 64,
             1, True, False)
         sync = self._sync()
         legacy = ofdm_prs_ranging.prs_frame_detector(
             self.FS, self.FFT, self.CP, self.ACTIVE, self.NSYM, self.L, self.R,
-            self.NZ, self.NG, self.NT, self.PREAMBLE_THRESHOLD, 300, self.ROOT,
+            self.NZ, self.PREAMBLE_THRESHOLD, 300, self.ROOT,
             self.CHANNEL, False, 0.05, 0.0002, 0.004, self.ZC_THRESHOLD, False)
         frames = blocks.message_debug()
         legacy_frames = blocks.message_debug()

@@ -26,8 +26,6 @@ public:
                      int preamble_len = 128,
                      int preamble_repeats = 16,
                      int coarse_sync_len = 839,
-                     int zero_guard_len = 1000,
-                     int tail_guard_len = 1000,
                      float threshold = 0.35f,
                      int min_frame_gap = 10000,
                      int coarse_zc_root = 25,

@@ -53,7 +53,7 @@ class qa_prs_text_ui(gr_unittest.TestCase):
             clock=self.clock)
 
         ui._handle_tx(metadata(
-            packet_type=1, poll_frame_id=7, frame_id=7))
+            packet_type=1, poll_id=7, frame_id=7))
         pending = ui.snapshot()
         self.assertEqual(pending["polls"], 1)
         self.assertEqual(pending["pending"], 1)
@@ -61,7 +61,7 @@ class qa_prs_text_ui(gr_unittest.TestCase):
 
         response = metadata(
             packet_type=2,
-            poll_frame_id=7,
+            poll_id=7,
             frame_id_valid=True,
             snr=23.5,
             range_m=84.25)
@@ -75,7 +75,7 @@ class qa_prs_text_ui(gr_unittest.TestCase):
         self.assertAlmostEqual(received["range_m"], 84.25)
 
         ui._handle_tx(metadata(
-            packet_type=1, poll_frame_id=8, frame_id=8))
+            packet_type=1, poll_id=8, frame_id=8))
         self.now += 1.1
         expired = ui.snapshot()
         self.assertEqual(expired["polls"], 2)
@@ -96,13 +96,13 @@ class qa_prs_text_ui(gr_unittest.TestCase):
             clock=self.clock)
         poll = metadata(
             packet_type=1,
-            poll_frame_id=12,
+            poll_id=12,
             frame_id_valid=True,
             snr=18.0)
         ui._handle_frame(pmt.cons(poll, pmt.PMT_NIL))
         ui._handle_measurement(pmt.cons(poll, pmt.PMT_NIL))
         ui._handle_tx(metadata(
-            packet_type=2, poll_frame_id=12, response_frame_id=15))
+            packet_type=2, poll_id=12, anchor_id=15))
 
         status = ui.snapshot()
         self.assertEqual(status["polls"], 1)

@@ -93,8 +93,8 @@ void prs_timing_collector_impl::handle_timing(const pmt::pmt_t& message)
     const uint64_t handler_end_ns = dict_uint64(message, "handler_end_ns");
     const uint64_t handler_duration_ns = dict_uint64(message, "handler_duration_ns");
     const uint64_t attempt_id = dict_uint64(message, "attempt_id");
-    const uint64_t poll_frame_id = dict_uint64(message, "poll_frame_id");
-    const uint64_t response_frame_id = dict_uint64(message, "response_frame_id");
+    const uint64_t poll_id = dict_uint64(message, "poll_id");
+    const uint64_t anchor_id = dict_uint64(message, "anchor_id");
     const uint64_t frame_id = dict_uint64(message, "frame_id");
     const uint64_t packet_type = dict_uint64(message, "packet_type");
     const bool valid = pmt::to_bool(pmt::dict_ref(message, pmt::mp("valid"), pmt::PMT_F));
@@ -103,8 +103,8 @@ void prs_timing_collector_impl::handle_timing(const pmt::pmt_t& message)
     rows.push_back({ block,
                      "handler_total",
                      attempt_id,
-                     poll_frame_id,
-                     response_frame_id,
+                     poll_id,
+                     anchor_id,
                      frame_id,
                      packet_type,
                      valid,
@@ -121,8 +121,8 @@ void prs_timing_collector_impl::handle_timing(const pmt::pmt_t& message)
             rows.push_back({ block,
                              symbol_string(key, "unknown"),
                              attempt_id,
-                             poll_frame_id,
-                             response_frame_id,
+                             poll_id,
+                             anchor_id,
                              frame_id,
                              packet_type,
                              valid,
@@ -143,13 +143,13 @@ void prs_timing_collector_impl::finalize()
 
     if (!d_raw_csv_path.empty()) {
         std::ofstream raw(d_raw_csv_path, std::ios::trunc);
-        raw << "role,block,stage,attempt_id,poll_frame_id,response_frame_id,frame_id,"
+        raw << "role,block,stage,attempt_id,poll_id,anchor_id,frame_id,"
                "packet_type,valid,handler_start_ns,handler_end_ns,duration_ns,duration_"
                "us\n";
         raw << std::setprecision(15);
         for (const auto& row : d_rows) {
             raw << d_role << ',' << row.block << ',' << row.stage << ',' << row.attempt_id
-                << ',' << row.poll_frame_id << ',' << row.response_frame_id << ','
+                << ',' << row.poll_id << ',' << row.anchor_id << ','
                 << row.frame_id << ',' << row.packet_type << ',' << (row.valid ? 1 : 0)
                 << ',' << row.handler_start_ns << ',' << row.handler_end_ns << ','
                 << row.duration_ns << ',' << static_cast<double>(row.duration_ns) / 1000.0

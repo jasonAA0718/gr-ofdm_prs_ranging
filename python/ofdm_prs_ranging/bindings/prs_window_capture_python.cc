@@ -16,8 +16,6 @@ void bind_prs_window_capture(py::module& m)
              py::arg("preamble_len") = 128,
              py::arg("preamble_repeats") = 17,
              py::arg("coarse_sync_len") = 819,
-             py::arg("zero_guard_len") = 1000,
-             py::arg("tail_guard_len") = 1000,
              py::arg("threshold") = 0.09f,
              py::arg("min_frame_gap") = 10000,
              py::arg("candidate_margin_before") = 4096,

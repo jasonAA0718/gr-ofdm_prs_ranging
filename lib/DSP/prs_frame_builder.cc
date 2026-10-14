@@ -126,7 +126,7 @@ void prs_frame_builder::normalize_sections(std::vector<gr_complex>& samples,
         }
     };
     // Scale the preamble and coarse sync sections to the target amplitude
-    const size_t preamble_start = static_cast<size_t>(cfg.zero_guard_len);
+    const size_t preamble_start = static_cast<size_t>(phy::leading_guard_samples);
     const size_t preamble_length = static_cast<size_t>(cfg.preamble_len * cfg.preamble_repeats);
     const size_t coarse_start = preamble_start + preamble_length;
     const size_t coarse_sync_len = static_cast<size_t>(cfg.coarse_sync_len);
@@ -171,11 +171,10 @@ prs_frame prs_frame_builder::build(const prs_frame_config& cfg,
 {
     prs_frame result;
     auto& frame = result.samples;
-    frame.reserve(cfg.zero_guard_len + cfg.preamble_len * cfg.preamble_repeats +
-                  cfg.coarse_sync_len + cfg.payload_len +
-                  cfg.prs_symbols * (cfg.fft_len + cfg.cp_len) + cfg.tail_guard_len);
+    frame.reserve(phy::frame_samples(cfg.preamble_len, cfg.preamble_repeats,
+                                    cfg.coarse_sync_len, cfg.fft_len, cfg.cp_len, cfg.prs_symbols));
 
-    frame.insert(frame.end(), cfg.zero_guard_len, gr_complex(0.0f, 0.0f));
+    frame.insert(frame.end(), phy::leading_guard_samples, gr_complex(0.0f, 0.0f));
     append_short_preamble(frame, cfg);
     append_coarse_sync(frame, cfg);
     result.payload_start = static_cast<int>(frame.size());
@@ -183,7 +182,7 @@ prs_frame prs_frame_builder::build(const prs_frame_config& cfg,
     result.prs_start = static_cast<int>(frame.size());
     append_prs_symbols(frame, cfg, payload);
     result.prs_len = static_cast<int>(frame.size()) - result.prs_start;
-    frame.insert(frame.end(), cfg.tail_guard_len, gr_complex(0.0f, 0.0f));
+    frame.insert(frame.end(), phy::tail_guard_samples, gr_complex(0.0f, 0.0f));
 
     normalize_sections(frame,
                        cfg,

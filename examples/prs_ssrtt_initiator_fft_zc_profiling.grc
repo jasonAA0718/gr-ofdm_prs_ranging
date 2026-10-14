@@ -234,7 +234,6 @@ blocks:
     prs_symbols: '127'
     reply_delay_s: '0.05'
     samp_rate: samp_rate
-    tail_guard_len: '1000'
     threshold: '0.35'
     time_gating: '1'
     window_after_s: '0.010'
@@ -242,7 +241,6 @@ blocks:
     zc_search_after: 4096-256
     zc_search_before: '256'
     zc_threshold: '0.4'
-    zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false
@@ -309,10 +307,8 @@ blocks:
     prs_symbols: '127'
     samp_rate: samp_rate
     seed: '13990001'
-    tail_guard_len: '1000'
     tx_amp: '0.7'
     tx_lead_time: '0.5'
-    zero_guard_len: '1000'
   states:
     bus_sink: false
     bus_source: false

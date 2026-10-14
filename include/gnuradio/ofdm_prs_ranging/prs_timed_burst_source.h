@@ -44,8 +44,6 @@ public:
                      int preamble_len = 128,
                      int preamble_repeats = 16,
                      int coarse_sync_len = 839,
-                     int zero_guard_len = 1000,
-                     int tail_guard_len = 1000,
                      double tx_lead_time = 0.5,
                      double burst_period = 0.1,
                      float tx_amp = 0.6f,

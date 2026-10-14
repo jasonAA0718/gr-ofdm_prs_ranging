@@ -25,8 +25,6 @@ prs_frame_detector::sptr prs_frame_detector::make(double samp_rate,
                                                   int preamble_len,
                                                   int preamble_repeats,
                                                   int coarse_sync_len,
-                                                  int zero_guard_len,
-                                                  int tail_guard_len,
                                                   float threshold,
                                                   int min_frame_gap,
                                                   int coarse_zc_root,
@@ -46,8 +44,6 @@ prs_frame_detector::sptr prs_frame_detector::make(double samp_rate,
                                                               preamble_len,
                                                               preamble_repeats,
                                                               coarse_sync_len,
-                                                              zero_guard_len,
-                                                              tail_guard_len,
                                                               threshold,
                                                               min_frame_gap,
                                                               coarse_zc_root,
@@ -68,8 +64,6 @@ prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
                                                  int preamble_len,
                                                  int preamble_repeats,
                                                  int coarse_sync_len,
-                                                 int zero_guard_len,
-                                                 int tail_guard_len,
                                                  float threshold,
                                                  int min_frame_gap,
                                                  int coarse_zc_root,
@@ -122,8 +116,6 @@ prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
     d_cfg.preamble_len = preamble_len;
     d_cfg.preamble_repeats = preamble_repeats;
     d_cfg.coarse_sync_len = coarse_sync_len;
-    d_cfg.zero_guard_len = zero_guard_len;
-    d_cfg.tail_guard_len = tail_guard_len;
     d_cfg.coarse_zc_root = coarse_zc_root;
     d_cfg.channel_id = channel_id;
     d_coarse = coarse_sync_sequence(d_cfg.coarse_sync_len, d_cfg.coarse_zc_root);
@@ -173,7 +165,7 @@ void prs_frame_detector_impl::handle_tx_time(const pmt::pmt_t& message)
     const uint64_t attempt_id = dict_ref_uint64(
         msg,
         "attempt_id",
-        dict_ref_uint64(msg, "poll_frame_id", dict_ref_uint64(msg, "frame_id", 0)));
+        dict_ref_uint64(msg, "poll_id", dict_ref_uint64(msg, "frame_id", 0)));
     correlation_window window{ tx_time + d_reply_delay_s - d_window_before_s,
                                tx_time + d_reply_delay_s + d_window_after_s,
                                attempt_id,
@@ -383,8 +375,8 @@ bool prs_frame_detector_impl::find_frame(size_t& frame_start_index,
     profiling::accumulated_timer scan_timer(d_enable_profiling, d_scan_duration_ns);
     const int flen = frame_len(d_cfg);
     const int coarse_rel =
-        d_cfg.zero_guard_len + d_cfg.preamble_len * d_cfg.preamble_repeats;
-    const int preamble_rel = d_cfg.zero_guard_len;
+        phy::leading_guard_samples + d_cfg.preamble_len * d_cfg.preamble_repeats;
+    const int preamble_rel = phy::leading_guard_samples;
     if (buffered_size() < static_cast<size_t>(flen)) {
         return false;
     }

@@ -10,8 +10,8 @@ class qa_prs_window_capture(gr_unittest.TestCase):
     L = 8
     R = 4
     NZ = 11
-    NG = 5
-    NT = 5
+    NG = ofdm_prs_ranging.PHY_LEADING_GUARD_SAMPLES
+    NT = ofdm_prs_ranging.PHY_TAIL_GUARD_SAMPLES
     FFT = 16
     CP = 4
     NSYM = 2
@@ -27,8 +27,7 @@ class qa_prs_window_capture(gr_unittest.TestCase):
             preamble_len=self.L,
             preamble_repeats=self.R,
             coarse_sync_len=self.NZ,
-            zero_guard_len=self.NG,
-            tail_guard_len=self.NT,
+
             threshold=threshold,
             min_frame_gap=100,
             candidate_margin_before=self.MARGIN,
@@ -112,7 +111,7 @@ class qa_prs_window_capture(gr_unittest.TestCase):
         self.fail("reference preamble crossing not found")
 
     def test_metric_and_candidate_geometry(self):
-        samples = self._samples([300], 900)
+        samples = self._samples([2300], 4900)
         capture = self._make_capture()
         rx_tag = gr.tag_t()
         rx_tag.offset = 0
@@ -166,7 +165,7 @@ class qa_prs_window_capture(gr_unittest.TestCase):
         # Keep the scheduled boundary beyond the first scheduler buffer so the
         # asynchronous command is installed before that part of the stream arrives.
         burst_start = 50000
-        samples = self._samples([burst_start], 51000)
+        samples = self._samples([burst_start], 53000)
         capture = self._make_capture(enabled=False)
         # The complete preamble is already in history when this two-sample window opens.
         window_start = burst_start + self.L * self.R - 1
@@ -190,7 +189,7 @@ class qa_prs_window_capture(gr_unittest.TestCase):
 
     def test_absolute_time_window(self):
         burst_start = 50000
-        samples = self._samples([burst_start], 51000)
+        samples = self._samples([burst_start], 53000)
         capture = self._make_capture(enabled=False)
         window_start = burst_start + self.L * self.R - 1
         command = pmt.make_dict()
@@ -213,8 +212,8 @@ class qa_prs_window_capture(gr_unittest.TestCase):
         self.assertEqual(self._uint(meta, "window_id"), 31)
 
     def test_stalled_consumer_drops_without_stalling_stream(self):
-        burst_starts = [300, 800, 1300, 1800, 2300]
-        samples = self._samples(burst_starts, 3000)
+        burst_starts = [2300, 4800, 7300, 9800, 12300]
+        samples = self._samples(burst_starts, 15000)
         capture = self._make_capture(queue_depth=2)
         candidates, events = self._run(samples, capture)
 
@@ -231,7 +230,7 @@ class qa_prs_window_capture(gr_unittest.TestCase):
         self.assertEqual(last_full_count, len(burst_starts) - 2)
 
     def test_chunk_boundaries_preserve_candidate(self):
-        samples = self._samples([300], 900)
+        samples = self._samples([2300], 4900)
         reference, _ = self._run(
             samples, self._make_capture(), max_noutput_items=4096)
         self.assertEqual(reference.num_messages(), 1)
@@ -273,7 +272,7 @@ class qa_prs_window_capture(gr_unittest.TestCase):
                 reference_samples)
 
     def test_lockout_end_inside_chunk(self):
-        samples = self._samples([300, 800], 1300)
+        samples = self._samples([2300, 4800], 7300)
         candidates, _ = self._run(
             samples, self._make_capture(), max_noutput_items=1024)
         self.assertEqual(candidates.num_messages(), 2)
@@ -283,7 +282,7 @@ class qa_prs_window_capture(gr_unittest.TestCase):
         self.assertEqual(
             starts,
             [self._reference_first_crossing(samples, 0.8, 0),
-             self._reference_first_crossing(samples, 0.8, 700)])
+             self._reference_first_crossing(samples, 0.8, 4700)])
 
 
 if __name__ == '__main__':

@@ -7,6 +7,7 @@
 
 #include "prs_frame_builder.h"
 #include "prs_payload_codec.h"
+#include "prs_protocol_metadata.h"
 #include "prs_timed_burst_source_impl.h"
 #include <gnuradio/io_signature.h>
 #include <algorithm>
@@ -27,18 +28,6 @@ uint64_t pmt_to_uint64(const pmt::pmt_t& value)
         return static_cast<uint64_t>(pmt::to_long(value));
     }
     return 0;
-}
-
-uint64_t dict_ref_u64(const pmt::pmt_t& dict, const char* key, uint64_t fallback)
-{
-    const auto value = pmt::dict_ref(dict, pmt::mp(key), pmt::PMT_NIL);
-    if (pmt::is_uint64(value)) {
-        return pmt::to_uint64(value);
-    }
-    if (pmt::is_integer(value)) {
-        return static_cast<uint64_t>(pmt::to_long(value));
-    }
-    return fallback;
 }
 
 double dict_ref_double_local(const pmt::pmt_t& dict, const char* key, double fallback)
@@ -78,8 +67,6 @@ prs_timed_burst_source::sptr prs_timed_burst_source::make(double samp_rate,
                                                           int preamble_len,
                                                           int preamble_repeats,
                                                           int coarse_sync_len,
-                                                          int zero_guard_len,
-                                                          int tail_guard_len,
                                                           double tx_lead_time,
                                                           double burst_period,
                                                           float tx_amp,
@@ -97,8 +84,6 @@ prs_timed_burst_source::sptr prs_timed_burst_source::make(double samp_rate,
                                                                   preamble_len,
                                                                   preamble_repeats,
                                                                   coarse_sync_len,
-                                                                  zero_guard_len,
-                                                                  tail_guard_len,
                                                                   tx_lead_time,
                                                                   burst_period,
                                                                   tx_amp,
@@ -117,8 +102,6 @@ prs_timed_burst_source_impl::prs_timed_burst_source_impl(double samp_rate,
                                                          int preamble_len,
                                                          int preamble_repeats,
                                                          int coarse_sync_len,
-                                                         int zero_guard_len,
-                                                         int tail_guard_len,
                                                          double tx_lead_time,
                                                          double burst_period,
                                                          float tx_amp,
@@ -138,8 +121,6 @@ prs_timed_burst_source_impl::prs_timed_burst_source_impl(double samp_rate,
       d_preamble_len(preamble_len),
       d_preamble_repeats(preamble_repeats),
       d_coarse_sync_len(coarse_sync_len),
-      d_zero_guard_len(zero_guard_len),
-      d_tail_guard_len(tail_guard_len),
       d_tx_lead_time(tx_lead_time),
       d_burst_period(burst_period),
       d_tx_amp(tx_amp),
@@ -183,7 +164,7 @@ void prs_timed_burst_source_impl::validate_parameters() const
                                     "prs_symbols=127, cp_len=64");
     }
     if (d_prs_symbols <= 0 || d_preamble_len <= 0 || d_preamble_repeats <= 0 ||
-        d_coarse_sync_len <= 0 || d_zero_guard_len < 0 || d_tail_guard_len < 0) {
+        d_coarse_sync_len <= 0) {
         throw std::invalid_argument("frame lengths must be positive");
     }
     if (d_tx_amp <= 0.0f || d_tx_amp > 1.0f) {
@@ -208,8 +189,6 @@ prs_frame_config prs_timed_burst_source_impl::frame_config() const
                              d_preamble_repeats,
                              d_coarse_sync_len,
                              0,
-                             d_zero_guard_len,
-                             d_tail_guard_len,
                              d_tx_amp,
                              d_seed,
                              d_coarse_zc_root,
@@ -238,9 +217,11 @@ void prs_timed_burst_source_impl::prepare_burst_frame(uint64_t frame_id)
     (void)frame_id;
     prs_payload_info info;
     info.packet_type = d_current_burst.packet_type;
-    info.poll_frame_id = d_current_burst.poll_frame_id;
-    info.response_frame_id = d_current_burst.response_frame_id;
+    info.poll_id = d_current_burst.poll_id;
+    info.anchor_id = d_current_burst.anchor_id;
     info.reply_delay_samples = d_current_burst.reply_delay_samples;
+    info.poll_fine_delay_q10 = d_current_burst.poll_fine_delay_q10;
+    info.fine_delay_valid = d_current_burst.fine_delay_valid;
     d_burst_frame = prs_frame_builder::build(frame_config(), info).samples;
 }
 
@@ -276,17 +257,37 @@ double prs_timed_burst_source_impl::current_time_estimate()
 void prs_timed_burst_source_impl::handle_trigger(pmt::pmt_t msg)
 {
     if (pmt::is_dict(msg)) {
-        const uint8_t packet_type =
-            static_cast<uint8_t>(dict_ref_u64(msg, "packet_type", prs_packet_type_poll));
+        prs_payload_info info;
+        if (!bounded_uint(msg, "packet_type", prs_packet_type_poll, 3, info.packet_type) ||
+            (info.packet_type != prs_packet_type_poll && info.packet_type != prs_packet_type_response) ||
+            !bounded_uint(msg, "anchor_id", 0, 7, info.anchor_id) ||
+            !bounded_uint(msg, "poll_id", 0, 65535, info.poll_id) ||
+            !bounded_uint(msg, "reply_delay_samples", 0, 0xffffff, info.reply_delay_samples) ||
+            !bounded_q10(msg, info.poll_fine_delay_q10)) {
+            d_logger->warn("Rejected out-of-range packet v2 trigger");
+            return;
+        }
+        const bool have_fine_value = dict_has_key(msg, "poll_fine_delay_q10") ||
+            dict_has_key(msg, "poll_fine_delay_samples") ||
+            dict_has_key(msg, "fine_delay_samples") || dict_has_key(msg, "fine_delay");
+        info.fine_delay_valid = metadata_true(msg, "fine_delay_valid") && have_fine_value;
+        const char* float_key = dict_has_key(msg, "poll_fine_delay_samples")
+                                    ? "poll_fine_delay_samples"
+                                    : (dict_has_key(msg, "fine_delay_samples") ? "fine_delay_samples" : "fine_delay");
+        if (dict_has_key(msg, float_key)) {
+            double samples = dict_ref_double_local(msg, float_key, NAN);
+            if (std::string(float_key) == "fine_delay") samples *= d_samp_rate;
+            int16_t q = 0;
+            info.fine_delay_valid = quantize_poll_fine_delay(samples, info.fine_delay_valid, q);
+            info.poll_fine_delay_q10 = q;
+        }
+        if (!info.fine_delay_valid) info.poll_fine_delay_q10 = 0;
+        // Allocate only after validating arbitrary caller-supplied values.
+        if (!dict_has_key(msg, "poll_id")) {
+            if (info.packet_type == prs_packet_type_response) return;
+            info.poll_id = d_scheduler.allocate_poll_id();
+        }
         const uint64_t allocated = d_scheduler.allocate_frame_id();
-        const uint32_t response_id =
-            static_cast<uint32_t>(dict_ref_u64(msg, "response_frame_id", allocated));
-        const uint32_t poll_id = static_cast<uint32_t>(
-            dict_ref_u64(msg,
-                         "poll_frame_id",
-                         packet_type == prs_packet_type_response ? 0 : response_id));
-        const uint32_t reply_delay_samples =
-            static_cast<uint32_t>(dict_ref_u64(msg, "reply_delay_samples", 0));
 
         double tx_time = std::numeric_limits<double>::quiet_NaN();
         if (dict_has_key(msg, "tx_time")) {
@@ -299,22 +300,9 @@ void prs_timed_burst_source_impl::handle_trigger(pmt::pmt_t msg)
             tx_time = current_time_estimate() + d_tx_lead_time;
         }
 
-        const uint64_t primary_id =
-            packet_type == prs_packet_type_response ? response_id : poll_id;
-        d_scheduler.queue_burst(prs_pending_burst{ primary_id,
-                                                   tx_time,
-                                                   0.0,
-                                                   packet_type,
-                                                   poll_id,
-                                                   response_id,
-                                                   reply_delay_samples });
-        PRS_TBS_DEBUG("PRS dict trigger queued: packet_type={} poll_id={} response_id={} "
-                      "tx_time={} reply_delay_samples={}",
-                      packet_type,
-                      poll_id,
-                      response_id,
-                      tx_time,
-                      reply_delay_samples);
+        d_scheduler.queue_burst(prs_pending_burst{ allocated, tx_time, 0.0,
+            info.packet_type, info.poll_id, info.anchor_id, info.reply_delay_samples,
+            info.poll_fine_delay_q10, info.fine_delay_valid });
         return;
     }
 
@@ -352,19 +340,21 @@ void prs_timed_burst_source_impl::add_burst_tags(uint64_t abs_offset,
     add_item_tag(0, abs_offset, pmt::mp("tx_sob"), pmt::PMT_T);
     add_item_tag(0, abs_offset, pmt::mp("frame_id"), pmt::from_uint64(burst.frame_id));
     add_item_tag(
-        0, abs_offset, pmt::mp("attempt_id"), pmt::from_uint64(burst.poll_frame_id));
+        0, abs_offset, pmt::mp("attempt_id"), pmt::from_uint64(burst.poll_id));
     add_item_tag(
         0, abs_offset, pmt::mp("packet_type"), pmt::from_long(burst.packet_type));
     add_item_tag(
-        0, abs_offset, pmt::mp("poll_frame_id"), pmt::from_uint64(burst.poll_frame_id));
+        0, abs_offset, pmt::mp("poll_id"), pmt::from_uint64(burst.poll_id));
     add_item_tag(0,
                  abs_offset,
-                 pmt::mp("response_frame_id"),
-                 pmt::from_uint64(burst.response_frame_id));
+                 pmt::mp("anchor_id"),
+                 pmt::from_uint64(burst.anchor_id));
     add_item_tag(0,
                  abs_offset,
                  pmt::mp("reply_delay_samples"),
                  pmt::from_uint64(burst.reply_delay_samples));
+    add_item_tag(0, abs_offset, pmt::mp("poll_fine_delay_q10"), pmt::from_long(burst.poll_fine_delay_q10));
+    add_item_tag(0, abs_offset, pmt::mp("fine_delay_valid"), burst.fine_delay_valid ? pmt::PMT_T : pmt::PMT_F);
     add_item_tag(0, abs_offset, pmt::mp("burst_len"), pmt::from_long(frame_len()));
     add_item_tag(0, abs_offset, pmt::mp("prs_start"), pmt::from_long(d_prs_start));
     add_item_tag(0, abs_offset, pmt::mp("prs_len"), pmt::from_long(d_prs_len));
@@ -391,12 +381,12 @@ void prs_timed_burst_source_impl::publish_tx_time(const prs_pending_burst& burst
     pmt::pmt_t meta = pmt::make_dict();
     meta = pmt::dict_add(meta, pmt::mp("frame_id"), pmt::from_uint64(burst.frame_id));
     meta =
-        pmt::dict_add(meta, pmt::mp("attempt_id"), pmt::from_uint64(burst.poll_frame_id));
+        pmt::dict_add(meta, pmt::mp("attempt_id"), pmt::from_uint64(burst.poll_id));
     meta = pmt::dict_add(meta, pmt::mp("packet_type"), pmt::from_long(burst.packet_type));
     meta = pmt::dict_add(
-        meta, pmt::mp("poll_frame_id"), pmt::from_uint64(burst.poll_frame_id));
+        meta, pmt::mp("poll_id"), pmt::from_uint64(burst.poll_id));
     meta = pmt::dict_add(
-        meta, pmt::mp("response_frame_id"), pmt::from_uint64(burst.response_frame_id));
+        meta, pmt::mp("anchor_id"), pmt::from_uint64(burst.anchor_id));
     meta = pmt::dict_add(meta,
                          pmt::mp("reply_delay_samples"),
                          pmt::from_uint64(burst.reply_delay_samples));
@@ -405,6 +395,8 @@ void prs_timed_burst_source_impl::publish_tx_time(const prs_pending_burst& burst
                          pmt::from_uint64(static_cast<uint64_t>(secs_floor)));
     meta = pmt::dict_add(
         meta, pmt::mp("tx_time_frac"), pmt::from_double(burst.tx_time - secs_floor));
+    meta = pmt::dict_add(meta, pmt::mp("poll_fine_delay_q10"), pmt::from_long(burst.poll_fine_delay_q10));
+    meta = pmt::dict_add(meta, pmt::mp("fine_delay_valid"), burst.fine_delay_valid ? pmt::PMT_T : pmt::PMT_F);
     meta = pmt::dict_add(meta, pmt::mp("burst_len"), pmt::from_long(frame_len()));
     meta = pmt::dict_add(meta, pmt::mp("prs_start"), pmt::from_long(d_prs_start));
     meta = pmt::dict_add(meta, pmt::mp("prs_len"), pmt::from_long(d_prs_len));

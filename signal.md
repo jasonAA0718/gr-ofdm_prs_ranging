@@ -43,12 +43,11 @@ N_{\text{PRS}} = 127(512 + 64) = 73152
 ```
 
 Acquisition geometry is configurable and must match the peer transmitter.
-The working-tree main examples differ: initiator period/repeats/ZC length
-are 512/33/2001, responder values are 512/16/1999. The FFT-ZC profiling pair
-uses 256/4/419. All four use 30 MS/s and carrier 1060 MHz; these are example
-settings, not immutable waveform requirements. The main initiator uses
-100-sample zero and tail guards, while the responder and profiling examples
-use 1000 samples each. These differences also affect the timestamp reference.
+The main examples use preamble period/repeats/ZC length 128/17/819;
+the FFT-ZC profiling pair uses 256/4/419. All configure 30 MS/s and
+1060 MHz. Leading and tail guards are fixed at 1000 samples each in
+`lib/DSP/prs_phy_geometry.h`; constructors and GRC do not expose guard controls.
+The TX timestamp is the first complete-burst sample, including the leading guard.
 
 For zero guard length `N_g`, preamble period `L_p`, repetitions `R`,
 ZC length `N_z`, and tail guard `N_t`:
@@ -216,40 +215,53 @@ detector success alone does not imply payload success.
 
 ## MC-DS OFDM Payload and PRS
 
-The current prototype carries the existing 120-bit SS-TWR packet inside the
-OFDM symbols. There is no standalone time-domain payload. Native FFT bins use
-a fixed three-pilot/one-data comb:
+The current packet v2 carries 80 logical bits inside the existing OFDM symbols.
+RF airtime, 512/64/127 geometry, Gold references and carrier allocation are unchanged.
+There is no standalone time-domain payload. Native data bins are `k=4q+3`:
+384 pilots and 128 data/padding bins. Positions `q=0...79` carry packet/CRC;
+`q=80...127` are 48 logical zero padding bits.
 
-```math
-\mathcal{D}=\{k: k\bmod 4=3\},\qquad |\mathcal{D}|=128
-```
+| Bit positions | Field | Width |
+|---|---|---:|
+| 0–1 | `packet_type` (`1=POLL`, `2=RESPONSE`) | 2 |
+| 2–4 | `anchor_id` | 3 |
+| 5–20 | `poll_id` | 16 |
+| 21–44 | `reply_delay_samples` | 24 |
+| 45–60 | `poll_fine_delay_q10` (signed two's complement) | 16 |
+| 61 | `fine_delay_valid` | 1 |
+| 62–63 | Reserved, must be zero | 2 |
+| 64–79 | CRC16 | 16 |
 
-The other 384 bins form the pilot set `P`. Data-bin indices `q=0...119`
-contain the serialized packet bits and `q=120...127` contain zero padding.
-Serialization remains LSB-first and the CRC16 initial value and polynomial
-remain `0xffff` and `0x1021`.
+Each field and the CRC are LSB-first. The eight packed control bytes are fed
+to the non-reflected CRC in increasing byte order (control bits 0–7 first).
+CRC polynomial is `0x1021`, initial value `0xffff`, no final XOR; coverage is
+exactly those eight bytes, including reserved bits. RX rejects nonzero reserved
+bits even if CRC matches. Padding, scrambling and acquisition samples are outside CRC.
+There is no automatic v1 compatibility decoder.
 
-| Payload field | Bits | POLL | RESPONSE |
-|---|---:|---|---|
-| `packet_type` | 8 | `1` | `2` |
-| `poll_frame_id` | 32 | New poll ID | Echoed poll ID |
-| `response_frame_id` | 32 | Zero/unused | New response ID |
-| `reply_delay_samples` | 32 | Zero/unused | Configured delay |
-| CRC16 | 16 | Enabled | Enabled |
+POLL allocation is unsigned 16-bit with deterministic 65535 → 0 wrap.
+POLLs normally set anchor/delay/fine fields to zero and fine validity false.
+RESPONSES echo `poll_id` and carry the configured anchor ID (0–7), sample delay
+(0–0xFFFFFF), and the responder's POLL fine estimate. RESPONSE IDs are absent
+from the wire. External field values are bounds-checked before narrowing.
+
+Responder Q10 encoding is `round(fine_delay_samples * 1024)`, decoded as
+`q / 1024.0`. Phase `valid` is independent of CRC validity. Invalid phase fits,
+nonfinite samples or rounded values outside −32768…32767 produce a RESPONSE
+with `fine_delay_valid=false` and a zero placeholder that is never a valid estimate.
+Fine delay is not restricted to half a sample.
 
 After serialization, CRC generation, and padding, TX XORs this exact fixed
 128-bit scrambler:
 
 ```text
-00100101001010011100110011110110010101100100000010010111100110111111010100001000001100001101101100111100000111111110011100100011
+11011101001110110111011110001111001010110000100001101000111001010011001111010100001010011100101010111100010101000110100000111000
 ```
 
 It has 64 zeros and 64 ones. If `u_q` is the logical payload or padding bit and
 `s_q` is the scrambler bit, `b_q=2(u_q\mathbin{\mathrm{XOR}}s_q)-1` under the
-project's `0 -> -1`, `1 -> +1` BPSK convention. CRC is computed over the first 104 logical information bits; its 16-bit
-value completes the 120-bit packet. Scrambling and padding are outside CRC
-coverage. The CRC update consumes packet type followed by each 32-bit field
-in least-significant-byte order; the transmitted fields and CRC are LSB-first.
+project's `0 -> -1`, `1 -> +1` BPSK convention. All 128 logical positions,
+including the 48 padding positions, use this shared production scrambler.
 
 Let `c_i[m]` be chip `m` from row `i` of
 `lib/DSP/gold127_family_bipolar.csv`, where row index equals `code_id`. The
@@ -270,8 +282,8 @@ data values. RX removes the Gold chip and Golay sign before inter-symbol CFO
 estimation. After CFO phase alignment, it averages channel estimates across
 all 127 symbols on the 384 pilot bins. Data bins are Gold-despread, coherently
 combined across 127 symbols, equalized by adjacent-pilot interpolation, and
-hard-decided. RX XORs the same scrambler, discards positions `120...127`, and
-parses/checks the unchanged 120-bit packet and CRC.
+hard-decided. RX XORs the same scrambler, discards positions `80...127`, and
+parses/checks the 80-bit v2 packet, CRC and reserved bits.
 
 A mismatched Gold row suppresses coherent amplitude according to its
 cross-correlation with the transmitted row, but `code_id` is not an identity or
@@ -284,7 +296,7 @@ The OFDM payload quality metric is the mean normalized BPSK decision margin:
 
 ```math
 m_q=\frac{|\Re\{\hat D_q\}|}{\max(10^{-12},|\hat D_q|)},\qquad
-\text{payload\_metric}=\frac{1}{120}\sum_{q=0}^{119}m_q.
+\text{payload\_metric}=\frac{1}{80}\sum_{q=0}^{79}m_q.
 ```
 
 This metric is relative and dimensionless. CRC remains authoritative. The
@@ -336,10 +348,15 @@ fft_bin 0 ... 255   -> signed bins 0 ... +255
 fft_bin 256 ... 511 -> signed bins -256 ... -1
 ```
 
-Measured over each useful 512-sample IFFT output before CP for 50,000
-sequential POLL IDs, the production scrambler gives PAPR
-mean/P99.9/maximum of `7.1019 / 8.9338 / 9.5733 dB`. Multiplication by a real
-Gold chip does not alter a symbol's PAPR.
+The earlier scrambler with the historical v1 packet gave useful-symbol PAPR
+mean/P99.9/maximum `7.1019 / 8.9338 / 9.5733 dB` over 50,000 sequential
+POLL IDs. These are historical values, not results for the sequence above.
+Multiplication by a real Gold chip does not alter a symbol's PAPR.
+The replacement sequence was selected using user-reported MATLAB protocol-wide
+validation; the repository QA below remains a sequential-POLL benchmark.
+With packet v2 and the replacement scrambler, the existing 50,000 sequential-POLL
+QA passes unchanged PAPR limits: mean/P99.9/maximum
+`6.5775 / 7.9880 / 8.5061 dB`. This software benchmark is not RF validation.
 
 The Gold-code source of truth and its production representation are:
 
@@ -441,10 +458,10 @@ Its interpolated channel is `(bar H[k-1]+bar H[k+1])/2`, except native
 bin 511 uses only bin 510. With channel power above `1e-12`, equalization
 is `D_q * conj(H_interp) / |H_interp|^2`; otherwise the equalized value is
 zero. The hard bit is one if the equalized real part is nonnegative, zero
-otherwise. RX descrambles, removes eight padding bits, and compares the
-received CRC with the recomputed CRC over the 104 information bits.
+otherwise. RX descrambles, removes 48 padding bits, and checks CRC over the
+64-bit control word and zero reserved bits.
 
-`frame_id_valid` reports that CRC comparison, not a phase-fit test or packet
+`frame_id_valid` reports CRC plus reserved-bit validity, not a phase-fit test or packet
 type check. The channel estimator publishes payload outcomes on `event_out`
 and the channel on `channel_out`. SS-TWR then checks POLL/RESPONSE type.
 Legacy retry fields are populated with false/zero; there is no current
@@ -835,31 +852,31 @@ selected boundary can change the fine estimate by roughly the opposite sample.
 Multipath, RF group delay, CFO/ICI and FFT-window errors can spoil this model;
 the implementation does not guarantee `fine_delay` lies within +/-0.5 sample.
 
-The live SS-TWR solver calculates
+The live SS-TWR solver preserves the timestamp/calibration expression:
 
-```math
-\mathrm{RTT}=T_4-T_1-T_{reply},\qquad
-R_{integer}=\frac{c}{2}(\mathrm{RTT}-T_{cal}),
+```text
+reply_delay_s = reply_delay_samples / Fs
+rtt_s = T4 - T1 - reply_delay_s
+integer_tof_s = (rtt_s + 4.841619800497349e-5) / 2
+integer_range_m = 299792458 * integer_tof_s
+fine_range_correction_m = 299792458 / (2 * Fs)
+                          * (poll_fine_delay_samples + response_fine_delay_samples)
+corrected_range_m = integer_range_m + fine_range_correction_m
 ```
 
-with `T_cal = 1.159952546762614e-05 s` hard-coded in the solver.
-It publishes this as both `range_m` and `integer_range_m`. The RESPONSE
-fine-delay contribution `c * fine_delay / 2` is logged separately.
-The code does not receive the responder's POLL fine estimate in the control
-payload, so it cannot form a live bidirectional fine correction.
+`range_m` and `tof_s` remain integer-timing compatibility outputs. The new
+`corrected_range_m` is separate. Correction requires a valid RESPONSE packet,
+transported `fine_delay_valid`, local phase-fit `valid`, and finite directional
+sample estimates. Otherwise `fine_correction_valid=false`; correction and
+corrected range are NaN while integer range remains available. CRC-invalid
+RESPONSES produce no solver measurement. `measurement_timestamp` is T4 in
+UHD seconds. `poll_id` and packet `anchor_id` identify the measurement;
+channel/root/attempt labels are acquisition diagnostics.
 
-For matched directional logs, the offline correction under consistent
-timestamp/reference conventions is
-
-```math
-R_{corrected}=R_{integer}
-+\frac{c}{2}(\tau_{IR,fine}+\tau_{RI,fine}).
-```
-
-Here IR is POLL reception at the responder and RI is RESPONSE reception at
-the initiator. Each link is estimated separately; the live receiver does not
-jointly fit both channels. Historical offline measurements are recorded in
-README.md, not evidence of an implemented online fusion block.
+The POLL TX timestamp store is bounded by the 16-bit ID domain, but has no cycle
+expiry or generation tracking. Wrap/stale-response ambiguity, duplicate policy
+and multi-anchor cycle management are deferred. No RF accuracy is implied by
+synthetic fine-correction QA; the calibration constant has not been changed.
 
 At 30 MS/s, one sample is 33.333 ns and one integer RTT range increment is
 approximately 4.997 m. A phase fit can resolve a residual below one sample,

@@ -236,20 +236,22 @@ void prs_channel_estimator_impl::handle_symbols(pmt::pmt_t msg)
     const double payload_metric = margin_sum / prs_payload_data_bits;
     report.checkpoint("payload_equalize_decode");
 
-    const uint64_t frame_id = payload_info.packet_type == prs_packet_type_response
-                                  ? payload_info.response_frame_id
-                                  : payload_info.poll_frame_id;
+    const uint64_t frame_id = payload_info.poll_id;
     meta = pmt::dict_add(meta, pmt::mp("frame_id"), pmt::from_uint64(frame_id));
     meta = pmt::dict_add(
         meta, pmt::mp("packet_type"), pmt::from_long(payload_info.packet_type));
     meta = pmt::dict_add(
-        meta, pmt::mp("poll_frame_id"), pmt::from_uint64(payload_info.poll_frame_id));
+        meta, pmt::mp("poll_id"), pmt::from_uint64(payload_info.poll_id));
     meta = pmt::dict_add(meta,
-                         pmt::mp("response_frame_id"),
-                         pmt::from_uint64(payload_info.response_frame_id));
+                         pmt::mp("anchor_id"),
+                         pmt::from_uint64(payload_info.anchor_id));
     meta = pmt::dict_add(meta,
                          pmt::mp("reply_delay_samples"),
                          pmt::from_uint64(payload_info.reply_delay_samples));
+    meta = pmt::dict_add(meta, pmt::mp("poll_fine_delay_q10"), pmt::from_long(payload_info.poll_fine_delay_q10));
+    meta = pmt::dict_add(meta, pmt::mp("fine_delay_valid"), payload_info.fine_delay_valid ? pmt::PMT_T : pmt::PMT_F);
+    meta = pmt::dict_add(meta, pmt::mp("poll_fine_delay_samples"), pmt::from_double(
+        frame_id_valid && payload_info.fine_delay_valid ? payload_info.poll_fine_delay_q10 / 1024.0 : NAN));
     meta = pmt::dict_add(
         meta, pmt::mp("frame_id_valid"), frame_id_valid ? pmt::PMT_T : pmt::PMT_F);
     meta =
@@ -266,7 +268,7 @@ void prs_channel_estimator_impl::handle_symbols(pmt::pmt_t msg)
                          pmt::mp(frame_id_valid ? "NONE" : "PAYLOAD_CRC"));
     if (pmt::is_null(pmt::dict_ref(meta, pmt::mp("attempt_id"), pmt::PMT_NIL))) {
         meta = pmt::dict_add(
-            meta, pmt::mp("attempt_id"), pmt::from_uint64(payload_info.poll_frame_id));
+            meta, pmt::mp("attempt_id"), pmt::from_uint64(payload_info.poll_id));
     }
     meta = pmt::dict_add(meta, pmt::mp("snr"), pmt::from_double(snr));
     meta = pmt::dict_add(

@@ -6,11 +6,13 @@
  */
 
 #include "prs_payload_codec.h"
+#include "prs_protocol_metadata.h"
 #include "prs_receiver_utils.h"
 #include "prs_ssrtt_responder_impl.h"
 #include "prs_timing_helper.h"
 #include <gnuradio/io_signature.h>
 #include <cmath>
+#include <stdexcept>
 
 namespace gr {
 namespace ofdm_prs_ranging {
@@ -31,23 +33,29 @@ double dict_ref_time_tuple(const pmt::pmt_t& dict, const char* key, double fallb
 } // namespace
 
 prs_ssrtt_responder::sptr prs_ssrtt_responder::make(double samp_rate,
-                                                    uint32_t reply_delay_samples,
-                                                    bool enable_profiling)
+                                                    uint64_t reply_delay_samples,
+                                                    bool enable_profiling,
+                                                    uint64_t anchor_id)
 {
     return gnuradio::make_block_sptr<prs_ssrtt_responder_impl>(
-        samp_rate, reply_delay_samples, enable_profiling);
+        samp_rate, reply_delay_samples, enable_profiling, anchor_id);
 }
 
 prs_ssrtt_responder_impl::prs_ssrtt_responder_impl(double samp_rate,
-                                                   uint32_t reply_delay_samples,
-                                                   bool enable_profiling)
+                                                   uint64_t reply_delay_samples,
+                                                   bool enable_profiling,
+                                                    uint64_t anchor_id)
     : gr::block("prs_ssrtt_responder",
                 gr::io_signature::make(0, 0, 0),
                 gr::io_signature::make(0, 0, 0)),
       d_samp_rate(samp_rate),
       d_reply_delay_samples(reply_delay_samples),
+      d_anchor_id(anchor_id),
       d_enable_profiling(enable_profiling)
 {
+    if (!std::isfinite(samp_rate) || samp_rate <= 0 || reply_delay_samples > 0xffffff || anchor_id > 7) {
+        throw std::invalid_argument("invalid responder sample rate, delay or anchor_id");
+    }
     message_port_register_in(pmt::mp("measurement_in"));
     message_port_register_out(pmt::mp("trigger_out"));
     message_port_register_out(pmt::mp("timing_out"));
@@ -74,8 +82,11 @@ void prs_ssrtt_responder_impl::handle_measurement(pmt::pmt_t msg)
         return;
     }
 
-    const uint64_t poll_frame_id =
-        dict_ref_uint64(meta, "poll_frame_id", dict_ref_uint64(meta, "frame_id", 0));
+    uint64_t poll_id = 0;
+    if (!bounded_uint(meta, "poll_id", 65536, 65535, poll_id)) return;
+    int16_t fine_q = 0;
+    const bool fine_valid = quantize_poll_fine_delay(
+        dict_ref_double(meta, "fine_delay_samples", NAN), metadata_true(meta, "valid"), fine_q);
     const double reply_delay_s = static_cast<double>(d_reply_delay_samples) / d_samp_rate;
     const double response_tx_time = poll_rx_time + reply_delay_s;
     const double secs_floor = std::floor(response_tx_time);
@@ -86,7 +97,10 @@ void prs_ssrtt_responder_impl::handle_measurement(pmt::pmt_t msg)
     trigger = pmt::dict_add(
         trigger, pmt::mp("packet_type"), pmt::from_long(prs_packet_type_response));
     trigger =
-        pmt::dict_add(trigger, pmt::mp("poll_frame_id"), pmt::from_uint64(poll_frame_id));
+        pmt::dict_add(trigger, pmt::mp("poll_id"), pmt::from_uint64(poll_id));
+    trigger = pmt::dict_add(trigger, pmt::mp("anchor_id"), pmt::from_uint64(d_anchor_id));
+    trigger = pmt::dict_add(trigger, pmt::mp("poll_fine_delay_q10"), pmt::from_long(fine_q));
+    trigger = pmt::dict_add(trigger, pmt::mp("fine_delay_valid"), fine_valid ? pmt::PMT_T : pmt::PMT_F);
     trigger = pmt::dict_add(
         trigger, pmt::mp("reply_delay_samples"), pmt::from_uint64(d_reply_delay_samples));
     trigger = pmt::dict_add(trigger,

@@ -20,13 +20,20 @@ void prs_burst_scheduler::queue_trigger(int count, double base_tx_time, double b
                                                base_tx_time + sequence_delay,
                                                sequence_delay,
                                                prs_packet_type_poll,
-                                               static_cast<uint32_t>(frame_id),
+                                               allocate_poll_id(),
                                                0,
                                                0 });
     }
 }
 
 uint64_t prs_burst_scheduler::allocate_frame_id() { return d_next_frame_id++; }
+
+uint16_t prs_burst_scheduler::allocate_poll_id()
+{
+    const auto id = d_next_poll_id;
+    d_next_poll_id = static_cast<uint16_t>(static_cast<uint32_t>(id) + 1U);
+    return id;
+}
 
 void prs_burst_scheduler::queue_burst(const prs_pending_burst& burst)
 {

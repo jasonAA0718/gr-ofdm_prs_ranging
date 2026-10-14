@@ -18,10 +18,12 @@ struct prs_pending_burst {
     uint64_t frame_id;
     double tx_time;
     double sequence_delay;
-    uint8_t packet_type;
-    uint32_t poll_frame_id;
-    uint32_t response_frame_id;
-    uint32_t reply_delay_samples;
+    uint64_t packet_type;
+    uint64_t poll_id;
+    uint64_t anchor_id;
+    uint64_t reply_delay_samples;
+    int64_t poll_fine_delay_q10 = 0;
+    bool fine_delay_valid = false;
 };
 
 class prs_burst_scheduler
@@ -29,6 +31,7 @@ class prs_burst_scheduler
 public:
     void queue_trigger(int count, double base_tx_time, double burst_period);
     uint64_t allocate_frame_id();
+    uint16_t allocate_poll_id();
     void queue_burst(const prs_pending_burst& burst);
     bool empty() const;
     const prs_pending_burst& front() const;
@@ -36,6 +39,7 @@ public:
 
 private:
     uint64_t d_next_frame_id = 0;
+    uint16_t d_next_poll_id = 0;
     std::deque<prs_pending_burst> d_pending;
 };
 

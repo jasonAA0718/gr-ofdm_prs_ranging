@@ -28,8 +28,6 @@ public:
                      int preamble_len = 128,
                      int preamble_repeats = 17,
                      int coarse_sync_len = 819,
-                     int zero_guard_len = 1000,
-                     int tail_guard_len = 1000,
                      float preamble_threshold = 0.09f,
                      float zc_threshold = 0.35f,
                      int coarse_zc_root = 25,

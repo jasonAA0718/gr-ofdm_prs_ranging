@@ -83,11 +83,11 @@ class prs_ssrtt_responder(gr.top_block):
         self.uhd_usrp_sink_0_0.set_gain(tx_gain, 0)
         self.uhd_usrp_sink_0_0.set_min_output_buffer(1048576)
         self.prs_text_ui_0 = ofdm_prs_ranging.prs_text_ui("responder", 1.5, 1.0, 2.0, True)
-        self.prs_ssrtt_responder_0 = ofdm_prs_ranging.prs_ssrtt_responder(samp_rate, reply_delay_samples, 0)
+        self.prs_ssrtt_responder_0 = ofdm_prs_ranging.prs_ssrtt_responder(samp_rate, reply_delay_samples, 0, 0)
         self.prs_source = ofdm_prs_ranging.prs_timed_burst_source(
             samp_rate, 512, 64, 512, 127,
             premble_length, premble_rep, zc_length,
-            1000, 1000, 0.1,
+            0.1,
             0.1, 0.7, 13990001, 1,
             True, 29, 2)
         self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 512, 512, 1.0, 0)
@@ -95,9 +95,9 @@ class prs_ssrtt_responder(gr.top_block):
         self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger("CSV/responder_measurements.csv", 1, 0)
         self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 512, 512, 127, 13990001, 0, 2)
         self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/responder_acquisition.csv", "responder", 1)
-        self.ofdm_prs_ranging_prs_zc_frame_sync_0 = ofdm_prs_ranging.prs_zc_frame_sync(30e6, 512, 64, 512, 127, 128, 17, 819, 1000, 1000, 0.15, 0.35, 25, 0, 0)
+        self.ofdm_prs_ranging_prs_zc_frame_sync_0 = ofdm_prs_ranging.prs_zc_frame_sync(30e6, 512, 64, 512, 127, 128, 17, 819, 0.15, 0.35, 25, 0, 0)
         self.ofdm_prs_ranging_prs_zc_frame_sync_0.set_processor_affinity([2])
-        self.ofdm_prs_ranging_prs_window_capture_0 = ofdm_prs_ranging.prs_window_capture(30e6, 512, 64, 512, 127, 128, 17, 819, 1000, 1000, 0.09, 10000, 4096, 4096, 2, True, False)
+        self.ofdm_prs_ranging_prs_window_capture_0 = ofdm_prs_ranging.prs_window_capture(30e6, 512, 64, 512, 127, 128, 17, 819, 0.09, 10000, 4096, 4096, 2, True, False)
 
 
         ##################################################

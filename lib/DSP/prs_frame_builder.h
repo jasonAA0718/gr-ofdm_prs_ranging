@@ -9,6 +9,7 @@
 #define INCLUDED_OFDM_PRS_RANGING_PRS_FRAME_BUILDER_H
 
 #include "prs_payload_codec.h"
+#include "prs_phy_geometry.h"
 #include <gnuradio/gr_complex.h>
 #include <cstdint>
 #include <vector>
@@ -26,8 +27,6 @@ struct prs_frame_config {
     int preamble_repeats;
     int coarse_sync_len;
     int payload_len;
-    int zero_guard_len;
-    int tail_guard_len;
     float tx_amp;
     uint32_t seed;
     int coarse_zc_root = 25;

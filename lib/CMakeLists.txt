@@ -124,6 +124,9 @@ foreach(qa_file ${test_ofdm_prs_ranging_sources})
         target_sources(${qa_target} PRIVATE
                        ${CMAKE_CURRENT_SOURCE_DIR}/DSP/prs_payload_codec.cc)
     endif()
+    if(qa_file STREQUAL "USRP/qa_prs_timed_burst_source.cc")
+        target_sources(${qa_target} PRIVATE USRP/prs_burst_scheduler.cc DSP/prs_receiver_utils.cc)
+    endif()
     if(qa_file STREQUAL "DSP/qa_zc_packet_utils.cc")
         target_sources(${qa_target} PRIVATE
                        ${CMAKE_CURRENT_SOURCE_DIR}/DSP/zc_packet_utils.cc)

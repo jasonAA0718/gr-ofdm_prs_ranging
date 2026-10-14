@@ -19,24 +19,26 @@ namespace ofdm_prs_ranging {
 constexpr uint8_t prs_packet_type_poll = 1;
 constexpr uint8_t prs_packet_type_response = 2;
 constexpr int prs_frame_id_ref_symbols = 16;
-constexpr int prs_payload_packet_type_bits = 8;
-constexpr int prs_payload_frame_id_bits = 32;
-constexpr int prs_payload_reply_delay_bits = 32;
+constexpr int prs_payload_control_bits = 64;
 constexpr int prs_payload_crc_bits = 16;
-constexpr int prs_payload_repeat = 280;
-constexpr int prs_payload_data_bits =
-    prs_payload_packet_type_bits + prs_payload_frame_id_bits + prs_payload_frame_id_bits +
-    prs_payload_reply_delay_bits + prs_payload_crc_bits;
+constexpr int prs_payload_data_bits = 80;
+constexpr int prs_payload_repeat = 280; // historical repeated-sample helper only
 constexpr int prs_frame_id_data_symbols = prs_payload_data_bits * prs_payload_repeat;
-constexpr int prs_frame_id_payload_symbols =
-    prs_frame_id_ref_symbols + prs_frame_id_data_symbols;
+constexpr int prs_frame_id_payload_symbols = prs_frame_id_ref_symbols + prs_frame_id_data_symbols;
 
+// Wide inputs deliberately retain invalid values until bounds have been checked.
 struct prs_payload_info {
-    uint8_t packet_type = prs_packet_type_poll;
-    uint32_t poll_frame_id = 0;
-    uint32_t response_frame_id = 0;
-    uint32_t reply_delay_samples = 0;
+    uint64_t packet_type = prs_packet_type_poll;
+    uint64_t anchor_id = 0;
+    uint64_t poll_id = 0;
+    uint64_t reply_delay_samples = 0;
+    int64_t poll_fine_delay_q10 = 0;
+    bool fine_delay_valid = false;
 };
+
+bool payload_fields_valid(const prs_payload_info& info);
+uint16_t crc16_control_word(uint64_t control);
+bool quantize_poll_fine_delay(double samples, bool phase_valid, int16_t& q);
 
 using prs_payload_bits = std::array<uint8_t, prs_payload_data_bits>;
 

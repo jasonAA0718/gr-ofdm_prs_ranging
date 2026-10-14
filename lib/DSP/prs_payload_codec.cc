@@ -8,6 +8,7 @@
 #include "prs_payload_codec.h"
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 
 namespace gr {
 namespace ofdm_prs_ranging {
@@ -30,94 +31,82 @@ void crc16_update(uint16_t& crc, uint8_t byte)
     }
 }
 
-void crc16_update_u32(uint16_t& crc, uint32_t value)
+} // namespace
+
+bool payload_fields_valid(const prs_payload_info& info)
 {
-    for (int byte = 0; byte < 4; ++byte) {
-        crc16_update(crc, static_cast<uint8_t>((value >> (8 * byte)) & 0xffU));
-    }
+    return info.packet_type <= 3 && info.anchor_id <= 7 && info.poll_id <= 65535 &&
+           info.reply_delay_samples <= 0xffffff && info.poll_fine_delay_q10 >= -32768 &&
+           info.poll_fine_delay_q10 <= 32767;
 }
 
-uint16_t crc16_ccitt(const prs_payload_info& info)
+uint16_t crc16_control_word(uint64_t control)
 {
     uint16_t crc = 0xffffU;
-    crc16_update(crc, info.packet_type);
-    crc16_update_u32(crc, info.poll_frame_id);
-    crc16_update_u32(crc, info.response_frame_id);
-    crc16_update_u32(crc, info.reply_delay_samples);
+    for (int byte = 0; byte < 8; ++byte) {
+        crc16_update(crc, static_cast<uint8_t>(control >> (8 * byte)));
+    }
     return crc;
 }
 
-bool payload_bit(const prs_payload_info& info, uint16_t crc, int bit_index)
+bool quantize_poll_fine_delay(double samples, bool phase_valid, int16_t& q)
 {
-    if (bit_index < prs_payload_packet_type_bits) {
-        return ((info.packet_type >> bit_index) & 0x1U) != 0;
+    q = 0;
+    if (!phase_valid || !std::isfinite(samples)) {
+        return false;
     }
-    bit_index -= prs_payload_packet_type_bits;
-    if (bit_index < prs_payload_frame_id_bits) {
-        return ((info.poll_frame_id >> bit_index) & 0x1U) != 0;
+    const double rounded = std::round(samples * 1024.0);
+    if (!std::isfinite(rounded) || rounded < -32768.0 || rounded > 32767.0) {
+        return false;
     }
-    bit_index -= prs_payload_frame_id_bits;
-    if (bit_index < prs_payload_frame_id_bits) {
-        return ((info.response_frame_id >> bit_index) & 0x1U) != 0;
-    }
-    bit_index -= prs_payload_frame_id_bits;
-    if (bit_index < prs_payload_reply_delay_bits) {
-        return ((info.reply_delay_samples >> bit_index) & 0x1U) != 0;
-    }
-    bit_index -= prs_payload_reply_delay_bits;
-    return ((crc >> bit_index) & 0x1U) != 0;
+    q = static_cast<int16_t>(rounded);
+    return true;
 }
-} // namespace
 
 prs_payload_bits serialize_packet_payload(const prs_payload_info& info)
 {
-    const uint16_t crc = crc16_ccitt(info);
+    if (!payload_fields_valid(info)) {
+        throw std::invalid_argument("packet v2 field out of range");
+    }
+    const uint64_t control = info.packet_type | (info.anchor_id << 2) |
+        (info.poll_id << 5) | (info.reply_delay_samples << 21) |
+        (static_cast<uint64_t>(static_cast<uint16_t>(info.poll_fine_delay_q10)) << 45) |
+        (static_cast<uint64_t>(info.fine_delay_valid) << 61);
+    const uint16_t crc = crc16_control_word(control);
     prs_payload_bits bits{};
-    for (int bit = 0; bit < prs_payload_data_bits; ++bit) {
-        bits[static_cast<size_t>(bit)] = payload_bit(info, crc, bit) ? 1U : 0U;
+    for (int bit = 0; bit < 64; ++bit) {
+        bits[bit] = (control >> bit) & 1U;
+    }
+    for (int bit = 0; bit < 16; ++bit) {
+        bits[64 + bit] = (crc >> bit) & 1U;
     }
     return bits;
 }
 
-bool deserialize_packet_payload(const uint8_t* bits,
-                                size_t bit_count,
+bool deserialize_packet_payload(const uint8_t* bits, size_t bit_count,
                                 prs_payload_info& info)
 {
     info = prs_payload_info{};
     info.packet_type = 0;
-    if (bits == nullptr || bit_count < static_cast<size_t>(prs_payload_data_bits)) {
+    if (!bits || bit_count < prs_payload_data_bits) {
         return false;
     }
-
-    uint16_t rx_crc = 0;
-    for (int bit = 0; bit < prs_payload_data_bits; ++bit) {
-        if ((bits[static_cast<size_t>(bit)] & 1U) == 0U) {
-            continue;
-        }
-        int field_bit = bit;
-        if (field_bit < prs_payload_packet_type_bits) {
-            info.packet_type |= static_cast<uint8_t>(uint8_t{ 1 } << field_bit);
-            continue;
-        }
-        field_bit -= prs_payload_packet_type_bits;
-        if (field_bit < prs_payload_frame_id_bits) {
-            info.poll_frame_id |= uint32_t{ 1 } << field_bit;
-            continue;
-        }
-        field_bit -= prs_payload_frame_id_bits;
-        if (field_bit < prs_payload_frame_id_bits) {
-            info.response_frame_id |= uint32_t{ 1 } << field_bit;
-            continue;
-        }
-        field_bit -= prs_payload_frame_id_bits;
-        if (field_bit < prs_payload_reply_delay_bits) {
-            info.reply_delay_samples |= uint32_t{ 1 } << field_bit;
-            continue;
-        }
-        field_bit -= prs_payload_reply_delay_bits;
-        rx_crc |= static_cast<uint16_t>(uint16_t{ 1 } << field_bit);
+    uint64_t control = 0;
+    uint16_t crc = 0;
+    for (int bit = 0; bit < 64; ++bit) {
+        control |= static_cast<uint64_t>(bits[bit] & 1U) << bit;
     }
-    return rx_crc == crc16_ccitt(info);
+    for (int bit = 0; bit < 16; ++bit) {
+        crc |= static_cast<uint16_t>(bits[64 + bit] & 1U) << bit;
+    }
+    info.packet_type = control & 3U;
+    info.anchor_id = (control >> 2) & 7U;
+    info.poll_id = (control >> 5) & 0xffffU;
+    info.reply_delay_samples = (control >> 21) & 0xffffffU;
+    const int64_t raw_q = (control >> 45) & 0xffffU;
+    info.poll_fine_delay_q10 = raw_q >= 32768 ? raw_q - 65536 : raw_q;
+    info.fine_delay_valid = ((control >> 61) & 1U) != 0;
+    return (control >> 62) == 0 && crc == crc16_control_word(control);
 }
 
 void encode_packet_payload(const prs_payload_info& info,
@@ -144,8 +133,7 @@ void encode_frame_id_payload(uint64_t frame_id,
 {
     prs_payload_info info;
     info.packet_type = prs_packet_type_poll;
-    info.poll_frame_id = static_cast<uint32_t>(frame_id & 0xffffffffU);
-    info.response_frame_id = 0;
+    info.poll_id = frame_id;
     info.reply_delay_samples = 0;
     encode_packet_payload(info, amplitude, out);
 }
@@ -184,11 +172,7 @@ bool decode_packet_payload(const gr_complex* payload,
     const float ref_metric = static_cast<float>(
         std::min(1.0, ref_mag / std::sqrt(ref_power * prs_frame_id_ref_symbols)));
 
-    uint8_t packet_type = 0;
-    uint32_t poll_frame_id = 0;
-    uint32_t response_frame_id = 0;
-    uint32_t reply_delay_samples = 0;
-    uint16_t rx_crc = 0;
+    prs_payload_bits bits{};
     double decision_margin_sum = 0.0;
     for (int bit = 0; bit < prs_payload_data_bits; ++bit) {
         double decision_sum = 0.0;
@@ -205,48 +189,13 @@ bool decode_packet_payload(const gr_complex* payload,
             decision_margin_sum += std::min(1.0, std::abs(decision_sum) / magnitude_sum);
         }
 
-        int field_bit = bit;
-        if (field_bit < prs_payload_packet_type_bits) {
-            if (one) {
-                packet_type |= static_cast<uint8_t>(uint8_t{ 1 } << field_bit);
-            }
-            continue;
-        }
-        field_bit -= prs_payload_packet_type_bits;
-        if (field_bit < prs_payload_frame_id_bits) {
-            if (one) {
-                poll_frame_id |= (uint32_t{ 1 } << field_bit);
-            }
-            continue;
-        }
-        field_bit -= prs_payload_frame_id_bits;
-        if (field_bit < prs_payload_frame_id_bits) {
-            if (one) {
-                response_frame_id |= (uint32_t{ 1 } << field_bit);
-            }
-            continue;
-        }
-        field_bit -= prs_payload_frame_id_bits;
-        if (field_bit < prs_payload_reply_delay_bits) {
-            if (one) {
-                reply_delay_samples |= (uint32_t{ 1 } << field_bit);
-            }
-            continue;
-        }
-        field_bit -= prs_payload_reply_delay_bits;
-        if (one) {
-            rx_crc |= static_cast<uint16_t>(uint16_t{ 1 } << field_bit);
-        }
+        bits[bit] = one ? 1U : 0U;
     }
 
-    info.packet_type = packet_type;
-    info.poll_frame_id = poll_frame_id;
-    info.response_frame_id = response_frame_id;
-    info.reply_delay_samples = reply_delay_samples;
     const float decision_metric = static_cast<float>(
         decision_margin_sum / static_cast<double>(prs_payload_data_bits));
     metric = std::min(ref_metric, decision_metric);
-    return rx_crc == crc16_ccitt(info);
+    return deserialize_packet_payload(bits.data(), bits.size(), info);
 }
 
 bool decode_frame_id_payload(const gr_complex* payload,
@@ -256,8 +205,7 @@ bool decode_frame_id_payload(const gr_complex* payload,
 {
     prs_payload_info info;
     const bool valid = decode_packet_payload(payload, payload_len, info, metric);
-    frame_id = info.packet_type == prs_packet_type_response ? info.response_frame_id
-                                                            : info.poll_frame_id;
+    frame_id = info.poll_id;
     return valid;
 }
 

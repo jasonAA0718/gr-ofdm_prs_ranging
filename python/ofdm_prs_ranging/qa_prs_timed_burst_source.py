@@ -11,7 +11,7 @@ import time
 
 import numpy
 import pmt
-from gnuradio import blocks, gr, gr_unittest
+from gnuradio import blocks, gr, gr_unittest, ofdm_prs_ranging
 
 try:
     from gnuradio.ofdm_prs_ranging import prs_rx_timekeeper, prs_timed_burst_source
@@ -38,6 +38,28 @@ class qa_prs_timed_burst_source(gr_unittest.TestCase):
             src.frame_len(), expected_prs_start + 127 * (512 + 64) + 1000)
         self.assertEqual(src.prs_start(), expected_prs_start)
         self.assertEqual(src.prs_len(), 127 * (512 + 64))
+
+    def test_guards_are_fixed_and_not_constructor_controls(self):
+        leading = ofdm_prs_ranging.PHY_LEADING_GUARD_SAMPLES
+        tail = ofdm_prs_ranging.PHY_TAIL_GUARD_SAMPLES
+        self.assertEqual((leading, tail), (1000, 1000))
+        for factory in (ofdm_prs_ranging.prs_timed_burst_source,
+                        ofdm_prs_ranging.prs_frame_detector,
+                        ofdm_prs_ranging.prs_fft_zc_frame_detector,
+                        ofdm_prs_ranging.prs_window_capture,
+                        ofdm_prs_ranging.prs_zc_frame_sync):
+            for key in ("zero_guard_len", "tail_guard_len"):
+                with self.assertRaises(TypeError):
+                    factory(**{key: 1000})
+        for root, amplitude, preamble in ((25, 0.2, 128), (29, 0.7, 256)):
+            src = prs_timed_burst_source(coarse_zc_root=root, tx_amp=amplitude,
+                                         preamble_len=preamble, samp_rate=30e6)
+            frame = numpy.asarray(src.frame_samples())
+            numpy.testing.assert_array_equal(frame[:leading], 0)
+            numpy.testing.assert_array_equal(frame[-tail:], 0)
+            self.assertEqual(src.frame_len(), leading + preamble * 16 + 839 + 127 * 576 + tail)
+            self.assertAlmostEqual(float(abs(frame[leading])), 0.95, places=6)
+            self.assertLessEqual(float(numpy.max(numpy.abs(frame[src.prs_start():-tail]))), 0.900001)
 
     def test_active_subcarrier_mapping(self):
         src = prs_timed_burst_source()

@@ -190,7 +190,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
             if pmt.to_bool(pmt.dict_ref(
                     meta, pmt.intern("frame_id_valid"), pmt.PMT_F)):
                 frame_ids.append(pmt.to_uint64(pmt.dict_ref(
-                    meta, pmt.intern("poll_frame_id"), pmt.PMT_NIL)))
+                    meta, pmt.intern("poll_id"), pmt.PMT_NIL)))
         self.assertEqual(frame_ids, [0, 1, 2])
 
     def test_triggered_response_payload_round_trip(self):
@@ -201,9 +201,11 @@ class qa_prs_receiver(gr_unittest.TestCase):
         trigger = pmt.make_dict()
         for key, value in (
             ("packet_type", pmt.from_long(2)),
-            ("poll_frame_id", pmt.from_uint64(42)),
-            ("response_frame_id", pmt.from_uint64(77)),
+            ("poll_id", pmt.from_uint64(42)),
+            ("anchor_id", pmt.from_uint64(7)),
             ("reply_delay_samples", pmt.from_uint64(1500000)),
+            ("poll_fine_delay_q10", pmt.from_long(-384)),
+            ("fine_delay_valid", pmt.PMT_T),
             ("tx_time_secs", pmt.from_uint64(0)),
             ("tx_time_frac", pmt.from_double(0.0)),
         ):
@@ -237,9 +239,12 @@ class qa_prs_receiver(gr_unittest.TestCase):
         self.assertEqual(pmt.to_long(pmt.dict_ref(
             meta, pmt.intern("packet_type"), pmt.PMT_NIL)), 2)
         self.assertEqual(pmt.to_uint64(pmt.dict_ref(
-            meta, pmt.intern("poll_frame_id"), pmt.PMT_NIL)), 42)
+            meta, pmt.intern("poll_id"), pmt.PMT_NIL)), 42)
         self.assertEqual(pmt.to_uint64(pmt.dict_ref(
-            meta, pmt.intern("response_frame_id"), pmt.PMT_NIL)), 77)
+            meta, pmt.intern("anchor_id"), pmt.PMT_NIL)), 7)
+        self.assertTrue(pmt.to_bool(pmt.dict_ref(meta, pmt.intern("fine_delay_valid"), pmt.PMT_F)))
+        self.assertAlmostEqual(pmt.to_double(pmt.dict_ref(
+            meta, pmt.intern("poll_fine_delay_samples"), pmt.PMT_NIL)), -0.375)
         self.assertEqual(pmt.to_uint64(pmt.dict_ref(
             meta, pmt.intern("reply_delay_samples"), pmt.PMT_NIL)), 1500000)
 
@@ -690,8 +695,8 @@ class qa_prs_receiver(gr_unittest.TestCase):
                 ("coarse_zc_root", pmt.from_long(29)),
                 ("recv_id", pmt.from_uint64(77)),
                 ("frame_id", pmt.from_uint64(88)),
-                ("poll_frame_id", pmt.from_uint64(55)),
-                ("response_frame_id", pmt.from_uint64(66)),
+                ("poll_id", pmt.from_uint64(55)),
+                ("anchor_id", pmt.from_uint64(6)),
                 ("rx_time_tag_offset", pmt.from_uint64(1000)),
                 ("absolute_sample_index", pmt.from_uint64(2000)),
                 ("frame_start", pmt.from_uint64(2000)),
@@ -715,7 +720,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
             self.assertEqual(header, [
                 "log_time_unix", "node", "attempt_id", "failure_reason",
                 "channel_id", "coarse_zc_root", "packet_type",
-                "poll_frame_id", "response_frame_id", "reply_delay_samples",
+                "poll_id", "anchor_id", "reply_delay_samples",
                 "frame_id_valid", "rx_time", "preamble_metric",
                 "coarse_metric", "zc_peak_ratio", "zc_gate_offset_samples",
                 "payload_initial_valid", "payload_initial_metric",
@@ -742,8 +747,8 @@ class qa_prs_receiver(gr_unittest.TestCase):
                 self.assertNotIn(removed, header)
             for retained in (
                 "attempt_id",
-                "poll_frame_id",
-                "response_frame_id",
+                "poll_id",
+                "anchor_id",
             ):
                 self.assertIn(retained, header)
             self.assertEqual(len(header), len(fields))
@@ -751,7 +756,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
             self.assertEqual(fields[2], "55")
             self.assertEqual(fields[3], "ZC_SYNC")
             self.assertEqual(fields[7], "55")
-            self.assertEqual(fields[8], "66")
+            self.assertEqual(fields[8], "6")
         finally:
             if os.path.exists(path):
                 os.unlink(path)
@@ -763,8 +768,8 @@ class qa_prs_receiver(gr_unittest.TestCase):
             logger = ofdm_prs_ranging.prs_csv_logger(path, False)
             meta = pmt.make_dict()
             for key, value in (
-                ("poll_frame_id", pmt.from_uint64(7)),
-                ("response_frame_id", pmt.from_uint64(9)),
+                ("poll_id", pmt.from_uint64(7)),
+                ("anchor_id", pmt.from_uint64(3)),
                 ("t1_tx_time", pmt.from_double(100.0)),
                 ("t4_rx_time", pmt.from_double(100.000011)),
                 ("reply_delay_samples", pmt.from_uint64(50)),
@@ -792,8 +797,8 @@ class qa_prs_receiver(gr_unittest.TestCase):
             header = lines[0].split(",")
             fields = lines[1].split(",")
             self.assertEqual(len(header), len(fields))
-            self.assertEqual(fields[header.index("poll_frame_id")], "7")
-            self.assertEqual(fields[header.index("response_frame_id")], "9")
+            self.assertEqual(fields[header.index("poll_id")], "7")
+            self.assertEqual(fields[header.index("anchor_id")], "3")
             self.assertAlmostEqual(float(fields[header.index("t1_tx_time")]), 100.0)
             self.assertAlmostEqual(float(fields[header.index("t4_rx_time")]), 100.000011)
             self.assertEqual(fields[header.index("reply_delay_samples")], "50")
@@ -806,6 +811,208 @@ class qa_prs_receiver(gr_unittest.TestCase):
             if os.path.exists(path):
                 os.unlink(path)
 
+    @staticmethod
+    def _v2_meta(values):
+        meta = pmt.make_dict()
+        for key, value in values.items():
+            if isinstance(value, bool):
+                encoded = pmt.PMT_T if value else pmt.PMT_F
+            elif isinstance(value, int):
+                encoded = pmt.from_long(value)
+            elif isinstance(value, float):
+                encoded = pmt.from_double(value)
+            else:
+                encoded = value
+            meta = pmt.dict_add(meta, pmt.intern(key), encoded)
+        return meta
+
+    def _await_messages(self, debug, count):
+        deadline = time.monotonic() + 3.0
+        while debug.num_messages() < count and time.monotonic() < deadline:
+            time.sleep(0.002)
+        self.assertEqual(debug.num_messages(), count)
+
+    def test_v2_responder_quantization_validity_and_bounds(self):
+        for anchor in (8, 255, 256):
+            with self.assertRaises(ValueError):
+                ofdm_prs_ranging.prs_ssrtt_responder(anchor_id=anchor)
+        with self.assertRaises(ValueError):
+            ofdm_prs_ranging.prs_ssrtt_responder(reply_delay_samples=0x1000000)
+        responder = ofdm_prs_ranging.prs_ssrtt_responder(30e6, 1500000, False, 7)
+        debug = blocks.message_debug()
+        self.tb.msg_connect(responder, "trigger_out", debug, "store")
+        cases = [(0.25, True, True, 256), (-0.375, True, True, -384),
+                 (-32.0, True, True, -32768), (32767 / 1024.0, True, True, 32767),
+                 (0.0, False, False, 0), (32.0, True, False, 0),
+                 (-32.001, True, False, 0)]
+        cases += [(value, True, False, 0) for value in (float('nan'), float('inf'), -float('inf'))]
+        self.tb.start()
+        try:
+            for samples, phase_valid, _, _ in cases:
+                meta = self._v2_meta(dict(frame_id_valid=True, packet_type=1, poll_id=65535,
+                    fine_delay_samples=samples, valid=phase_valid,
+                    rx_time=pmt.make_tuple(pmt.from_uint64(10), pmt.from_double(0.25))))
+                responder.to_basic_block()._post(pmt.intern("measurement_in"), pmt.cons(meta, pmt.PMT_NIL))
+            self._await_messages(debug, len(cases))
+            for index, (_, _, expected_valid, q) in enumerate(cases):
+                trigger = debug.get_message(index)
+                self.assertEqual(pmt.to_uint64(pmt.dict_ref(trigger, pmt.intern("anchor_id"), pmt.PMT_NIL)), 7)
+                self.assertEqual(pmt.to_uint64(pmt.dict_ref(trigger, pmt.intern("poll_id"), pmt.PMT_NIL)), 65535)
+                self.assertEqual(pmt.to_long(pmt.dict_ref(trigger, pmt.intern("poll_fine_delay_q10"), pmt.PMT_NIL)), q)
+                self.assertEqual(pmt.to_bool(pmt.dict_ref(trigger, pmt.intern("fine_delay_valid"), pmt.PMT_F)), expected_valid)
+        finally:
+            self.tb.stop()
+            self.tb.wait()
+
+    def test_v2_one_anchor_complete_software_chain(self):
+        fs = 30e6
+        poll = ofdm_prs_ranging.prs_timed_burst_source(samp_rate=fs, attach_tx_time=False)
+        response = ofdm_prs_ranging.prs_timed_burst_source(samp_rate=fs, attach_tx_time=False,
+                                                         coarse_zc_root=29)
+        rx_tag = gr.tag_utils.python_to_tag((0, pmt.intern("rx_time"),
+            pmt.make_tuple(pmt.from_uint64(10), pmt.from_double(0.0)), pmt.intern("qa")))
+        source = blocks.vector_source_c(list(poll.frame_samples()), False, 1, [rx_tag])
+        detector = ofdm_prs_ranging.prs_frame_detector(samp_rate=fs, threshold=0.30)
+        fft = ofdm_prs_ranging.prs_fft_receiver(samp_rate=fs)
+        channel = ofdm_prs_ranging.prs_channel_estimator(samp_rate=fs)
+        phase = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate=fs)
+        responder = ofdm_prs_ranging.prs_ssrtt_responder(fs, 1500000, False, 7)
+        trigger_debug = blocks.message_debug()
+        sink = blocks.vector_sink_c()
+        head = blocks.head(gr.sizeof_gr_complex, response.frame_len())
+        self.tb.connect(source, detector)
+        self.tb.msg_connect(detector, "frame_out", fft, "frame_in")
+        self.tb.msg_connect(fft, "symbols_out", channel, "symbols_in")
+        self.tb.msg_connect(channel, "channel_out", phase, "channel_in")
+        self.tb.msg_connect(phase, "measurement_out", responder, "measurement_in")
+        self.tb.msg_connect(responder, "trigger_out", response, "trigger")
+        self.tb.msg_connect(responder, "trigger_out", trigger_debug, "store")
+        self.tb.connect(response, head, sink)
+        self.tb.start()
+        try:
+            self._await_messages(trigger_debug, 1)
+            deadline = time.monotonic() + 3.0
+            while len(sink.data()) < response.frame_len() and time.monotonic() < deadline:
+                time.sleep(0.002)
+            self.assertEqual(len(sink.data()), response.frame_len())
+        finally:
+            self.tb.stop()
+            self.tb.wait()
+        trigger = trigger_debug.get_message(0)
+        self.assertTrue(pmt.to_bool(pmt.dict_ref(trigger, pmt.intern("fine_delay_valid"), pmt.PMT_F)))
+
+        self.tb = gr.top_block()
+        rx_tag.value = pmt.make_tuple(pmt.from_uint64(10), pmt.from_double(0.0500136))
+        source = blocks.vector_source_c(list(sink.data()), False, 1, [rx_tag])
+        detector = ofdm_prs_ranging.prs_frame_detector(samp_rate=fs, threshold=0.30, coarse_zc_root=29)
+        fft = ofdm_prs_ranging.prs_fft_receiver(samp_rate=fs)
+        channel = ofdm_prs_ranging.prs_channel_estimator(samp_rate=fs)
+        phase = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate=fs)
+        solver = ofdm_prs_ranging.prs_ssrtt_solver(fs)
+        debug = blocks.message_debug()
+        self.tb.connect(source, detector)
+        self.tb.msg_connect(detector, "frame_out", fft, "frame_in")
+        self.tb.msg_connect(fft, "symbols_out", channel, "symbols_in")
+        self.tb.msg_connect(channel, "channel_out", phase, "channel_in")
+        self.tb.msg_connect(phase, "measurement_out", solver, "measurement_in")
+        self.tb.msg_connect(solver, "ssrtt_out", debug, "store")
+        solver.to_basic_block()._post(pmt.intern("tx_time_in"), self._v2_meta(
+            dict(packet_type=1, poll_id=0, tx_time_secs=10, tx_time_frac=0.0)))
+        self.tb.start()
+        try:
+            self._await_messages(debug, 1)
+            out = pmt.car(debug.get_message(0))
+            self.assertEqual(pmt.to_uint64(pmt.dict_ref(out, pmt.intern("anchor_id"), pmt.PMT_NIL)), 7)
+            self.assertEqual(pmt.to_uint64(pmt.dict_ref(out, pmt.intern("poll_id"), pmt.PMT_NIL)), 0)
+            self.assertTrue(pmt.to_bool(pmt.dict_ref(out, pmt.intern("fine_correction_valid"), pmt.PMT_F)))
+            get = lambda key: pmt.to_double(pmt.dict_ref(out, pmt.intern(key), pmt.PMT_NIL))
+            self.assertAlmostEqual(get("corrected_range_m"), get("integer_range_m") +
+                299792458.0 / (2 * fs) * (get("poll_fine_delay_samples") + get("response_fine_delay_samples")), places=8)
+        finally:
+            self.tb.stop()
+            self.tb.wait()
+
+    def test_v2_bidirectional_correction_signs_and_invalid_fallback(self):
+        fs = 30e6
+        solver = ofdm_prs_ranging.prs_ssrtt_solver(fs)
+        debug = blocks.message_debug()
+        self.tb.msg_connect(solver, "ssrtt_out", debug, "store")
+        cases = [(poll, response, True, True) for poll in (0.25, -0.25) for response in (0.375, -0.375)]
+        cases += [(0.0, 0.25, False, True), (0.25, 0.0, True, False)]
+        cases += [(value, 0.25, True, True) for value in (float('nan'), float('inf'), -float('inf'))]
+        cases += [(0.25, value, True, True) for value in (float('nan'), float('inf'), -float('inf'))]
+        self.tb.start()
+        try:
+            tx = self._v2_meta(dict(packet_type=1, poll_id=42, tx_time_secs=100, tx_time_frac=0.0))
+            solver.to_basic_block()._post(pmt.intern("tx_time_in"), tx)
+            deadline = time.monotonic() + 1.0
+            while solver.to_basic_block().nmsgs(pmt.intern("tx_time_in")) and time.monotonic() < deadline:
+                time.sleep(0.002)
+            rejected = self._v2_meta(dict(frame_id_valid=False, packet_type=2, poll_id=42,
+                anchor_id=7, reply_delay_samples=1500000, poll_fine_delay_samples=0.25,
+                fine_delay_samples=0.25, fine_delay_valid=True, valid=True,
+                rx_time=pmt.make_tuple(pmt.from_uint64(100), pmt.from_double(0.0500136))))
+            solver.to_basic_block()._post(pmt.intern("measurement_in"), pmt.cons(rejected, pmt.PMT_NIL))
+            for poll, response, poll_valid, response_valid in cases:
+                meta = self._v2_meta(dict(frame_id_valid=True, packet_type=2, poll_id=42,
+                    anchor_id=7, reply_delay_samples=1500000, poll_fine_delay_samples=poll,
+                    fine_delay_samples=response, fine_delay_valid=poll_valid, valid=response_valid,
+                    rx_time=pmt.make_tuple(pmt.from_uint64(100), pmt.from_double(0.0500136))))
+                solver.to_basic_block()._post(pmt.intern("measurement_in"), pmt.cons(meta, pmt.PMT_NIL))
+            self._await_messages(debug, len(cases))
+            integer = (13.6e-6 + 4.841619800497349e-5) * 299792458.0 / 2
+            for index, (poll, response, pv, rv) in enumerate(cases):
+                out = pmt.car(debug.get_message(index))
+                get = lambda key: pmt.to_double(pmt.dict_ref(out, pmt.intern(key), pmt.PMT_NIL))
+                self.assertAlmostEqual(get("integer_range_m"), integer, delta=2e-6)
+                expected_valid = pv and rv and numpy.isfinite(poll) and numpy.isfinite(response)
+                self.assertEqual(pmt.to_bool(pmt.dict_ref(out, pmt.intern("fine_correction_valid"), pmt.PMT_F)), expected_valid)
+                self.assertAlmostEqual(get("measurement_timestamp"), 100.0500136)
+                if expected_valid:
+                    correction = 299792458.0 / (2 * fs) * (poll + response)
+                    self.assertAlmostEqual(get("fine_range_correction_m"), correction, places=9)
+                    self.assertAlmostEqual(get("corrected_range_m"), integer + correction, delta=2e-6)
+                else:
+                    self.assertTrue(numpy.isnan(get("corrected_range_m")))
+                    self.assertTrue(numpy.isnan(get("fine_range_correction_m")))
+        finally:
+            self.tb.stop()
+            self.tb.wait()
+
+    def test_v2_trigger_bounds_and_nonfinite_float(self):
+        tx = ofdm_prs_ranging.prs_timed_burst_source(attach_tx_time=False)
+        debug = blocks.message_debug()
+        head = blocks.head(gr.sizeof_gr_complex, 5 * tx.frame_len())
+        sink = blocks.vector_sink_c()
+        self.tb.connect(tx, head, sink)
+        self.tb.msg_connect(tx, "tx_time_out", debug, "store")
+        base = dict(packet_type=2, poll_id=65535, anchor_id=7,
+                    reply_delay_samples=0xffffff, poll_fine_delay_q10=-32768,
+                    fine_delay_valid=True, tx_time_secs=0, tx_time_frac=0.0)
+        invalid = [("anchor_id", value) for value in (8, 255, 256, -1)]
+        invalid += [("poll_id", 65536), ("reply_delay_samples", 0x1000000),
+                    ("poll_fine_delay_q10", -32769), ("poll_fine_delay_q10", 32768)]
+        self.tb.start()
+        try:
+            for key, value in invalid:
+                tx.to_basic_block()._post(pmt.intern("trigger"), self._v2_meta(dict(base, **{key: value})))
+            for samples in (0.25, float('nan'), float('inf'), -float('inf')):
+                tx.to_basic_block()._post(pmt.intern("trigger"), self._v2_meta(dict(base, poll_fine_delay_samples=samples)))
+            missing_fine = dict(base)
+            del missing_fine["poll_fine_delay_q10"]
+            tx.to_basic_block()._post(pmt.intern("trigger"), self._v2_meta(missing_fine))
+            self._await_messages(debug, 5)
+            for index in range(5):
+                out = debug.get_message(index)
+                self.assertEqual(pmt.to_bool(pmt.dict_ref(out, pmt.intern("fine_delay_valid"), pmt.PMT_F)), index == 0)
+            deadline = time.monotonic() + 3.0
+            while len(sink.data()) < 5 * tx.frame_len() and time.monotonic() < deadline:
+                time.sleep(0.002)
+            self.assertEqual(len(sink.data()), 5 * tx.frame_len())
+        finally:
+            self.tb.stop()
+            self.tb.wait()
+
     def test_ssrtt_responder_schedules_response_trigger(self):
         responder = ofdm_prs_ranging.prs_ssrtt_responder(10e6, 50000)
         debug = blocks.message_debug()
@@ -814,7 +1021,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
         for key, value in (
             ("frame_id_valid", pmt.PMT_T),
             ("packet_type", pmt.from_long(1)),
-            ("poll_frame_id", pmt.from_uint64(123)),
+            ("poll_id", pmt.from_uint64(123)),
             ("frame_id", pmt.from_uint64(123)),
             ("rx_time", pmt.make_tuple(pmt.from_uint64(10), pmt.from_double(0.25))),
         ):
@@ -831,7 +1038,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
         self.assertGreaterEqual(debug.num_messages(), 1)
         trigger = debug.get_message(0)
         self.assertEqual(pmt.to_long(pmt.dict_ref(trigger, pmt.intern("packet_type"), pmt.PMT_NIL)), 2)
-        self.assertEqual(pmt.to_uint64(pmt.dict_ref(trigger, pmt.intern("poll_frame_id"), pmt.PMT_NIL)), 123)
+        self.assertEqual(pmt.to_uint64(pmt.dict_ref(trigger, pmt.intern("poll_id"), pmt.PMT_NIL)), 123)
         self.assertEqual(pmt.to_uint64(pmt.dict_ref(trigger, pmt.intern("reply_delay_samples"), pmt.PMT_NIL)), 50000)
         self.assertEqual(pmt.to_uint64(pmt.dict_ref(trigger, pmt.intern("tx_time_secs"), pmt.PMT_NIL)), 10)
         self.assertAlmostEqual(pmt.to_double(pmt.dict_ref(trigger, pmt.intern("tx_time_frac"), pmt.PMT_NIL)), 0.255)
@@ -843,7 +1050,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
         tx = pmt.make_dict()
         for key, value in (
             ("packet_type", pmt.from_long(1)),
-            ("poll_frame_id", pmt.from_uint64(42)),
+            ("poll_id", pmt.from_uint64(42)),
             ("frame_id", pmt.from_uint64(42)),
             ("tx_time_secs", pmt.from_uint64(100)),
             ("tx_time_frac", pmt.from_double(0.0)),
@@ -854,8 +1061,8 @@ class qa_prs_receiver(gr_unittest.TestCase):
         for key, value in (
             ("frame_id_valid", pmt.PMT_T),
             ("packet_type", pmt.from_long(2)),
-            ("poll_frame_id", pmt.from_uint64(42)),
-            ("response_frame_id", pmt.from_uint64(77)),
+            ("poll_id", pmt.from_uint64(42)),
+            ("anchor_id", pmt.from_uint64(7)),
             ("reply_delay_samples", pmt.from_uint64(50000)),
             ("rx_time", pmt.make_tuple(pmt.from_uint64(100), pmt.from_double(0.0050136))),
             ("fine_delay", pmt.from_double(25.0e-9)),
@@ -881,8 +1088,9 @@ class qa_prs_receiver(gr_unittest.TestCase):
         self.assertGreaterEqual(debug.num_messages(), 1)
         out = pmt.car(debug.get_message(0))
         self.assertAlmostEqual(pmt.to_double(pmt.dict_ref(out, pmt.intern("rtt_s"), pmt.PMT_NIL)), 13.6e-6)
-        self.assertAlmostEqual(pmt.to_double(pmt.dict_ref(out, pmt.intern("tof_s"), pmt.PMT_NIL)), 1.0e-6)
-        calibrated_tof = (13.6e-6 - 1.159952546762614e-05) / 2.0
+        self.assertAlmostEqual(pmt.to_double(pmt.dict_ref(out, pmt.intern("tof_s"), pmt.PMT_NIL)),
+                               (13.6e-6 + 4.841619800497349e-5) / 2.0)
+        calibrated_tof = (13.6e-6 + 4.841619800497349e-5) / 2.0
         calibrated_range = calibrated_tof * 299792458.0
         self.assertAlmostEqual(pmt.to_double(pmt.dict_ref(out, pmt.intern("range_m"), pmt.PMT_NIL)), calibrated_range, places=5)
         self.assertAlmostEqual(pmt.to_double(pmt.dict_ref(
