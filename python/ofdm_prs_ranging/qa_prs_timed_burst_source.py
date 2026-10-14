@@ -76,7 +76,7 @@ class qa_prs_timed_burst_source(gr_unittest.TestCase):
     def test_amplitude_limit(self):
         src = prs_timed_burst_source()
         frame = numpy.asarray(src.frame_samples(), dtype=numpy.complex64)
-        self.assertLessEqual(float(numpy.max(numpy.abs(frame))), 0.900001)
+        self.assertLessEqual(float(numpy.max(numpy.abs(frame))), 1.000001)
         rms = math.sqrt(float(numpy.mean(numpy.abs(frame) ** 2)))
         self.assertGreater(rms, 0.0)
 

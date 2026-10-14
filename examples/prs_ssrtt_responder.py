@@ -36,13 +36,13 @@ class prs_ssrtt_responder(gr.top_block):
         ##################################################
         self.samp_rate = samp_rate = 30000000
         self.zc_length = zc_length = 819
-        self.tx_gain = tx_gain = 55
-        self.rx_gain = rx_gain = 48
+        self.tx_gain = tx_gain = 60
+        self.rx_gain = rx_gain = 57
         self.reply_delay_samples = reply_delay_samples = int(0.031*samp_rate)
         self.premble_rep = premble_rep = 17
         self.premble_length = premble_length = 128
         self.center_freq = center_freq = 1060e6
-        self.T_burst = T_burst = 0.2
+        self.T_burst = T_burst = 0.75
 
         ##################################################
         # Blocks
@@ -97,7 +97,7 @@ class prs_ssrtt_responder(gr.top_block):
         self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/responder_acquisition.csv", "responder", 1)
         self.ofdm_prs_ranging_prs_zc_frame_sync_0 = ofdm_prs_ranging.prs_zc_frame_sync(30e6, 512, 64, 512, 127, 128, 17, 819, 0.15, 0.35, 25, 0, 0)
         self.ofdm_prs_ranging_prs_zc_frame_sync_0.set_processor_affinity([2])
-        self.ofdm_prs_ranging_prs_window_capture_0 = ofdm_prs_ranging.prs_window_capture(30e6, 512, 64, 512, 127, 128, 17, 819, 0.09, 10000, 4096, 4096, 2, True, False)
+        self.ofdm_prs_ranging_prs_window_capture_0 = ofdm_prs_ranging.prs_window_capture(30e6, 512, 64, 512, 127, 128, 17, 819, 0.12, 10000, 4096, 4096, 1, True, False)
 
 
         ##################################################

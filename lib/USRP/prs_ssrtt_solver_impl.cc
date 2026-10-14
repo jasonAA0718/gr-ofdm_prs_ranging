@@ -111,7 +111,7 @@ void prs_ssrtt_solver_impl::handle_measurement(pmt::pmt_t msg)
 
     const double reply_delay_s = static_cast<double>(reply_delay_samples) / d_samp_rate;
     const double rtt_s = t4 - t1 - reply_delay_s;
-    const double tof_s = (rtt_s + 4.841619800497349e-5)/ 2.0; // the processing delay of the response packet;
+    const double tof_s = (rtt_s + 1.839982020395609e-05)/ 2.0; // the processing delay of the response packet;
     const double range_m = tof_s * c_mps;
     const double poll_fine_samples = dict_ref_double(meta, "poll_fine_delay_samples", NAN);
     const double response_fine_samples = dict_ref_double(meta, "fine_delay_samples", NAN);
