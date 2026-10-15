@@ -12,6 +12,7 @@
 #include "prs_timing_helper.h"
 #include <gnuradio/io_signature.h>
 #include <cmath>
+#include <algorithm>
 #include <stdexcept>
 
 namespace gr {
@@ -58,6 +59,7 @@ prs_ssrtt_responder_impl::prs_ssrtt_responder_impl(double samp_rate,
     }
     message_port_register_in(pmt::mp("measurement_in"));
     message_port_register_out(pmt::mp("trigger_out"));
+    message_port_register_out(pmt::mp("diagnostic_out"));
     message_port_register_out(pmt::mp("timing_out"));
     set_msg_handler(pmt::mp("measurement_in"),
                     [this](pmt::pmt_t msg) { handle_measurement(msg); });
@@ -84,6 +86,21 @@ void prs_ssrtt_responder_impl::handle_measurement(pmt::pmt_t msg)
 
     uint64_t poll_id = 0;
     if (!bounded_uint(meta, "poll_id", 65536, 65535, poll_id)) return;
+    const double duplicate_hold_s = std::max(0.2, d_reply_delay_samples / d_samp_rate + 0.05);
+    d_latest_poll_time = std::max(d_latest_poll_time, poll_rx_time);
+    for (auto it = d_recent_polls.begin(); it != d_recent_polls.end();) {
+        if (d_latest_poll_time - it->second > duplicate_hold_s) it = d_recent_polls.erase(it);
+        else ++it;
+    }
+    const auto prior = d_recent_polls.find(poll_id);
+    if (poll_rx_time < d_latest_poll_time - duplicate_hold_s ||
+        (prior != d_recent_polls.end() && poll_rx_time <= prior->second + duplicate_hold_s)) {
+        auto diagnostic = pmt::dict_add(meta, pmt::mp("duplicate_poll"), pmt::PMT_T);
+        message_port_pub(pmt::mp("diagnostic_out"), pmt::cons(diagnostic, pmt::PMT_NIL));
+        return;
+    }
+    // At most 65536 protocol IDs; age-based cleanup normally keeps only recent POLLs.
+    d_recent_polls[poll_id] = poll_rx_time;
     int16_t fine_q = 0;
     const bool fine_valid = quantize_poll_fine_delay(
         dict_ref_double(meta, "fine_delay_samples", NAN), metadata_true(meta, "valid"), fine_q);

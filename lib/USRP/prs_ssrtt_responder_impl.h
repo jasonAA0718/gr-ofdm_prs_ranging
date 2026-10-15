@@ -10,6 +10,7 @@
 
 #include <gnuradio/ofdm_prs_ranging/prs_ssrtt_responder.h>
 #include <pmt/pmt.h>
+#include <unordered_map>
 
 namespace gr {
 namespace ofdm_prs_ranging {
@@ -27,6 +28,8 @@ private:
     uint64_t d_reply_delay_samples;
     uint64_t d_anchor_id;
     bool d_enable_profiling;
+    std::unordered_map<uint64_t, double> d_recent_polls;
+    double d_latest_poll_time = -1.0;
 
     void handle_measurement(pmt::pmt_t msg);
 };

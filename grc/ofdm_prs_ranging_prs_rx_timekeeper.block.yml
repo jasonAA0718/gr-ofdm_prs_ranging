@@ -29,4 +29,6 @@ outputs:
   domain: message
   optional: true
 
+- {label: clock_out, domain: message, optional: true}
+
 file_format: 1

@@ -22,6 +22,7 @@ namespace py = pybind11;
 // Please do not delete
 /**************************************/
 // BINDING_FUNCTION_PROTOTYPES(
+void bind_prs_multi_anchor_cycle(py::module& m);
 void bind_prs_acquisition_logger(py::module& m);
 void bind_prs_frame_detector(py::module& m);
 void bind_prs_fft_zc_frame_detector(py::module& m);
@@ -70,6 +71,7 @@ PYBIND11_MODULE(ofdm_prs_ranging_python, m)
     // Please do not delete
     /**************************************/
     // BINDING_FUNCTION_CALLS(
+    bind_prs_multi_anchor_cycle(m);
     bind_prs_acquisition_logger(m);
     bind_prs_frame_detector(m);
     bind_prs_fft_zc_frame_detector(m);

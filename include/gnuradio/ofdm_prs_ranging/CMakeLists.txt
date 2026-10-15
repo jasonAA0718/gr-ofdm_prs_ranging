@@ -10,6 +10,7 @@
 # Install public header files
 ########################################################################
 install(FILES api.h
+    prs_multi_anchor_cycle.h
     prs_acquisition_logger.h
     prs_rx_timekeeper.h
     prs_timed_burst_source.h

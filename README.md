@@ -1,8 +1,8 @@
 # OFDM PRS / SS-TWR Ranging
 
 GNU Radio OOT blocks for USRP/UHD burst ranging using a custom OFDM PRS-like
-waveform. The current system supports a single POLL/RESPONSE link; the
-long-term goal is positioning with multiple anchors. It is not a
+waveform. The current system supports one-anchor operation and statically scheduled
+two-anchor ranging cycles. Positioning remains future work. It is not a
 standards-complete LTE/NR PRS implementation.
 
 Packet, geometry and one-anchor ranging sections were updated for Phase B.
@@ -29,7 +29,9 @@ no standalone time-domain BPSK payload in the current receiver chain.
 | Live range | Integer timestamp SS-TWR plus separate bidirectional corrected range when both fine estimates are valid |
 | Profiling | Optional instrumentation in existing blocks and a timing collector |
 | Anchor identity | Packet-level anchor ID 0–7; responder POLL fine delay transported in RESPONSE |
-| Multi-anchor operation | Cycle/slot management and positioning not implemented |
+| Two-anchor ranging cycles | Implemented with static windows, packet identity, duplicate suppression and bounded cycle completion; synthetic QA verified |
+| RF validation | One-anchor Phase B reported successful by the user; two-anchor Phase C RF validation pending |
+| Positioning epochs / online positioning | Not implemented |
 | DS-TWR, clock-skew correction, pre-FFT PRS CFO correction | Not implemented |
 
 The FFT-ZC algorithm remains experimental in accuracy terms even though the
@@ -125,7 +127,7 @@ All modified measurement/profiling CSV identity columns now use `poll_id` and
 ## Ranging and Diagnostics
 
 The live solver uses POLL TX time T1, RESPONSE RX time T4, and the responder's
-reported reply delay. It retains the existing additive hard-coded calibration and publishes integer
+reported reply delay. It retains the current hard-coded calibration and publishes integer
 range alongside a separate corrected range. The RESPONSE carries the responder's
 POLL phase estimate, and the initiator adds both directional residuals only when
 their validity/finite checks pass. Invalid correction produces NaN, leaving
@@ -296,7 +298,8 @@ independent OFDM limiter; the test needs a separate implementation/QA update.
 Public constructor changes require corresponding headers, bindings, GRC YAML,
 examples, and focused QA updates.
 
-Phase B software verification: the build passes and the full registered suite
+Historical Phase B software verification before the later scrambler/calibration
+updates: the build passed and the full registered suite
 passes 8/11 targets. Packet v2, Q10 bounds/validity, PMT trigger rejection, fixed
 guards, synthetic one-anchor transport and bidirectional correction pass. The
 old whole-frame 0.9 amplitude assertions still conflict with unchanged 0.95
@@ -307,4 +310,101 @@ P99.9 8.9338 dB and maximum 9.5733 dB, confirming this is a v2 regression.
 Those limits and waveform scaling were not changed to make QA green.
 The obsolete subtractive-calibration/1-us synthetic assertions were reconciled
 with the unchanged additive source expression in the updated ranging QA.
-No RF validation, multi-anchor cycle manager or positioning is claimed.
+That historical software run did not constitute RF validation. The user has
+since reported successful one-anchor Phase-B RF validation.
+
+## Phase C: Static Two-Anchor Ranging Cycles
+
+`prs_multi_anchor_cycle` is a native message-level coordinator between the
+phase-slope receiver and the unchanged SS-TWR calculation. It creates two
+independent FFT-ZC receive windows per POLL, checks the decoded packet's
+`(poll_id, anchor_id)` against local schedule metadata, forwards consistent
+responses to the solver, and publishes each accepted anchor-specific range.
+The solver returns results to the coordinator; first-valid-wins suppression
+prevents a second accepted range for the same anchor in one cycle. Invalid
+fine correction still leaves the Phase-B integer range available.
+
+The coordinator additionally emits `cycle_out` summaries and `diagnostic_out`
+PDUs. A cycle summary is not a positioning epoch. No ranges are averaged and
+no coordinates, position solver, three/four-anchor mode or overlapping-response
+separation are implemented. This constructor currently requires exactly two
+unique IDs in 0–7; the list/index representation and packet have room for later
+extension without a protocol redesign.
+
+New RF preparation examples (existing single-anchor GRCs/Python are preserved):
+
+| Role | GRC / generated Python basename | Anchor / delay |
+|---|---|---|
+| Initiator | `prs_ssrtt_initiator_multi_anchor` | `anchor_ids=[0,1]`, `time_delays=[0.031,0.081]` seconds |
+| Anchor 0 | `prs_ssrtt_responder_anchor0` | ID 0, 0.031 s = 930000 samples |
+| Anchor 1 | `prs_ssrtt_responder_anchor1` | ID 1, 0.081 s = 2430000 samples |
+
+All three use 30 MS/s, 1060 MHz and 128/17/819 acquisition geometry. Both
+RESPONSES retain root 29, Gold code 2 and the same verified waveform. Anchor
+examples reuse the existing split-acquisition responder structure; select the
+correct UHD device/address on each target PC. The new initiator uses the
+existing FFT-ZC gated path; optional pilot-CFO feedback is left unconnected
+so one anchor's tracked CFO is not reused as the next anchor's reference.
+The existing bootstrap/CP/channel CFO mathematics are unchanged.
+
+The complete response is 78147 samples / 2.6049 ms. Start spacing is 50 ms;
+physical burst gap is 47.3951 ms. The configured 2 ms early and 5 ms late
+margins produce 9.6049 ms receive windows with 40.3951 ms between them.
+The new initiator retains the main example's conservative 400 ms POLL strobe
+and 100 ms TX lead. These are initial experimental settings, not measured
+multi-anchor timing guarantees. Detailed schedule semantics are in signal.md.
+
+Wire the timekeeper's optional `clock_out` to coordinator `clock_in`. This
+hardware-time heartbeat advances expiration even with no detected packets.
+The coordinator records cycle completion at the final full-window end and
+allows a configured 100 ms hardware-time DSP-drain grace before emitting the
+summary/cleaning solver state. Results whose RX timestamp lies outside their
+window, or which arrive after that finite grace, are rejected diagnostically.
+Missing anchors appear in `missing_anchor_ids`; no zero/previous ranges are
+fabricated. If RX time stops advancing, normal expiration cannot advance;
+flowgraph shutdown flushes active state as `STOPPED_INCOMPLETE`, not success.
+
+Local `cycle_sequence` plus RX timestamp and slot bounds reject delayed results
+from an expired generation after POLL-ID wrap. This does not authenticate a
+bit-identical RF replay physically received inside a newly matching slot:
+packet v2 has no on-air generation/nonce. The coordinator holds at most 16
+active cycles, detector explicit windows at most 32, and pending/accepted sets
+at most two anchors per cycle. Overlapping cycles, duplicate/out-of-order TX
+notifications and capacity violations are rejected on `diagnostic_out`.
+
+Responder duplicate-POLL suppression uses the POLL RX timestamp: a repeat ID
+within `max(0.2 s, configured_reply_delay + 0.05 s)` does not trigger another
+RESPONSE. Older queued POLLs beyond the RX high-water/hold interval are also
+rejected. Entries expire by hardware time, allowing legitimate future 16-bit
+ID reuse; the cache is bounded by that 16-bit domain.
+
+Run `qa_prs_multi_anchor_cycle` for focused schedule, association, missing,
+duplicate, cleanup, reuse and complete packet/acquisition tests. The existing
+v2 quantization QA now uses distinct POLL IDs for its independent cases so
+it does not deliberately trigger the new duplicate-POLL policy. No Phase-B
+packet/fine-delay/PAPR assertions were relaxed.
+
+Before Phase C edits, a fresh baseline build/CTest passed 10/11 targets. Two
+`qa_prs_receiver` assertions still expect the earlier additive calibration;
+current source uses `rtt_s/2 - 5.808278798530661e-06`. This is a pre-existing
+source/test conflict. Phase C preserves the current source equation exactly
+and does not alter those two expectations to make the suite green.
+
+Software tests do not establish two-anchor RF success. Rebuild/reinstall on
+all three target PCs, restart all flowgraphs and verify the loaded library.
+Use fresh `CSV/multi_anchor_*` and `CSV/anchor0_*` / `CSV/anchor1_*` logs.
+The initiator prints cycle summaries/diagnostics and writes accepted ranges
+with decoded anchor identity to its measurement CSV. First demonstrate two
+physical responders with one shared POLL ID, then evaluate RF availability,
+association and range behavior before any positioning work.
+
+Final Phase C software verification: build successful; the eight focused
+`qa_prs_multi_anchor_cycle` test functions pass, including five complete
+packet/FFT-ZC reception scenarios (both anchors, either missing, first CRC
+invalid, and production 30 MS/s with 31/81 ms delays). Per-anchor fine-valid/invalid behavior, ID reuse, capacity rejection
+and solver cleanup are covered. Full CTest passes 11/12 targets; the same two
+pre-existing calibration expectations fail within `qa_prs_receiver`. There
+are no new regression failures. Scrambler/PAPR checks pass unchanged
+(mean/P99.9/max 6.5775/7.9880/8.5061 dB). All three new GRCs were compiled
+using workspace block definitions and their generated Python is included.
+Two-anchor RF validation remains pending.

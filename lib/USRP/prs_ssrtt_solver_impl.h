@@ -23,7 +23,8 @@ public:
 
 private:
     double d_samp_rate;
-    std::unordered_map<uint64_t, double> d_poll_tx_times;
+    struct poll_tx { double t1; uint64_t sequence; bool managed; };
+    std::unordered_map<uint64_t, poll_tx> d_poll_tx_times;
     bool d_enable_profiling;
 
     void handle_tx_time(pmt::pmt_t msg);

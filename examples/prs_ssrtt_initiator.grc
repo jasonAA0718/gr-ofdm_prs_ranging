@@ -1169,7 +1169,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1120, 512.0]
+    coordinate: [1176, 544.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_1_0

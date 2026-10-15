@@ -380,21 +380,13 @@ void prs_timed_burst_source_impl::publish_tx_time(const prs_pending_burst& burst
     const double secs_floor = std::floor(burst.tx_time);
     pmt::pmt_t meta = pmt::make_dict();
     meta = pmt::dict_add(meta, pmt::mp("frame_id"), pmt::from_uint64(burst.frame_id));
-    meta =
-        pmt::dict_add(meta, pmt::mp("attempt_id"), pmt::from_uint64(burst.poll_id));
+    meta = pmt::dict_add(meta, pmt::mp("attempt_id"), pmt::from_uint64(burst.poll_id));
     meta = pmt::dict_add(meta, pmt::mp("packet_type"), pmt::from_long(burst.packet_type));
-    meta = pmt::dict_add(
-        meta, pmt::mp("poll_id"), pmt::from_uint64(burst.poll_id));
-    meta = pmt::dict_add(
-        meta, pmt::mp("anchor_id"), pmt::from_uint64(burst.anchor_id));
-    meta = pmt::dict_add(meta,
-                         pmt::mp("reply_delay_samples"),
-                         pmt::from_uint64(burst.reply_delay_samples));
-    meta = pmt::dict_add(meta,
-                         pmt::mp("tx_time_secs"),
-                         pmt::from_uint64(static_cast<uint64_t>(secs_floor)));
-    meta = pmt::dict_add(
-        meta, pmt::mp("tx_time_frac"), pmt::from_double(burst.tx_time - secs_floor));
+    meta = pmt::dict_add(meta, pmt::mp("poll_id"), pmt::from_uint64(burst.poll_id));
+    meta = pmt::dict_add(meta, pmt::mp("anchor_id"), pmt::from_uint64(burst.anchor_id));
+    meta = pmt::dict_add(meta, pmt::mp("reply_delay_samples"),pmt::from_uint64(burst.reply_delay_samples));
+    meta = pmt::dict_add(meta, pmt::mp("tx_time_secs"), pmt::from_uint64(static_cast<uint64_t>(secs_floor)));
+    meta = pmt::dict_add(meta, pmt::mp("tx_time_frac"), pmt::from_double(burst.tx_time - secs_floor));
     meta = pmt::dict_add(meta, pmt::mp("poll_fine_delay_q10"), pmt::from_long(burst.poll_fine_delay_q10));
     meta = pmt::dict_add(meta, pmt::mp("fine_delay_valid"), burst.fine_delay_valid ? pmt::PMT_T : pmt::PMT_F);
     meta = pmt::dict_add(meta, pmt::mp("burst_len"), pmt::from_long(frame_len()));
@@ -404,8 +396,7 @@ void prs_timed_burst_source_impl::publish_tx_time(const prs_pending_burst& burst
     meta = pmt::dict_add(meta, pmt::mp("cp_len"), pmt::from_long(d_cp_len));
     meta = pmt::dict_add(meta, pmt::mp("active_bins"), pmt::from_long(d_active_bins));
     meta = pmt::dict_add(meta, pmt::mp("prs_symbols"), pmt::from_long(d_prs_symbols));
-    meta = pmt::dict_add(
-        meta, pmt::mp("mc_ds_gold_code_id"), pmt::from_long(d_mc_ds_gold_code_id));
+    meta = pmt::dict_add(meta, pmt::mp("mc_ds_gold_code_id"), pmt::from_long(d_mc_ds_gold_code_id));
     message_port_pub(pmt::mp("tx_time_out"), meta);
 }
 

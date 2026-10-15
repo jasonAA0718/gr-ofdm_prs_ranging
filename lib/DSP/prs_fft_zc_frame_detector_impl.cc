@@ -200,6 +200,22 @@ void prs_fft_zc_frame_detector_impl::handle_tx_time(const pmt::pmt_t& message)
         return;
     }
 
+    const double explicit_start = dict_ref_double(msg, "window_start", NAN);
+    const double explicit_end = dict_ref_double(msg, "window_end", NAN);
+    if (std::isfinite(explicit_start) && std::isfinite(explicit_end)) {
+        if (explicit_start < 0 || explicit_end <= explicit_start ||
+            explicit_end - explicit_start < frame_len(d_cfg) / d_cfg.samp_rate) return;
+        correlation_window window{explicit_start, explicit_end,
+            dict_ref_uint64(msg, "poll_id", 0), false, false, false, 0, 0, msg};
+        std::lock_guard<std::mutex> lock(d_window_mutex);
+        // The coordinator is bounded; also bound the detector for arbitrary message callers.
+        if (d_windows.size() >= 32) return;
+        d_windows.push_back(window);
+        std::sort(d_windows.begin(), d_windows.end(), [](const correlation_window& a, const correlation_window& b) {
+            return a.start < b.start;
+        });
+        return;
+    }
     double tx_time =
         dict_ref_double(msg, "tx_time", std::numeric_limits<double>::quiet_NaN());
     if (!std::isfinite(tx_time)) {
@@ -823,6 +839,7 @@ bool prs_fft_zc_frame_detector_impl::find_frame(size_t& frame_start_index,
         return false;
     }
 
+    if (d_time_gating) d_next_coarse_index = best_coarse + 1;
     frame_start_index = best_start;
     coarse_index = best_coarse;
     preamble_metric_out = preamble_metric;
@@ -913,6 +930,17 @@ void prs_fft_zc_frame_detector_impl::publish_frame(size_t frame_start_index,
     const bool have_gated_attempt = complete_attempt(frame_time, attempt_id);
     if (have_gated_attempt) {
         meta = pmt::dict_add(meta, pmt::mp("attempt_id"), pmt::from_uint64(attempt_id));
+    }
+    {
+        std::lock_guard<std::mutex> lock(d_window_mutex);
+        for (const auto& window : d_windows) {
+            if (frame_time >= window.start && frame_time < window.end && pmt::is_dict(window.schedule_meta)) {
+                for (const char* key : {"cycle_sequence", "expected_anchor_id", "response_slot_index", "expected_reply_delay_samples"}) {
+                    meta = pmt::dict_add(meta, pmt::mp(key), pmt::dict_ref(window.schedule_meta, pmt::mp(key), pmt::PMT_NIL));
+                }
+                break;
+            }
+        }
     }
     if (d_have_rx_time) {
         const double rx_time = frame_time;

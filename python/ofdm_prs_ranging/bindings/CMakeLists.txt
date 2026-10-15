@@ -25,6 +25,7 @@ include(GrPybind)
 ########################################################################
 
 list(APPEND ofdm_prs_ranging_python_files
+    prs_multi_anchor_cycle_python.cc
     prs_acquisition_logger_python.cc
     prs_frame_detector_python.cc
     prs_fft_zc_frame_detector_python.cc

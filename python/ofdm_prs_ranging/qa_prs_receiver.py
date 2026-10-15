@@ -848,8 +848,8 @@ class qa_prs_receiver(gr_unittest.TestCase):
         cases += [(value, True, False, 0) for value in (float('nan'), float('inf'), -float('inf'))]
         self.tb.start()
         try:
-            for samples, phase_valid, _, _ in cases:
-                meta = self._v2_meta(dict(frame_id_valid=True, packet_type=1, poll_id=65535,
+            for case_index, (samples, phase_valid, _, _) in enumerate(cases):
+                meta = self._v2_meta(dict(frame_id_valid=True, packet_type=1, poll_id=65535 - case_index,
                     fine_delay_samples=samples, valid=phase_valid,
                     rx_time=pmt.make_tuple(pmt.from_uint64(10), pmt.from_double(0.25))))
                 responder.to_basic_block()._post(pmt.intern("measurement_in"), pmt.cons(meta, pmt.PMT_NIL))
@@ -857,7 +857,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
             for index, (_, _, expected_valid, q) in enumerate(cases):
                 trigger = debug.get_message(index)
                 self.assertEqual(pmt.to_uint64(pmt.dict_ref(trigger, pmt.intern("anchor_id"), pmt.PMT_NIL)), 7)
-                self.assertEqual(pmt.to_uint64(pmt.dict_ref(trigger, pmt.intern("poll_id"), pmt.PMT_NIL)), 65535)
+                self.assertEqual(pmt.to_uint64(pmt.dict_ref(trigger, pmt.intern("poll_id"), pmt.PMT_NIL)), 65535 - index)
                 self.assertEqual(pmt.to_long(pmt.dict_ref(trigger, pmt.intern("poll_fine_delay_q10"), pmt.PMT_NIL)), q)
                 self.assertEqual(pmt.to_bool(pmt.dict_ref(trigger, pmt.intern("fine_delay_valid"), pmt.PMT_F)), expected_valid)
         finally:

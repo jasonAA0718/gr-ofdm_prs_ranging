@@ -68,6 +68,7 @@ prs_rx_timekeeper_impl::prs_rx_timekeeper_impl(double samp_rate, double tx_lead_
 
     message_port_register_in(pmt::mp("trigger_in"));
     message_port_register_out(pmt::mp("timed_trigger_out"));
+    message_port_register_out(pmt::mp("clock_out"));
     set_msg_handler(pmt::mp("trigger_in"),
                     [this](pmt::pmt_t msg) { handle_trigger(std::move(msg)); });
 }
@@ -150,6 +151,17 @@ int prs_rx_timekeeper_impl::general_work(int noutput_items,
 
     update_rx_time_tags(abs_start, abs_stop);
     publish_pending(abs_stop);
+    if (d_have_rx_time) {
+        const double now = d_rx_time_value +
+            (static_cast<double>(abs_stop) - d_rx_time_tag_offset) / d_samp_rate;
+        if (now >= d_last_clock_publish + 0.01) {
+            // Every 3e5 samples publish a clock message, even if no triggers are pending. This is useful for
+            // cycles manger blocks to check cycle expiration without having to wait for a trigger message.
+            auto clock = pmt::dict_add(pmt::make_dict(), pmt::mp("clock_time"), pmt::from_double(now));
+            message_port_pub(pmt::mp("clock_out"), clock);
+            d_last_clock_publish = now;
+        }
+    }
     consume_each(ninput);
     return 0;
 }

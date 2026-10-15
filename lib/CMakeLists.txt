@@ -28,6 +28,7 @@ set(ofdm_prs_ranging_dsp_sources
     DSP/zc_peak_detector_impl.cc)
 
 set(ofdm_prs_ranging_usrp_sources
+    USRP/prs_multi_anchor_cycle_impl.cc
     USRP/prs_burst_scheduler.cc
     USRP/prs_rx_timekeeper_impl.cc
     USRP/prs_ssrtt_responder_impl.cc

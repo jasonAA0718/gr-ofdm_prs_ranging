@@ -32,6 +32,7 @@ private:
     bool d_have_rx_time;
     uint64_t d_rx_time_tag_offset;
     double d_rx_time_value;
+    double d_last_clock_publish = -1.0;
     std::mutex d_pending_mutex;
     std::deque<pmt::pmt_t> d_pending_triggers;
 

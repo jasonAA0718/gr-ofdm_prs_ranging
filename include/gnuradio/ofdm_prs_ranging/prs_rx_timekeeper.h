@@ -16,6 +16,7 @@ namespace ofdm_prs_ranging {
 
 /*!
  * \brief Stamp trigger messages with time derived from UHD rx_time tags.
+ * clock_out optionally publishes the consumed RX hardware time (seconds).
  * \ingroup ofdm_prs_ranging
  */
 class OFDM_PRS_RANGING_API prs_rx_timekeeper : virtual public gr::block

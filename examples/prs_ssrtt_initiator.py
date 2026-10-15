@@ -51,7 +51,7 @@ class prs_ssrtt_initiator(gr.top_block):
         ##################################################
 
         self.uhd_usrp_source_0_0 = uhd.usrp_source(
-            ",".join(("serial=34D0563", "recv_buff_size=25000000,num_recv_frames=1024")),
+            ",".join(("serial=34D0564", "recv_buff_size=25000000,num_recv_frames=1024")),
             uhd.stream_args(
                 cpu_format="fc32",
                 args='',
@@ -68,7 +68,7 @@ class prs_ssrtt_initiator(gr.top_block):
         self.uhd_usrp_source_0_0.set_gain(rx_gain, 0)
         self.uhd_usrp_source_0_0.set_min_output_buffer(1048576)
         self.uhd_usrp_sink_0 = uhd.usrp_sink(
-            ",".join(("serial=34D0563", '')),
+            ",".join(("serial=34D0564", '')),
             uhd.stream_args(
                 cpu_format="fc32",
                 args='',

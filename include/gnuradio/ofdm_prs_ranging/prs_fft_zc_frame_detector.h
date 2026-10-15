@@ -18,6 +18,8 @@ class OFDM_PRS_RANGING_API prs_fft_zc_frame_detector : virtual public gr::block
 {
 public:
     typedef std::shared_ptr<prs_fft_zc_frame_detector> sptr;
+    // tx_time_in additionally accepts explicit window_start/window_end (UHD seconds)
+    // with cycle_sequence, expected_anchor_id and response_slot_index metadata.
     static sptr make(double samp_rate = 10e6,
                      int fft_len = 512,
                      int cp_len = 64,

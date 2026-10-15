@@ -1,0 +1,29 @@
+id: ofdm_prs_ranging_prs_multi_anchor_cycle
+label: PRS Two-Anchor Ranging Cycle
+category: '[ofdm_prs_ranging]'
+templates:
+  imports: from gnuradio import ofdm_prs_ranging
+  make: ofdm_prs_ranging.prs_multi_anchor_cycle(${samp_rate}, ${anchor_ids}, ${time_delays}, ${preamble_len}, ${preamble_repeats}, ${coarse_sync_len}, ${window_before_s}, ${window_after_s}, ${processing_grace_s})
+parameters:
+- {id: samp_rate, label: Sample Rate, dtype: real, default: 30e6}
+- {id: anchor_ids, label: Expected Anchor IDs (exactly two), dtype: int_vector, default: '[0, 1]'}
+- {id: time_delays, label: Expected Response Delays (seconds), dtype: real_vector, default: '[0.031, 0.081]'}
+- {id: preamble_len, label: Response Preamble Length, dtype: int, default: 128}
+- {id: preamble_repeats, label: Response Preamble Repeats, dtype: int, default: 17}
+- {id: coarse_sync_len, label: Response ZC Length, dtype: int, default: 819}
+- {id: window_before_s, label: Early Margin (s), dtype: real, default: 0.002}
+- {id: window_after_s, label: Late Margin After Full Frame (s), dtype: real, default: 0.005}
+- {id: processing_grace_s, label: DSP Drain Grace (s), dtype: real, default: 0.1}
+inputs:
+- {label: tx_time_in, domain: message}
+- {label: clock_in, domain: message}
+- {label: measurement_in, domain: message}
+- {label: range_in, domain: message}
+outputs:
+- {label: window_out, domain: message}
+- {label: solver_tx_out, domain: message}
+- {label: solver_measurement_out, domain: message}
+- {label: measurement_out, domain: message}
+- {label: cycle_out, domain: message}
+- {label: diagnostic_out, domain: message, optional: true}
+file_format: 1

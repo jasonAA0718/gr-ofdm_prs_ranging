@@ -105,6 +105,7 @@ private:
         bool completed;
         float preamble_metric;
         float coarse_metric;
+        pmt::pmt_t schedule_meta = pmt::PMT_NIL;
     };
     std::mutex d_window_mutex;
     std::vector<correlation_window> d_windows;

@@ -63,6 +63,15 @@ void prs_ssrtt_solver_impl::handle_tx_time(pmt::pmt_t msg)
     if (!pmt::is_dict(msg)) {
         return;
     }
+    if (metadata_true(msg, "expire_cycle")) {
+        const auto poll = dict_ref_uint64(msg, "poll_id", 65536);
+        const auto found = d_poll_tx_times.find(poll);
+        if (found != d_poll_tx_times.end() && found->second.managed &&
+            found->second.sequence == dict_ref_uint64(msg, "cycle_sequence", 0)) {
+            d_poll_tx_times.erase(found);
+        }
+        return;
+    }
     const uint64_t packet_type =
         dict_ref_uint64(msg, "packet_type", prs_packet_type_poll);
     if (packet_type != prs_packet_type_poll) {
@@ -73,7 +82,8 @@ void prs_ssrtt_solver_impl::handle_tx_time(pmt::pmt_t msg)
     const double t1 = dict_ref_double(msg, "tx_time_secs", 0.0) +
                       dict_ref_double(msg, "tx_time_frac", 0.0);
     if (!std::isfinite(t1)) return;
-    d_poll_tx_times[poll_id] = t1;
+    d_poll_tx_times[poll_id] = poll_tx{t1, dict_ref_uint64(msg, "cycle_sequence", 0),
+                                               metadata_true(msg, "cycle_managed")};
     report.checkpoint("tx_time_store");
     if (report.enabled()) {
         message_port_pub(pmt::mp("timing_out"), report.finish(msg));
@@ -103,7 +113,8 @@ void prs_ssrtt_solver_impl::handle_measurement(pmt::pmt_t msg)
         return;
     }
 
-    const double t1 = found->second;
+    if (found->second.managed && found->second.sequence != dict_ref_uint64(meta, "cycle_sequence", 0)) return;
+    const double t1 = found->second.t1;
     const double t4 = dict_ref_time_tuple(meta, "rx_time", NAN);
     if (!std::isfinite(t4)) {
         return;
