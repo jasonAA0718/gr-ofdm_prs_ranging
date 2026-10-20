@@ -157,7 +157,7 @@ blocks:
   id: variable
   parameters:
     comment: Static schedule in seconds; delays correspond to anchor_ids by index.
-    value: '[0.031, 0.081]'
+    value: '[0.041, 0.081]'
   states:
     bus_sink: false
     bus_source: false
@@ -219,7 +219,7 @@ blocks:
     maxoutbuf: '0'
     minoutbuf: '0'
     msg: pmt.PMT_T
-    period: '2000'
+    period: '500'
   states:
     bus_sink: false
     bus_source: false
@@ -591,7 +591,7 @@ blocks:
     clock_source6: ''
     clock_source7: ''
     comment: ''
-    dev_addr: '"serial=34D0563"'
+    dev_addr: '"serial=32712EF"'
     dev_args: ''
     gain0: tx_gain
     gain1: '0'
@@ -932,7 +932,7 @@ blocks:
     dc_offs_enb7: default
     dc_offs_enb8: default
     dc_offs_enb9: default
-    dev_addr: '"serial=34D0563"'
+    dev_addr: '"serial=32712EF"'
     dev_args: '"recv_buff_size=25000000,num_recv_frames=1024"'
     gain0: rx_gain
     gain1: '0'

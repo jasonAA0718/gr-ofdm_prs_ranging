@@ -35,7 +35,7 @@ class prs_ssrtt_responder_anchor0(gr.top_block):
         # Variables
         ##################################################
         self.samp_rate = samp_rate = 30000000
-        self.response_delay_seconds = response_delay_seconds = 0.031
+        self.response_delay_seconds = response_delay_seconds = 0.041
         self.zc_length = zc_length = 819
         self.tx_gain = tx_gain = 60
         self.rx_gain = rx_gain = 57
@@ -99,7 +99,7 @@ class prs_ssrtt_responder_anchor0(gr.top_block):
         self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/anchor0_acquisition.csv", "responder", 1)
         self.ofdm_prs_ranging_prs_zc_frame_sync_0 = ofdm_prs_ranging.prs_zc_frame_sync(30e6, 512, 64, 512, 127, 128, 17, 819, 0.15, 0.35, 25, 0, 0)
         self.ofdm_prs_ranging_prs_zc_frame_sync_0.set_processor_affinity([2])
-        self.ofdm_prs_ranging_prs_window_capture_0 = ofdm_prs_ranging.prs_window_capture(30e6, 512, 64, 512, 127, 128, 17, 819, 0.12, 10000, 4096, 4096, 4, True, False)
+        self.ofdm_prs_ranging_prs_window_capture_0 = ofdm_prs_ranging.prs_window_capture(30e6, 512, 64, 512, 127, 128, 17, 819, 0.12, 10000, 4096, 4096, 1, True, False)
 
 
         ##################################################
@@ -128,10 +128,10 @@ class prs_ssrtt_responder_anchor0(gr.top_block):
     def set_samp_rate(self, samp_rate):
         self.samp_rate = samp_rate
         self.set_reply_delay_samples(int(self.response_delay_seconds*self.samp_rate + 0.5))
-        self.uhd_usrp_source_0_0_0.set_samp_rate(self.samp_rate)
-        self.uhd_usrp_source_0_0_0.set_bandwidth(self.samp_rate, 0)
         self.uhd_usrp_sink_0_0.set_samp_rate(self.samp_rate)
         self.uhd_usrp_sink_0_0.set_bandwidth(self.samp_rate, 0)
+        self.uhd_usrp_source_0_0_0.set_samp_rate(self.samp_rate)
+        self.uhd_usrp_source_0_0_0.set_bandwidth(self.samp_rate, 0)
 
     def get_response_delay_seconds(self):
         return self.response_delay_seconds
@@ -183,8 +183,8 @@ class prs_ssrtt_responder_anchor0(gr.top_block):
 
     def set_center_freq(self, center_freq):
         self.center_freq = center_freq
-        self.uhd_usrp_source_0_0_0.set_center_freq(self.center_freq, 0)
         self.uhd_usrp_sink_0_0.set_center_freq(self.center_freq, 0)
+        self.uhd_usrp_source_0_0_0.set_center_freq(self.center_freq, 0)
 
     def get_anchor_id(self):
         return self.anchor_id

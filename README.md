@@ -274,6 +274,33 @@ Previously referenced `MC_DS_CDMA_PLAN.md` and
 the present description is grounded in source, not unavailable plan files.
 
 ## Build and Verification
+Build the environments
+```bash
+sudo apt update
+
+sudo apt install -y \
+    xterm \
+    clang-format \
+    build-essential \
+    cmake \
+    git \
+    pkg-config \
+    python3-dev \
+    python3-pip \
+    pybind11-dev \
+    libboost-all-dev \
+    gnuradio-dev \
+    libvolk-dev \
+    linux-tools-common \
+    linux-tools-generic
+
+sudo cpupower frequency-set -g performance
+
+sudo sysctl -w net.core.rmem_max=50000000
+sudo sysctl -w net.core.wmem_max=50000000
+sudo sysctl -w net.core.rmem_default=50000000
+sudo sysctl -w net.core.wmem_default=50000000
+```
 
 After source changes, rebuild and reinstall on the target PC rather than
 copying installed shared libraries between machines:

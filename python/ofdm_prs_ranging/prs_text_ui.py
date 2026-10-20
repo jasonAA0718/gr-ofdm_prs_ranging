@@ -10,7 +10,7 @@ import statistics
 import sys
 import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
 
 import pmt
 from gnuradio import gr
@@ -89,15 +89,16 @@ class prs_text_ui(gr.basic_block):
         self._latest_range = math.nan
         self._ranges = deque(maxlen=20)
         self._polls = {}
-        self._received_poll_ids = set()
-        self._sent_response_ids = set()
+        self._received_poll_count = 0
+        self._sent_response_count = 0
+        self._recent_polls = OrderedDict()
+        self._recent_responses = OrderedDict()
 
         for port in ("tx_in", "frame_in", "measurement_in"):
             self.message_port_register_in(pmt.intern(port))
         self.set_msg_handler(pmt.intern("tx_in"), self._handle_tx)
         self.set_msg_handler(pmt.intern("frame_in"), self._handle_frame)
-        self.set_msg_handler(
-            pmt.intern("measurement_in"), self._handle_measurement)
+        self.set_msg_handler(pmt.intern("measurement_in"), self._handle_measurement)
 
     def start(self):
         self._stop_event.clear()
@@ -123,9 +124,8 @@ class prs_text_ui(gr.basic_block):
         if meta is None:
             return
         packet_type = _integer(meta, "packet_type")
-        poll_id = _integer(
-            meta, "poll_id", _integer(meta, "frame_id"))
-        now = self._clock()
+        poll_id     = _integer(meta, "poll_id", _integer(meta, "frame_id"))
+        now         = self._clock()
         with self._lock:
             if self._role == "initiator" and packet_type == POLL:
                 if poll_id not in self._polls:
@@ -134,7 +134,8 @@ class prs_text_ui(gr.basic_block):
                         "deadline": now + self._response_timeout_s,
                     }
             elif self._role == "responder" and packet_type == RESPONSE:
-                self._sent_response_ids.add(poll_id)
+                if self._new_responder_event(meta, poll_id, self._recent_responses, tx=True):
+                    self._sent_response_count += 1
         self._render()
 
     def _handle_frame(self, message):
@@ -142,15 +143,15 @@ class prs_text_ui(gr.basic_block):
         if meta is None or not _boolean(meta, "frame_id_valid"):
             return
         packet_type = _integer(meta, "packet_type")
-        expected = RESPONSE if self._role == "initiator" else POLL
+        expected    = RESPONSE if self._role == "initiator" else POLL
         if packet_type != expected:
             return
-        poll_id = _integer(
-            meta, "poll_id", _integer(meta, "frame_id"))
+        poll_id     = _integer(meta, "poll_id", _integer(meta, "frame_id"))
         with self._lock:
             self._last_rx_time = self._clock()
             if self._role == "responder":
-                self._received_poll_ids.add(poll_id)
+                if self._new_responder_event(meta, poll_id, self._recent_polls):
+                    self._received_poll_count += 1
         self._render()
 
     def _handle_measurement(self, message):
@@ -158,13 +159,12 @@ class prs_text_ui(gr.basic_block):
         if meta is None or not _boolean(meta, "frame_id_valid"):
             return
         packet_type = _integer(meta, "packet_type")
-        expected = RESPONSE if self._role == "initiator" else POLL
+        expected    = RESPONSE if self._role == "initiator" else POLL
         if packet_type != expected:
             return
 
-        poll_id = _integer(
-            meta, "poll_id", _integer(meta, "frame_id"))
-        snr = _number(meta, "snr", math.nan)
+        poll_id = _integer(meta, "poll_id", _integer(meta, "frame_id"))
+        snr     = _number(meta, "snr", math.nan)
         range_m = _number(meta, "range_m", math.nan)
         with self._lock:
             self._last_rx_time = self._clock()
@@ -178,8 +178,37 @@ class prs_text_ui(gr.basic_block):
                     self._latest_range = range_m
                     self._ranges.append(range_m)
             else:
-                self._received_poll_ids.add(poll_id)
+                if self._new_responder_event(meta, poll_id, self._recent_polls):
+                    self._received_poll_count += 1
         self._render()
+
+    def _new_responder_event(self, meta, poll_id, recent, tx=False):
+        """Deduplicate pipeline notifications, not lifetime poll IDs. Lock held."""
+        if tx:
+            secs = _number(meta, "tx_time_secs", math.nan)
+            frac = _number(meta, "tx_time_frac", 0.0)
+            stamp = (secs, frac) if math.isfinite(secs) and math.isfinite(frac) else None
+        else:
+            rx_time = _number(meta, "rx_time", math.nan)
+            if math.isfinite(rx_time):
+                stamp = ("rx_time", rx_time)
+            else:
+                sample = pmt.dict_ref(meta, pmt.intern("frame_start"), pmt.PMT_NIL)
+                stamp = (("frame_start", pmt.to_uint64(sample)) if pmt.is_uint64(sample)
+                         else ("frame_start", pmt.to_long(sample)) if pmt.is_integer(sample)
+                         else None)
+        key = (poll_id, stamp)
+        now = self._clock()
+        previous = recent.get(key)
+        # Production messages carry timestamps. For legacy messages without
+        # them, suppress repeated IDs only for one response-timeout interval.
+        if previous is not None and (stamp is not None or now - previous < self._response_timeout_s):
+            return False
+        recent[key] = now
+        recent.move_to_end(key)
+        if len(recent) > 256:
+            recent.popitem(last=False)
+        return True
 
     def _expire_polls(self, now):
         for poll in self._polls.values():
@@ -208,8 +237,8 @@ class prs_text_ui(gr.basic_block):
                 lost = sum(p["state"] == "lost" for p in self._polls.values())
                 pending = polls - responses - lost
             else:
-                polls = len(self._received_poll_ids)
-                responses = len(self._sent_response_ids)
+                polls = self._received_poll_count
+                responses = self._sent_response_count
                 lost = max(0, polls - responses)
                 pending = 0
 

@@ -111,12 +111,12 @@ blocks:
   parameters:
     comment: Match initiator time_delays entry; seconds, converted once to integer
       samples.
-    value: '0.031'
+    value: '0.041'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [650, 120]
+    coordinate: [528, 120.0]
     rotation: 0
     state: enabled
 - name: rx_gain
@@ -226,14 +226,14 @@ blocks:
     preamble_len: '128'
     preamble_repeats: '17'
     prs_symbols: '127'
-    queue_depth: '4'
+    queue_depth: '1'
     samp_rate: 30e6
     threshold: '0.12'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [392, 736.0]
+    coordinate: [384, 736.0]
     rotation: 0
     state: enabled
 - name: ofdm_prs_ranging_prs_zc_frame_sync_0

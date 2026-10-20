@@ -114,6 +114,61 @@ class qa_prs_text_ui(gr_unittest.TestCase):
         self.assertIn("replies/polls 1/1", line)
         self.assertIn("SNR 18.0 dB", line)
 
+    def test_responder_cumulative_counts_survive_restart_and_wrap(self):
+        ui = prs_text_ui("responder", output_stream=self.output, clock=self.clock)
+        # Restart reuses IDs; wrap also reuses zero. Receive times remain local
+        # to the continuously running responder, so every transaction is new.
+        for index, poll_id in enumerate((0, 1, 0, 1, 65535, 0)):
+            poll = metadata(packet_type=1, poll_id=poll_id,
+                            frame_id_valid=True, rx_time=100.0 + index, snr=19.0)
+            # Either pipeline notification may arrive first.
+            handlers = (ui._handle_frame, ui._handle_measurement)
+            if index % 2:
+                handlers = handlers[::-1]
+            for handler in handlers:
+                handler(poll)
+            ui._handle_frame(poll)  # Repeated notification is not a new POLL.
+            reply = metadata(packet_type=2, poll_id=poll_id,
+                             tx_time_secs=100 + index, tx_time_frac=0.031)
+            ui._handle_tx(reply)
+            ui._handle_tx(reply)
+            status = ui.snapshot()
+            self.assertEqual(status["polls"], index + 1)
+            self.assertEqual(status["responses"], index + 1)
+            self.assertEqual(status["success_rate"], 1.0)
+            ui._render()
+            self.assertEqual(ui.snapshot(), status)
+
+    def test_responder_legacy_metadata_and_frame_sample_fallback(self):
+        ui = prs_text_ui("responder", output_stream=self.output, clock=self.clock)
+        poll = metadata(packet_type=1, poll_id=0, frame_id_valid=True)
+        ui._handle_frame(poll)
+        ui._handle_measurement(poll)
+        self.assertEqual(ui.snapshot()["polls"], 1)
+        self.now += 1.1
+        ui._handle_frame(poll)
+        ui._handle_measurement(poll)
+        self.assertEqual(ui.snapshot()["polls"], 2)
+        for sample in (1000, 2000):
+            stamped = pmt.dict_add(poll, pmt.intern("frame_start"), pmt.from_uint64(sample))
+            ui._handle_frame(stamped)
+            ui._handle_measurement(stamped)
+        self.assertEqual(ui.snapshot()["polls"], 4)
+
+    def test_responder_history_bounded_counters_keep_growing(self):
+        ui = prs_text_ui("responder", output_stream=self.output, clock=self.clock)
+        for index in range(300):
+            ui._handle_frame(metadata(packet_type=1, poll_id=index,
+                                      frame_id_valid=True, rx_time=float(index)))
+            ui._handle_tx(metadata(packet_type=2, poll_id=index,
+                                   tx_time_secs=index, tx_time_frac=0.031))
+        self.assertEqual(ui.snapshot()["polls"], 300)
+        self.assertEqual(ui.snapshot()["responses"], 300)
+        self.assertLessEqual(len(ui._recent_polls), 256)
+        self.assertLessEqual(len(ui._recent_responses), 256)
+        ui._handle_frame(metadata(packet_type=1, poll_id=301, frame_id_valid=False))
+        self.assertEqual(ui.snapshot()["polls"], 300)
+
 
 if __name__ == "__main__":
     gr_unittest.run(qa_prs_text_ui)
