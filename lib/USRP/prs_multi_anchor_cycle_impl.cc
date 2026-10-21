@@ -95,10 +95,6 @@ bool prs_multi_anchor_cycle_impl::start()
 void prs_multi_anchor_cycle_impl::diagnostic(pmt::pmt_t meta, const char* reason)
 {
     meta = pmt::dict_add(meta, pmt::mp("cycle_diagnostic"), pmt::mp(reason));
-    if (std::string(reason) == "REPLY_DELAY_MISMATCH")
-        meta = pmt::dict_add(meta, pmt::mp("reply_delay_mismatch"), pmt::PMT_T);
-    if (std::string(reason) == "SLOT_IDENTITY_MISMATCH")
-        meta = pmt::dict_add(meta, pmt::mp("slot_identity_mismatch"), pmt::PMT_T);
     message_port_pub(pmt::mp("diagnostic_out"), pmt::cons(meta, pmt::PMT_NIL));
 }
 void prs_multi_anchor_cycle_impl::handle_tx(pmt::pmt_t msg)
@@ -203,22 +199,23 @@ void prs_multi_anchor_cycle_impl::handle_range(pmt::pmt_t msg)
 void prs_multi_anchor_cycle_impl::finish(const cycle& c, const char* reason)
 {
     auto meta = pmt::make_dict();
-    meta = pmt::dict_add(meta, pmt::mp("poll_id"), pmt::from_uint64(c.poll));
-    meta = pmt::dict_add(meta, pmt::mp("cycle_sequence"), pmt::from_uint64(c.sequence));
-    meta = pmt::dict_add(meta, pmt::mp("poll_tx_timestamp"), pmt::from_double(c.t1));
-    meta = pmt::dict_add(meta, pmt::mp("cycle_completion_timestamp"), pmt::from_double(c.end));
-    meta = pmt::dict_add(meta, pmt::mp("summary_emission_timestamp"), pmt::from_double(d_clock));
-    meta = pmt::dict_add(meta, pmt::mp("completion_reason"), pmt::mp(reason));
     std::vector<uint32_t> received, missing;
     for (auto anchor : d_anchors) (c.received.count(anchor) ? received : missing).push_back(anchor);
-    meta = pmt::dict_add(meta, pmt::mp("expected_anchor_ids"), pmt::init_u32vector(d_anchors.size(), d_anchors));
-    meta = pmt::dict_add(meta, pmt::mp("received_anchor_ids"), pmt::init_u32vector(received.size(), received));
-    meta = pmt::dict_add(meta, pmt::mp("missing_anchor_ids"), pmt::init_u32vector(missing.size(), missing));
-    meta = pmt::dict_add(meta, pmt::mp("accepted_measurement_count"), pmt::from_uint64(received.size()));
-    meta = pmt::dict_add(meta, pmt::mp("duplicate_response_count"), pmt::from_uint64(c.duplicates));
-    meta = pmt::dict_add(meta, pmt::mp("slot_identity_mismatch_count"), pmt::from_uint64(c.identity_mismatches));
-    meta = pmt::dict_add(meta, pmt::mp("reply_delay_mismatch_count"), pmt::from_uint64(c.delay_mismatches));
     meta = pmt::dict_add(meta, pmt::mp("crc_failure_count"), pmt::from_uint64(c.crc_failures));
+    meta = pmt::dict_add(meta, pmt::mp("poll_tx_timestamp"), pmt::from_double(c.t1));
+    meta = pmt::dict_add(meta, pmt::mp("completion_reason"), pmt::mp(reason));
+    meta = pmt::dict_add(meta, pmt::mp("accepted_measurement_count"), pmt::from_uint64(received.size()));
+    meta = pmt::dict_add(meta, pmt::mp("missing_anchor_ids"), pmt::init_u32vector(missing.size(), missing));
+    meta = pmt::dict_add(meta, pmt::mp("poll_id"), pmt::from_uint64(c.poll));
+    // meta = pmt::dict_add(meta, pmt::mp("cycle_sequence"), pmt::from_uint64(c.sequence));
+    // meta = pmt::dict_add(meta, pmt::mp("cycle_completion_timestamp"), pmt::from_double(c.end));
+    // meta = pmt::dict_add(meta, pmt::mp("summary_emission_timestamp"), pmt::from_double(d_clock));
+    // meta = pmt::dict_add(meta, pmt::mp("expected_anchor_ids"), pmt::init_u32vector(d_anchors.size(), d_anchors));
+    // meta = pmt::dict_add(meta, pmt::mp("received_anchor_ids"), pmt::init_u32vector(received.size(), received));
+    // meta = pmt::dict_add(meta, pmt::mp("duplicate_response_count"), pmt::from_uint64(c.duplicates));
+    // meta = pmt::dict_add(meta, pmt::mp("slot_identity_mismatch_count"), pmt::from_uint64(c.identity_mismatches));
+    // meta = pmt::dict_add(meta, pmt::mp("reply_delay_mismatch_count"), pmt::from_uint64(c.delay_mismatches));
+    
     auto expire = pmt::dict_add(meta, pmt::mp("expire_cycle"), pmt::PMT_T);
     message_port_pub(pmt::mp("solver_tx_out"), expire);
     message_port_pub(pmt::mp("cycle_out"), pmt::cons(meta, pmt::PMT_NIL));

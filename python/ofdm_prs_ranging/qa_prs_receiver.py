@@ -776,7 +776,13 @@ class qa_prs_receiver(gr_unittest.TestCase):
                 ("reply_delay_s", pmt.from_double(5.0e-6)),
                 ("rtt_s", pmt.from_double(6.0e-6)),
                 ("tof_s", pmt.from_double(3.0e-6)),
-                ("range_m", pmt.from_double(899.377374)),
+                ("calibration_time", pmt.from_double(5.808278798530661e-06)),
+                ("integer_range_m", pmt.from_double(899.377374)),
+                ("corrected_range_m", pmt.from_double(900.25)),
+                ("poll_fine_delay_samples", pmt.from_double(-1.25)),
+                ("response_fine_delay_samples", pmt.from_double(2.5)),
+                ("fine_range_correction_m", pmt.from_double(0.872626)),
+                ("fine_correction_valid", pmt.PMT_T),
                 ("frame_id_valid", pmt.PMT_T),
                 ("coarse_metric", pmt.from_double(0.95)),
                 ("payload_metric", pmt.from_double(0.98)),
@@ -797,6 +803,26 @@ class qa_prs_receiver(gr_unittest.TestCase):
             header = lines[0].split(",")
             fields = lines[1].split(",")
             self.assertEqual(len(header), len(fields))
+            self.assertEqual(header, [
+                "t1_tx_time", "t4_rx_time", "calibration_time", "integer_range_m",
+                "corrected_range_m", "poll_fine_delay_samples", "response_fine_delay_samples",
+                "fine_range_correction_m", "fine_correction_valid",
+                "direction", "poll_id", "anchor_id", "reply_delay_samples", "fine_delay_s",
+                "fine_delay_samples", "phase_range_contribution_m", "frame_id_valid",
+                "coarse_metric", "payload_metric", "prs_cp_cfo_hz", "prs_cp_cfo_coherence",
+                "selected_cfo_hz", "payload_retry_used", "prs_channel_cfo_hz",
+                "residual_cfo_hz", "channel_coherence", "phase_slope_rad_per_hz",
+                "phase_residual", "snr", "quality",
+            ])
+            for name, expected in (
+                    ("calibration_time", 5.808278798530661e-06),
+                    ("integer_range_m", 899.377374),
+                    ("corrected_range_m", 900.25),
+                    ("poll_fine_delay_samples", -1.25),
+                    ("response_fine_delay_samples", 2.5),
+                    ("fine_range_correction_m", 0.872626)):
+                self.assertAlmostEqual(float(fields[header.index(name)]), expected, delta=1e-12)
+            self.assertEqual(fields[header.index("fine_correction_valid")], "1")
             self.assertEqual(fields[header.index("poll_id")], "7")
             self.assertEqual(fields[header.index("anchor_id")], "3")
             self.assertAlmostEqual(float(fields[header.index("t1_tx_time")]), 100.0)

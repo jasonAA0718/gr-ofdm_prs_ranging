@@ -165,7 +165,7 @@ class prs_text_ui(gr.basic_block):
 
         poll_id = _integer(meta, "poll_id", _integer(meta, "frame_id"))
         snr     = _number(meta, "snr", math.nan)
-        range_m = _number(meta, "range_m", math.nan)
+        range_m = _number(meta, "integer_range_m", math.nan)
         with self._lock:
             self._last_rx_time = self._clock()
             if math.isfinite(snr):
@@ -183,7 +183,7 @@ class prs_text_ui(gr.basic_block):
         self._render()
 
     def _new_responder_event(self, meta, poll_id, recent, tx=False):
-        """Deduplicate pipeline notifications, not lifetime poll IDs. Lock held."""
+        # Deduplicate pipeline notifications, not lifetime poll IDs. Lock held.
         if tx:
             secs = _number(meta, "tx_time_secs", math.nan)
             frac = _number(meta, "tx_time_frac", 0.0)
@@ -194,9 +194,12 @@ class prs_text_ui(gr.basic_block):
                 stamp = ("rx_time", rx_time)
             else:
                 sample = pmt.dict_ref(meta, pmt.intern("frame_start"), pmt.PMT_NIL)
-                stamp = (("frame_start", pmt.to_uint64(sample)) if pmt.is_uint64(sample)
-                         else ("frame_start", pmt.to_long(sample)) if pmt.is_integer(sample)
-                         else None)
+                if pmt.is_uint64(sample):
+                    stamp = ("frame_start", pmt.to_uint64(sample))
+                elif pmt.is_integer(sample):
+                    stamp = ("frame_start", pmt.to_long(sample))
+                else:
+                    stamp = None
         key = (poll_id, stamp)
         now = self._clock()
         previous = recent.get(key)
@@ -232,8 +235,7 @@ class prs_text_ui(gr.basic_block):
 
             if self._role == "initiator":
                 polls = len(self._polls)
-                responses = sum(
-                    p["state"] == "responded" for p in self._polls.values())
+                responses = sum(p["state"] == "responded" for p in self._polls.values())
                 lost = sum(p["state"] == "lost" for p in self._polls.values())
                 pending = polls - responses - lost
             else:
@@ -263,10 +265,10 @@ class prs_text_ui(gr.basic_block):
             }
 
     @staticmethod
-    def _format_value(value, suffix, precision=1):
+    def _format_value(value, unit, precision=1):
         if not math.isfinite(value):
             return "--"
-        return f"{value:.{precision}f}{suffix}"
+        return f"{value:.{precision}f}{unit}"
 
     def format_status(self):
         status = self.snapshot()
@@ -299,5 +301,6 @@ class prs_text_ui(gr.basic_block):
 
     def _refresh_loop(self):
         self._render()
+        # Keep render until _refresh_period_s or stopped program.
         while not self._stop_event.wait(self._refresh_period_s):
             self._render()

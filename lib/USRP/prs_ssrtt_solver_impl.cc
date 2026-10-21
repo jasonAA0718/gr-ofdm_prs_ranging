@@ -139,22 +139,12 @@ void prs_ssrtt_solver_impl::handle_measurement(pmt::pmt_t msg)
     auto stage_start = report.mark();
     meta = pmt::dict_add(meta, pmt::mp("t1_tx_time"), pmt::from_double(t1));
     meta = pmt::dict_add(meta, pmt::mp("t4_rx_time"), pmt::from_double(t4));
-    meta = pmt::dict_add(meta, pmt::mp("reply_delay_s"), pmt::from_double(reply_delay_s));
-    meta = pmt::dict_add(meta, pmt::mp("rtt_s"), pmt::from_double(rtt_s));
-    meta = pmt::dict_add(meta, pmt::mp("tof_s"), pmt::from_double(tof_s));
-    meta = pmt::dict_add(meta, pmt::mp("range_m"), pmt::from_double(range_m));
-    meta = pmt::dict_add(meta, pmt::mp("integer_tof_s"), pmt::from_double(tof_s));
+    meta = pmt::dict_add(meta, pmt::mp("calibration_time"), pmt::from_double(5.808278798530661e-06));
     meta = pmt::dict_add(meta, pmt::mp("integer_range_m"), pmt::from_double(range_m));
-    meta = pmt::dict_add(
-        meta, pmt::mp("response_fine_delay_s"), pmt::from_double(response_fine_delay_s));
-    meta = pmt::dict_add(meta,
-                         pmt::mp("response_phase_range_correction_m"),
-                         pmt::from_double(response_phase_range_correction_m));
-    meta = pmt::dict_add(meta, pmt::mp("measurement_timestamp"), pmt::from_double(t4));
+    meta = pmt::dict_add(meta, pmt::mp("corrected_range_m"), pmt::from_double(corrected_range_m));
     meta = pmt::dict_add(meta, pmt::mp("poll_fine_delay_samples"), pmt::from_double(poll_fine_samples));
     meta = pmt::dict_add(meta, pmt::mp("response_fine_delay_samples"), pmt::from_double(response_fine_samples));
     meta = pmt::dict_add(meta, pmt::mp("fine_range_correction_m"), pmt::from_double(correction_m));
-    meta = pmt::dict_add(meta, pmt::mp("corrected_range_m"), pmt::from_double(corrected_range_m));
     meta = pmt::dict_add(meta, pmt::mp("fine_correction_valid"), fine_valid ? pmt::PMT_T : pmt::PMT_F);
     auto stage_stop = report.mark();
     report.add("metadata_build", stage_start, stage_stop);

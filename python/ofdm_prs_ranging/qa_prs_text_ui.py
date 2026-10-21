@@ -64,7 +64,8 @@ class qa_prs_text_ui(gr_unittest.TestCase):
             poll_id=7,
             frame_id_valid=True,
             snr=23.5,
-            range_m=84.25)
+            integer_range_m=84.25,
+            range_m=999.0)
         ui._handle_frame(pmt.cons(response, pmt.PMT_NIL))
         ui._handle_measurement(pmt.cons(response, pmt.PMT_NIL))
         received = ui.snapshot()

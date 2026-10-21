@@ -34,16 +34,15 @@ prs_csv_logger_impl::prs_csv_logger_impl(const std::string& path,
       d_enable_profiling(enable_profiling)
 {
     if (!append || d_file.tellp() == 0) {
-        d_file << "direction,poll_id,anchor_id,t1_tx_time,t4_rx_time,"
-                  "reply_delay_samples,reply_delay_s,rtt_s,tof_s,range_m,"
-                  "integer_tof_s,integer_range_m,fine_delay_s,"
-                  "fine_delay_samples,phase_range_contribution_m,"
+        d_file << "direction,poll_id,anchor_id,"
+                  "t1_tx_time,t4_rx_time,calibration_time,integer_range_m,"
+                  "corrected_range_m,poll_fine_delay_samples,response_fine_delay_samples,"
+                  "fine_range_correction_m,fine_correction_valid,"
+                  "reply_delay_samples,"
                   "frame_id_valid,coarse_metric,payload_metric,"
                   "prs_cp_cfo_hz,prs_cp_cfo_coherence,selected_cfo_hz,"
                   "payload_retry_used,prs_channel_cfo_hz,residual_cfo_hz,"
-                  "channel_coherence,phase_slope_rad_per_hz,phase_residual,snr,quality,"
-                  "measurement_timestamp,poll_fine_delay_samples,response_fine_delay_samples,"
-                  "fine_range_correction_m,corrected_range_m,fine_correction_valid\n";
+                  "channel_coherence,phase_slope_rad_per_hz,phase_residual,snr,quality\n";
     }
     message_port_register_in(pmt::mp("measurement_in"));
     message_port_register_out(pmt::mp("timing_out"));
@@ -70,8 +69,7 @@ void prs_csv_logger_impl::handle_measurement(pmt::pmt_t msg)
         packet_type == prs_packet_type_poll
             ? "poll_rx"
             : (packet_type == prs_packet_type_response ? "response_rx" : "unknown");
-    const double fine_delay_s = dict_ref_double(meta, "fine_delay", 0.0);
-    const double phase_range_contribution_m = 0.5 * c_mps * fine_delay_s;
+
     report.checkpoint("input_decode");
     auto stage_start = report.mark();
     d_file << std::setprecision(15);
@@ -79,21 +77,17 @@ void prs_csv_logger_impl::handle_measurement(pmt::pmt_t msg)
            << dict_ref_uint64(meta, "anchor_id", 0) << ','
            << dict_ref_double(meta, "t1_tx_time", 0.0) << ','
            << dict_ref_double(meta, "t4_rx_time", 0.0) << ','
+           << dict_ref_double(meta, "calibration_time", NAN) << ','
+           << dict_ref_double(meta, "integer_range_m", NAN) << ','
+           << dict_ref_double(meta, "corrected_range_m", NAN) << ','
+           << dict_ref_double(meta, "poll_fine_delay_samples", NAN) << ','
+           << dict_ref_double(meta, "response_fine_delay_samples", NAN) << ','
+           << dict_ref_double(meta, "fine_range_correction_m", NAN) << ','
+           << (metadata_true(meta,  "fine_correction_valid") ? 1 : 0) << ','
            << dict_ref_uint64(meta, "reply_delay_samples", 0) << ','
-           << dict_ref_double(meta, "reply_delay_s", 0.0) << ','
-           << dict_ref_double(meta, "rtt_s", 0.0) << ','
-           << dict_ref_double(meta, "tof_s", 0.0) << ','
-           << dict_ref_double(meta, "range_m", 0.0) << ','
-           << dict_ref_double(meta, "integer_tof_s", 0.0) << ','
-           << dict_ref_double(meta, "integer_range_m", 0.0) << ',' << fine_delay_s << ','
-           << dict_ref_double(meta, "fine_delay_samples", 0.0) << ','
-           << phase_range_contribution_m << ','
            << (pmt::to_bool(pmt::dict_ref(meta, pmt::mp("frame_id_valid"), pmt::PMT_F))
-                   ? 1
-                   : 0)
-           << ','
-           << dict_ref_double(
-                  meta, "coarse_metric", dict_ref_double(meta, "peak_metric", 0.0))
+                   ? 1 : 0) << ','
+           << dict_ref_double(meta, "coarse_metric", dict_ref_double(meta, "peak_metric", 0.0))
            << ',' << dict_ref_double(meta, "payload_metric", 0.0) << ','
            << dict_ref_double(meta, "prs_cp_cfo_hz", 0.0) << ','
            << dict_ref_double(meta, "prs_cp_cfo_coherence", 0.0) << ','
@@ -108,13 +102,7 @@ void prs_csv_logger_impl::handle_measurement(pmt::pmt_t msg)
            << dict_ref_double(meta, "phase_slope", 0.0) << ','
            << dict_ref_double(meta, "phase_residual", 0.0) << ','
            << dict_ref_double(meta, "snr", 0.0) << ','
-           << dict_ref_double(meta, "quality", 0.0) << ','
-           << dict_ref_double(meta, "measurement_timestamp", NAN) << ','
-           << dict_ref_double(meta, "poll_fine_delay_samples", NAN) << ','
-           << dict_ref_double(meta, "response_fine_delay_samples", NAN) << ','
-           << dict_ref_double(meta, "fine_range_correction_m", NAN) << ','
-           << dict_ref_double(meta, "corrected_range_m", NAN) << ','
-           << (metadata_true(meta, "fine_correction_valid") ? 1 : 0) << '\n';
+           << dict_ref_double(meta, "quality", 0.0) << '\n';
     auto stage_stop = report.mark();
     report.add("format_write", stage_start, stage_stop);
     stage_start = stage_stop;
