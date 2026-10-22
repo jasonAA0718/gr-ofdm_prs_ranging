@@ -35,10 +35,10 @@ class prs_ssrtt_responder_anchor1(gr.top_block):
         # Variables
         ##################################################
         self.samp_rate = samp_rate = 30000000
-        self.response_delay_seconds = response_delay_seconds = 0.081
+        self.response_delay_seconds = response_delay_seconds = 0.051
         self.zc_length = zc_length = 819
         self.tx_gain = tx_gain = 60
-        self.rx_gain = rx_gain = 57
+        self.rx_gain = rx_gain = 56
         self.reply_delay_samples = reply_delay_samples = int(response_delay_seconds*samp_rate + 0.5)
         self.premble_rep = premble_rep = 17
         self.premble_length = premble_length = 128
@@ -51,14 +51,14 @@ class prs_ssrtt_responder_anchor1(gr.top_block):
         ##################################################
 
         self.uhd_usrp_source_0_0_0 = uhd.usrp_source(
-            ",".join(("", "recv_buff_size=20000000,num_recv_frames=700")),
+            ",".join(("serial=34D0563", "recv_buff_size=20000000,num_recv_frames=700")),
             uhd.stream_args(
                 cpu_format="fc32",
                 args='',
                 channels=list(range(0,1)),
             ),
         )
-        self.uhd_usrp_source_0_0_0.set_subdev_spec('A:B', 0)
+        self.uhd_usrp_source_0_0_0.set_subdev_spec('A:A', 0)
         self.uhd_usrp_source_0_0_0.set_samp_rate(samp_rate)
         self.uhd_usrp_source_0_0_0.set_time_unknown_pps(uhd.time_spec(0))
 
@@ -67,7 +67,7 @@ class prs_ssrtt_responder_anchor1(gr.top_block):
         self.uhd_usrp_source_0_0_0.set_bandwidth(samp_rate, 0)
         self.uhd_usrp_source_0_0_0.set_gain(rx_gain, 0)
         self.uhd_usrp_sink_0_0 = uhd.usrp_sink(
-            ",".join(("", '')),
+            ",".join(("serial=34D0563", '')),
             uhd.stream_args(
                 cpu_format="fc32",
                 args='',
@@ -75,7 +75,7 @@ class prs_ssrtt_responder_anchor1(gr.top_block):
             ),
             "",
         )
-        self.uhd_usrp_sink_0_0.set_subdev_spec('A:B', 0)
+        self.uhd_usrp_sink_0_0.set_subdev_spec('A:A', 0)
         self.uhd_usrp_sink_0_0.set_samp_rate(samp_rate)
         self.uhd_usrp_sink_0_0.set_time_unknown_pps(uhd.time_spec(0))
 

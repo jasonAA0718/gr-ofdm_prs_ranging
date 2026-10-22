@@ -133,7 +133,7 @@ void prs_ssrtt_solver_impl::handle_measurement(pmt::pmt_t msg)
         ? c_mps / (2.0 * d_samp_rate) * (poll_fine_samples + response_fine_samples) : NAN;
     const double corrected_range_m = fine_valid ? range_m + correction_m : NAN;
     const double response_fine_delay_s = response_fine_samples / d_samp_rate;
-    const double response_phase_range_correction_m = 0.5 * c_mps * response_fine_delay_s;
+    // const double response_phase_range_correction_m = 0.5 * c_mps * response_fine_delay_s;
     report.checkpoint("ssrtt_calculation");
 
     auto stage_start = report.mark();

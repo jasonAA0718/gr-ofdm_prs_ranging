@@ -38,8 +38,8 @@ class prs_ssrtt_initiator_multi_anchor(gr.top_block):
         # Variables
         ##################################################
         self.zc_length = zc_length = 819
-        self.tx_gain = tx_gain = 63
-        self.time_delays = time_delays = [0.041, 0.081]
+        self.tx_gain = tx_gain = 62
+        self.time_delays = time_delays = [0.041, 0.051]
         self.samp_rate = samp_rate = 30000000
         self.rx_gain = rx_gain = 58
         self.receive_late_s = receive_late_s = 0.005
@@ -56,7 +56,7 @@ class prs_ssrtt_initiator_multi_anchor(gr.top_block):
         ##################################################
 
         self.uhd_usrp_source_0_0 = uhd.usrp_source(
-            ",".join(("serial=34D0564", "recv_buff_size=25000000,num_recv_frames=1024")),
+            ",".join(("serial=32712EF", "recv_buff_size=25000000,num_recv_frames=1024")),
             uhd.stream_args(
                 cpu_format="fc32",
                 args='',
@@ -73,7 +73,7 @@ class prs_ssrtt_initiator_multi_anchor(gr.top_block):
         self.uhd_usrp_source_0_0.set_gain(rx_gain, 0)
         self.uhd_usrp_source_0_0.set_min_output_buffer(1048576)
         self.uhd_usrp_sink_0 = uhd.usrp_sink(
-            ",".join(("serial=34D0564", '')),
+            ",".join(("serial=32712EF", '')),
             uhd.stream_args(
                 cpu_format="fc32",
                 args='',
@@ -123,8 +123,8 @@ class prs_ssrtt_initiator_multi_anchor(gr.top_block):
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'cycle_out'), (self.cycle_summary_debug, 'print'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'measurement_out'), (self.prs_csv_logger_0, 'measurement_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'window_out'), (self.prs_frame_detector_0_0, 'tx_time_in'))
-        self.msg_connect((self.prs_multi_anchor_cycle_0, 'solver_tx_out'), (self.prs_ssrtt_solver_0, 'tx_time_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'solver_measurement_out'), (self.prs_ssrtt_solver_0, 'measurement_in'))
+        self.msg_connect((self.prs_multi_anchor_cycle_0, 'solver_tx_out'), (self.prs_ssrtt_solver_0, 'tx_time_in'))
         self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_multi_anchor_cycle_0, 'measurement_in'))
         self.msg_connect((self.prs_rx_timekeeper_0, 'clock_out'), (self.prs_multi_anchor_cycle_0, 'clock_in'))
         self.msg_connect((self.prs_rx_timekeeper_0, 'timed_trigger_out'), (self.prs_source, 'trigger'))

@@ -157,7 +157,7 @@ blocks:
   id: variable
   parameters:
     comment: Static schedule in seconds; delays correspond to anchor_ids by index.
-    value: '[0.041, 0.081]'
+    value: '[0.041, 0.051]'
   states:
     bus_sink: false
     bus_source: false
@@ -169,7 +169,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '63'
+    value: '62'
   states:
     bus_sink: false
     bus_source: false

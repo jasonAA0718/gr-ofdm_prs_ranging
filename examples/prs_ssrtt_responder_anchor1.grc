@@ -4,7 +4,8 @@ options:
     catch_exceptions: 'True'
     category: '[GRC Hier Blocks]'
     cmake_opt: ''
-    comment: Minimal SS-RTT responder topology. Add/configure UHD Source and Sink for hardware.
+    comment: Minimal SS-RTT responder topology. Add/configure UHD Source and Sink
+      for hardware.
     copyright: ''
     description: OFDM PRS SS-RTT responder
     gen_cmake: 'On'
@@ -28,11 +29,10 @@ options:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 40
-    - 32.0
+    coordinate: [40, 32.0]
     rotation: 0
     state: enabled
+
 blocks:
 - name: T_burst
   id: variable
@@ -43,9 +43,19 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1112
-    - 48.0
+    coordinate: [1112, 48.0]
+    rotation: 0
+    state: enabled
+- name: anchor_id
+  id: variable
+  parameters:
+    comment: ''
+    value: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [400, 120]
     rotation: 0
     state: enabled
 - name: center_freq
@@ -57,9 +67,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 224
-    - 104.0
+    coordinate: [224, 104.0]
     rotation: 0
     state: enabled
 - name: premble_length
@@ -71,9 +79,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 568
-    - 40.0
+    coordinate: [568, 40.0]
     rotation: 0
     state: enabled
 - name: premble_rep
@@ -85,9 +91,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 472
-    - 40.0
+    coordinate: [472, 40.0]
     rotation: 0
     state: enabled
 - name: reply_delay_samples
@@ -99,23 +103,32 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 328
-    - 40.0
+    coordinate: [328, 40.0]
+    rotation: 0
+    state: enabled
+- name: response_delay_seconds
+  id: variable
+  parameters:
+    comment: Match initiator time_delays entry; seconds, converted once to integer
+      samples.
+    value: '0.051'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [650, 120]
     rotation: 0
     state: enabled
 - name: rx_gain
   id: variable
   parameters:
     comment: ''
-    value: '57'
+    value: '56'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 816
-    - 40.0
+    coordinate: [816, 40.0]
     rotation: 0
     state: enabled
 - name: samp_rate
@@ -127,9 +140,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 224
-    - 32.0
+    coordinate: [224, 32.0]
     rotation: 0
     state: enabled
 - name: tx_gain
@@ -141,9 +152,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 912
-    - 40.0
+    coordinate: [912, 40.0]
     rotation: 0
     state: enabled
 - name: tx_gain
@@ -164,9 +173,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1008
-    - 28.0
+    coordinate: [1008, 28.0]
     rotation: 0
     state: disabled
 - name: zc_length
@@ -178,9 +185,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 688
-    - 40.0
+    coordinate: [688, 40.0]
     rotation: 0
     state: enabled
 - name: blocks_file_sink_0
@@ -198,9 +203,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 272
-    - 612.0
+    coordinate: [272, 612.0]
     rotation: 0
     state: disabled
 - name: ofdm_prs_ranging_prs_window_capture_0
@@ -230,9 +233,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 392
-    - 736.0
+    coordinate: [408, 720.0]
     rotation: 0
     state: enabled
 - name: ofdm_prs_ranging_prs_zc_frame_sync_0
@@ -260,9 +261,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 800
-    - 680.0
+    coordinate: [800, 680.0]
     rotation: 0
     state: enabled
 - name: prs_acquisition_logger_0
@@ -278,9 +277,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1680
-    - 872.0
+    coordinate: [1680, 872.0]
     rotation: 0
     state: enabled
 - name: prs_channel_estimator_0
@@ -302,9 +299,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1296
-    - 552.0
+    coordinate: [1296, 552.0]
     rotation: 0
     state: enabled
 - name: prs_csv_logger_0
@@ -322,9 +317,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 752
-    - 1080.0
+    coordinate: [752, 1080.0]
     rotation: 0
     state: enabled
 - name: prs_fft_receiver_0
@@ -345,9 +338,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 976
-    - 540.0
+    coordinate: [976, 540.0]
     rotation: 0
     state: enabled
 - name: prs_phase_slope_estimator_0
@@ -367,9 +358,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 368
-    - 1164.0
+    coordinate: [368, 1164.0]
     rotation: 0
     state: enabled
 - name: prs_source
@@ -400,9 +389,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 288
-    - 216.0
+    coordinate: [288, 216.0]
     rotation: 0
     state: enabled
 - name: prs_ssrtt_responder_0
@@ -421,9 +408,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 776
-    - 1252.0
+    coordinate: [776, 1252.0]
     rotation: 0
     state: enabled
 - name: prs_text_ui_0
@@ -441,9 +426,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1360
-    - 1128.0
+    coordinate: [1360, 1128.0]
     rotation: 0
     state: enabled
 - name: uhd_usrp_sink_0_0
@@ -557,7 +540,7 @@ blocks:
     clock_source6: ''
     clock_source7: ''
     comment: ''
-    dev_addr: '""'
+    dev_addr: '"serial=34D0563"'
     dev_args: ''
     gain0: tx_gain
     gain1: '0'
@@ -694,7 +677,7 @@ blocks:
     num_mboards: '1'
     otw: ''
     samp_rate: samp_rate
-    sd_spec0: A:B
+    sd_spec0: A:A
     sd_spec1: ''
     sd_spec2: ''
     sd_spec3: ''
@@ -720,9 +703,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 816
-    - 260.0
+    coordinate: [816, 260.0]
     rotation: 0
     state: enabled
 - name: uhd_usrp_source_0_0_0
@@ -900,7 +881,7 @@ blocks:
     dc_offs_enb7: default
     dc_offs_enb8: default
     dc_offs_enb9: default
-    dev_addr: '""'
+    dev_addr: '"serial=34D0563"'
     dev_args: '"recv_buff_size=20000000,num_recv_frames=700"'
     gain0: rx_gain
     gain1: '0'
@@ -1132,7 +1113,7 @@ blocks:
     rx_agc8: Default
     rx_agc9: Default
     samp_rate: samp_rate
-    sd_spec0: A:B
+    sd_spec0: A:A
     sd_spec1: ''
     sd_spec2: ''
     sd_spec3: ''
@@ -1158,9 +1139,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 40
-    - 668.0
+    coordinate: [40, 668.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_0
@@ -1173,9 +1152,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1040
-    - 1272.0
+    coordinate: [1040, 1272.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_0_0
@@ -1188,9 +1165,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 600
-    - 448.0
+    coordinate: [600, 448.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_1_0_0_0_0_1
@@ -1203,9 +1178,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1632
-    - 504.0
+    coordinate: [1632, 504.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_1_0_0_0_0_1_0
@@ -1218,9 +1191,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1176
-    - 744.0
+    coordinate: [1176, 744.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_1_0_0_0_0_1_0_0
@@ -1233,9 +1204,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1208
-    - 848.0
+    coordinate: [1208, 848.0]
     rotation: 0
     state: enabled
 - name: virtual_source_0
@@ -1248,9 +1217,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 64
-    - 312.0
+    coordinate: [64, 312.0]
     rotation: 0
     state: enabled
 - name: virtual_source_1
@@ -1263,9 +1230,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1056
-    - 1072.0
+    coordinate: [1056, 1072.0]
     rotation: 0
     state: enabled
 - name: virtual_source_1_0
@@ -1278,9 +1243,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1048
-    - 1160.0
+    coordinate: [1048, 1160.0]
     rotation: 0
     state: enabled
 - name: virtual_source_1_0_0
@@ -1293,9 +1256,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 688
-    - 576.0
+    coordinate: [688, 576.0]
     rotation: 0
     state: enabled
 - name: virtual_source_1_0_0_0_1_0_0_0_0
@@ -1308,9 +1269,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 88
-    - 1200.0
+    coordinate: [88, 1200.0]
     rotation: 0
     state: enabled
 - name: virtual_source_1_0_0_0_1_0_0_0_0_0
@@ -1323,113 +1282,36 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 152
-    - 960.0
+    coordinate: [152, 960.0]
     rotation: 0
     state: enabled
-- name: anchor_id
-  id: variable
-  parameters:
-    value: '1'
-  states:
-    coordinate:
-    - 400
-    - 120
-    rotation: 0
-    state: enabled
-- name: response_delay_seconds
-  id: variable
-  parameters:
-    value: '0.081'
-    comment: Match initiator time_delays entry; seconds, converted once to integer samples.
-  states:
-    coordinate:
-    - 650
-    - 120
-    rotation: 0
-    state: enabled
+
 connections:
-- - ofdm_prs_ranging_prs_window_capture_0
-  - candidate_out
-  - ofdm_prs_ranging_prs_zc_frame_sync_0
-  - candidate_in
-- - ofdm_prs_ranging_prs_window_capture_0
-  - event_out
-  - prs_acquisition_logger_0
-  - frame_in
-- - ofdm_prs_ranging_prs_zc_frame_sync_0
-  - slot_release
-  - virtual_sink_1_0_0_0_0_1_0_0
-  - '0'
-- - ofdm_prs_ranging_prs_zc_frame_sync_0
-  - synchronized_frame_out
-  - virtual_sink_1_0_0_0_0_1_0
-  - '0'
-- - prs_channel_estimator_0
-  - channel_out
-  - virtual_sink_1_0_0_0_0_1
-  - '0'
-- - prs_channel_estimator_0
-  - event_out
-  - prs_acquisition_logger_0
-  - frame_in
-- - prs_fft_receiver_0
-  - symbols_out
-  - prs_channel_estimator_0
-  - symbols_in
-- - prs_phase_slope_estimator_0
-  - measurement_out
-  - prs_csv_logger_0
-  - measurement_in
-- - prs_phase_slope_estimator_0
-  - measurement_out
-  - prs_ssrtt_responder_0
-  - measurement_in
-- - prs_phase_slope_estimator_0
-  - measurement_out
-  - prs_text_ui_0
-  - measurement_in
-- - prs_source
-  - '0'
-  - uhd_usrp_sink_0_0
-  - '0'
-- - prs_source
-  - tx_time_out
-  - virtual_sink_0_0
-  - '0'
-- - prs_ssrtt_responder_0
-  - trigger_out
-  - virtual_sink_0
-  - '0'
-- - uhd_usrp_source_0_0_0
-  - '0'
-  - ofdm_prs_ranging_prs_window_capture_0
-  - '0'
-- - virtual_source_0
-  - '0'
-  - prs_source
-  - trigger
-- - virtual_source_1
-  - '0'
-  - prs_text_ui_0
-  - tx_in
-- - virtual_source_1_0
-  - '0'
-  - prs_text_ui_0
-  - frame_in
-- - virtual_source_1_0_0
-  - '0'
-  - prs_fft_receiver_0
-  - frame_in
-- - virtual_source_1_0_0_0_1_0_0_0_0
-  - '0'
-  - prs_phase_slope_estimator_0
-  - channel_in
-- - virtual_source_1_0_0_0_1_0_0_0_0_0
-  - '0'
-  - ofdm_prs_ranging_prs_window_capture_0
-  - slot_release
+- [ofdm_prs_ranging_prs_window_capture_0, candidate_out, ofdm_prs_ranging_prs_zc_frame_sync_0,
+  candidate_in]
+- [ofdm_prs_ranging_prs_window_capture_0, event_out, prs_acquisition_logger_0, frame_in]
+- [ofdm_prs_ranging_prs_zc_frame_sync_0, slot_release, virtual_sink_1_0_0_0_0_1_0_0,
+  '0']
+- [ofdm_prs_ranging_prs_zc_frame_sync_0, synchronized_frame_out, virtual_sink_1_0_0_0_0_1_0,
+  '0']
+- [prs_channel_estimator_0, channel_out, virtual_sink_1_0_0_0_0_1, '0']
+- [prs_channel_estimator_0, event_out, prs_acquisition_logger_0, frame_in]
+- [prs_fft_receiver_0, symbols_out, prs_channel_estimator_0, symbols_in]
+- [prs_phase_slope_estimator_0, measurement_out, prs_csv_logger_0, measurement_in]
+- [prs_phase_slope_estimator_0, measurement_out, prs_ssrtt_responder_0, measurement_in]
+- [prs_phase_slope_estimator_0, measurement_out, prs_text_ui_0, measurement_in]
+- [prs_source, '0', uhd_usrp_sink_0_0, '0']
+- [prs_source, tx_time_out, virtual_sink_0_0, '0']
+- [prs_ssrtt_responder_0, trigger_out, virtual_sink_0, '0']
+- [uhd_usrp_source_0_0_0, '0', ofdm_prs_ranging_prs_window_capture_0, '0']
+- [virtual_source_0, '0', prs_source, trigger]
+- [virtual_source_1, '0', prs_text_ui_0, tx_in]
+- [virtual_source_1_0, '0', prs_text_ui_0, frame_in]
+- [virtual_source_1_0_0, '0', prs_fft_receiver_0, frame_in]
+- [virtual_source_1_0_0_0_1_0_0_0_0, '0', prs_phase_slope_estimator_0, channel_in]
+- [virtual_source_1_0_0_0_1_0_0_0_0_0, '0', ofdm_prs_ranging_prs_window_capture_0,
+  slot_release]
+
 metadata:
   file_format: 1
-  grc_version: 3.10.11.0
+  grc_version: 3.10.9.2
