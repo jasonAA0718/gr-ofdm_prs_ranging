@@ -24,7 +24,7 @@ outputs:
 - {label: solver_tx_out, domain: message}
 - {label: solver_measurement_out, domain: message}
 - {label: measurement_out, domain: message}
-- {label: cycle_out, domain: message}
+- {label: cycle_out, domain: message, optional: true}
 - {label: epoch_out, domain: message, optional: true}
 - {label: diagnostic_out, domain: message, optional: true}
 documentation: |-

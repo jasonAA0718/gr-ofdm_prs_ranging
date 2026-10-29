@@ -45,6 +45,18 @@ blocks:
     bus_structure: null
     coordinate: [400, 120]
     rotation: 0
+    state: disabled
+- name: anchor_ids
+  id: variable
+  parameters:
+    comment: Static schedule in seconds; delays correspond to anchor_ids by index.
+    value: '[0, 1]'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [400, 176.0]
+    rotation: 0
     state: enabled
 - name: center_freq
   id: variable
@@ -134,7 +146,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '58'
+    value: '30'
   states:
     bus_sink: false
     bus_source: false
@@ -158,12 +170,24 @@ blocks:
   id: variable
   parameters:
     comment: Static schedule in seconds; delays correspond to anchor_ids by index.
-    value: '[0.031, 0.081, 0.131, 0.181]'
+    value: '[0.031, 0.051, 0.131, 0.181]'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [560, 120]
+    coordinate: [528, 120.0]
+    rotation: 0
+    state: disabled
+- name: time_delays
+  id: variable
+  parameters:
+    comment: Static schedule in seconds; delays correspond to anchor_ids by index.
+    value: '[0.041, 0.051]'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [568, 176.0]
     rotation: 0
     state: enabled
 - name: tx_gain
@@ -257,14 +281,14 @@ blocks:
     bus_structure: null
     coordinate: [1232, 1328.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: positioning_epoch_debug
   id: blocks_message_debug
   parameters:
     affinity: ''
     alias: ''
     comment: Complete observations from all configured anchors; no position calculation.
-    en_uvec: 'True'
+    en_uvec: 'False'
     log_level: trace
   states:
     bus_sink: false
@@ -1147,7 +1171,7 @@ blocks:
     nchan: '1'
     num_mboards: '1'
     otw: ''
-    rx_agc0: Default
+    rx_agc0: Enabled
     rx_agc1: Default
     rx_agc10: Default
     rx_agc11: Default
@@ -1348,6 +1372,7 @@ connections:
 - [prs_frame_detector_0_0, event_out, prs_acquisition_logger_0, frame_in]
 - [prs_frame_detector_0_0, frame_out, prs_fft_receiver_0, frame_in]
 - [prs_multi_anchor_cycle_0, cycle_out, cycle_summary_debug, print]
+- [prs_multi_anchor_cycle_0, cycle_out, cycle_summary_debug, store]
 - [prs_multi_anchor_cycle_0, diagnostic_out, cycle_diagnostic_debug, print]
 - [prs_multi_anchor_cycle_0, epoch_out, positioning_epoch_debug, print]
 - [prs_multi_anchor_cycle_0, measurement_out, prs_csv_logger_0, measurement_in]
