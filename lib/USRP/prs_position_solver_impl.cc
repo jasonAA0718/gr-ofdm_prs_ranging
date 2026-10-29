@@ -1,6 +1,7 @@
-#ifndef INCLUDED_OFDM_PRS_RANGING_PRS_POSITION_SOLVER_IMPL_H
-#define INCLUDED_OFDM_PRS_RANGING_PRS_POSITION_SOLVER_IMPL_H
-#include <include/gnuradio/ofdm_prs_ranging/prs_position_solver.h>
+#include "prs_position_solver_impl.h"
+#include <gnuradio/io_signature.h>
+#include <cmath>
+#include <stdexcept>
 #include <pmt/pmt.h>
 #include <array>
 #include <unordered_map>
@@ -109,10 +110,6 @@ void prs_position_solver_impl::handle_epoch(pmt::pmt_t msg)
         result,
         pmt::mp("poll_id"),
         pmt::dict_ref(meta, pmt::mp("poll_id"), pmt::PMT_NIL));
-
-
-
-
 
     message_port_pub(
         pmt::mp("diagnostic_out"),

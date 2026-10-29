@@ -33,6 +33,7 @@ set(ofdm_prs_ranging_usrp_sources
     USRP/prs_rx_timekeeper_impl.cc
     USRP/prs_ssrtt_responder_impl.cc
     USRP/prs_ssrtt_solver_impl.cc
+    USRP/prs_position_solver_impl.cc
     USRP/prs_timed_burst_source_impl.cc
     USRP/zc_manual_ping_source_impl.cc
     USRP/zc_rtt_calculator_impl.cc

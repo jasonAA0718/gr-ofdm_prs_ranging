@@ -34,6 +34,7 @@ void bind_prs_phase_slope_estimator(py::module& m);
 void bind_prs_rx_timekeeper(py::module& m);
 void bind_prs_ssrtt_responder(py::module& m);
 void bind_prs_ssrtt_solver(py::module& m);
+void bind_prs_position_solver(py::module& m);
 void bind_prs_csv_logger(py::module& m);
 void bind_prs_timing_collector(py::module& m);
 void bind_prs_timed_burst_source(py::module& m);
@@ -83,6 +84,7 @@ PYBIND11_MODULE(ofdm_prs_ranging_python, m)
     bind_prs_rx_timekeeper(m);
     bind_prs_ssrtt_responder(m);
     bind_prs_ssrtt_solver(m);
+    bind_prs_position_solver(m);
     bind_prs_csv_logger(m);
     bind_prs_timing_collector(m);
     bind_prs_timed_burst_source(m);

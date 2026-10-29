@@ -4,8 +4,9 @@ options:
     catch_exceptions: 'True'
     category: '[GRC Hier Blocks]'
     cmake_opt: ''
-    comment: Static configurable 1..8-anchor schedule. Complete epochs only after
-      finalization; no position solver.
+    comment: 'Static configurable 1..8-anchor schedule.
+
+      Complete epochs only after finalization;'
     copyright: ''
     description: 'OFDM PRS SS-RTT initiator '
     gen_cmake: 'On'
@@ -17,7 +18,7 @@ options:
     output_language: python
     placement: (0,0)
     qt_qss_theme: ''
-    realtime_scheduling: ''
+    realtime_scheduling: '1'
     run: 'True'
     run_command: '{python} -u {filename}'
     run_options: prompt
@@ -37,25 +38,13 @@ blocks:
 - name: anchor_ids
   id: variable
   parameters:
-    comment: Static schedule in seconds; delays correspond to anchor_ids by index.
-    value: '[0, 1, 2, 3]'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [400, 120]
-    rotation: 0
-    state: disabled
-- name: anchor_ids
-  id: variable
-  parameters:
-    comment: Static schedule in seconds; delays correspond to anchor_ids by index.
+    comment: Delay corresponding anchor ID
     value: '[0, 1]'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [400, 176.0]
+    coordinate: [296, 120.0]
     rotation: 0
     state: enabled
 - name: center_freq
@@ -109,37 +98,37 @@ blocks:
 - name: processing_grace_s
   id: variable
   parameters:
-    comment: Static schedule in seconds; delays correspond to anchor_ids by index.
+    comment: ranging_cycle_time
     value: '0.1'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1040, 120]
+    coordinate: [1136, 128.0]
     rotation: 0
     state: enabled
 - name: receive_early_s
   id: variable
   parameters:
-    comment: Static schedule in seconds; delays correspond to anchor_ids by index.
+    comment: "Anchor received window \nbefore time"
     value: '0.002'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [720, 120]
+    coordinate: [856, 128.0]
     rotation: 0
     state: enabled
 - name: receive_late_s
   id: variable
   parameters:
-    comment: Static schedule in seconds; delays correspond to anchor_ids by index.
-    value: '0.005'
+    comment: "Anchor received window \nbefore time"
+    value: '0.004'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [880, 120]
+    coordinate: [1000, 128.0]
     rotation: 0
     state: enabled
 - name: rx_gain
@@ -169,25 +158,17 @@ blocks:
 - name: time_delays
   id: variable
   parameters:
-    comment: Static schedule in seconds; delays correspond to anchor_ids by index.
-    value: '[0.031, 0.051, 0.131, 0.181]'
+    comment: 'Static schedule in seconds; delays correspond to anchor_ids by index.
+
+      The minimal slot space:
+
+      delay_1 - delay_0 = before + after + frame_length'
+    value: '[0.041, 0.0497]'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [528, 120.0]
-    rotation: 0
-    state: disabled
-- name: time_delays
-  id: variable
-  parameters:
-    comment: Static schedule in seconds; delays correspond to anchor_ids by index.
-    value: '[0.041, 0.051]'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [568, 176.0]
+    coordinate: [480, 120.0]
     rotation: 0
     state: enabled
 - name: tx_gain
@@ -220,7 +201,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1176, 28.0]
+    coordinate: [1432, 184.0]
     rotation: 0
     state: disabled
 - name: zc_length
@@ -267,6 +248,21 @@ blocks:
     coordinate: [1232, 1648.0]
     rotation: 0
     state: enabled
+- name: cycle_diagnostic_debug_0
+  id: blocks_message_debug
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: Ranging cycle summary/diagnostics; epoch_out is separate.
+    en_uvec: 'False'
+    log_level: err
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1800, 1664.0]
+    rotation: 0
+    state: enabled
 - name: cycle_summary_debug
   id: blocks_message_debug
   parameters:
@@ -281,8 +277,26 @@ blocks:
     bus_structure: null
     coordinate: [1232, 1328.0]
     rotation: 0
-    state: disabled
-- name: positioning_epoch_debug
+    state: enabled
+- name: ofdm_prs_ranging_prs_position_solver_0
+  id: ofdm_prs_ranging_prs_position_solver
+  parameters:
+    affinity: ''
+    alias: ''
+    anchor_ids: '[0, 1, 2]'
+    anchor_positions_m: '[[0,0,0], [6,0,0], [0,8,0]]'
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    vehicle_height_m: '0.0'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1248, 1528.0]
+    rotation: 0
+    state: enabled
+- name: positioning_epoch_debug_0
   id: blocks_message_debug
   parameters:
     affinity: ''
@@ -294,7 +308,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1232, 1480.0]
+    coordinate: [1792, 1512.0]
     rotation: 0
     state: enabled
 - name: prs_acquisition_logger_0
@@ -1366,6 +1380,10 @@ blocks:
 
 connections:
 - [blocks_message_strobe_0, strobe, prs_rx_timekeeper_0, trigger_in]
+- [ofdm_prs_ranging_prs_position_solver_0, diagnostic_out, cycle_diagnostic_debug_0,
+  print]
+- [ofdm_prs_ranging_prs_position_solver_0, position_out, positioning_epoch_debug_0,
+  print]
 - [prs_channel_estimator_0, channel_out, prs_phase_slope_estimator_0, channel_in]
 - [prs_channel_estimator_0, event_out, prs_acquisition_logger_0, frame_in]
 - [prs_fft_receiver_0, symbols_out, prs_channel_estimator_0, symbols_in]
@@ -1374,7 +1392,7 @@ connections:
 - [prs_multi_anchor_cycle_0, cycle_out, cycle_summary_debug, print]
 - [prs_multi_anchor_cycle_0, cycle_out, cycle_summary_debug, store]
 - [prs_multi_anchor_cycle_0, diagnostic_out, cycle_diagnostic_debug, print]
-- [prs_multi_anchor_cycle_0, epoch_out, positioning_epoch_debug, print]
+- [prs_multi_anchor_cycle_0, epoch_out, ofdm_prs_ranging_prs_position_solver_0, epoch_in]
 - [prs_multi_anchor_cycle_0, measurement_out, prs_csv_logger_0, measurement_in]
 - [prs_multi_anchor_cycle_0, solver_measurement_out, prs_ssrtt_solver_0, measurement_in]
 - [prs_multi_anchor_cycle_0, solver_tx_out, prs_ssrtt_solver_0, tx_time_in]

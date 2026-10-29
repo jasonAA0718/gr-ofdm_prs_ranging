@@ -23,6 +23,7 @@ install(FILES api.h
     prs_phase_slope_estimator.h
     prs_ssrtt_responder.h
     prs_ssrtt_solver.h
+    prs_position_solver.h
     prs_csv_logger.h
     prs_timing_collector.h
     zc_manual_ping_source.h

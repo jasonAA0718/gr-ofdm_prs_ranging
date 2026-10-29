@@ -21,6 +21,7 @@ install(FILES
     ofdm_prs_ranging_prs_phase_slope_estimator.block.yml
     ofdm_prs_ranging_prs_ssrtt_responder.block.yml
     ofdm_prs_ranging_prs_ssrtt_solver.block.yml
+    ofdm_prs_ranging_prs_position_solver.block.yml
     ofdm_prs_ranging_prs_csv_logger.block.yml
     ofdm_prs_ranging_prs_timing_collector.block.yml
     ofdm_prs_ranging_zc_manual_ping_source.block.yml

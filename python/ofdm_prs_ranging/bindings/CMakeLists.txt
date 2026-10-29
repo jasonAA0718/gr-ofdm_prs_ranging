@@ -37,6 +37,7 @@ list(APPEND ofdm_prs_ranging_python_files
     prs_rx_timekeeper_python.cc
     prs_ssrtt_responder_python.cc
     prs_ssrtt_solver_python.cc
+    prs_position_solver_python.cc
     prs_csv_logger_python.cc
     prs_timing_collector_python.cc
     prs_timed_burst_source_python.cc

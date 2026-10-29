@@ -1,0 +1,59 @@
+
+id: ofdm_prs_ranging_prs_position_solver
+label: PRS Position Solver
+category: '[ofdm_prs_ranging]'
+
+templates:
+  imports: from gnuradio import ofdm_prs_ranging
+  make: |-
+    ofdm_prs_ranging.prs_position_solver(
+        ${anchor_ids},
+        ${anchor_positions_m},
+        ${vehicle_height_m}
+    )
+
+parameters:
+- id: anchor_ids
+  label: Anchor IDs
+  dtype: int_vector
+  default: '[0, 1, 2]'
+
+- id: anchor_positions_m
+  label: Anchor XYZ Coordinates (m)
+  dtype: raw
+  default: '[[0,0,0], [6,0,0], [0,8,0]]'
+
+- id: vehicle_height_m
+  label: Vehicle Height (m)
+  dtype: real
+  default: 0.0
+
+inputs:
+- label: epoch_in
+  domain: message
+
+outputs:
+- label: position_out
+  domain: message
+  optional: true
+
+- label: diagnostic_out
+  domain: message
+  optional: true
+
+documentation: |-
+  Position solver for complete multi-anchor positioning epochs.
+
+  Input:
+    epoch_in
+
+  Outputs:
+    position_out
+    diagnostic_out
+
+  Anchor coordinates use local XYZ coordinates in meters.
+  Vehicle height is fixed for 2D positioning.
+
+  WLS weights initially use the identity matrix.
+
+file_format: 1
