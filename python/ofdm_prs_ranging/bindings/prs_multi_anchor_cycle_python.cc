@@ -6,7 +6,8 @@ namespace py = pybind11;
 void bind_prs_multi_anchor_cycle(py::module& m)
 {
     using block = gr::ofdm_prs_ranging::prs_multi_anchor_cycle;
-    py::class_<block, gr::block, gr::basic_block, std::shared_ptr<block>>(m, "prs_multi_anchor_cycle")
+    py::class_<block, gr::block, gr::basic_block, std::shared_ptr<block>>(m, "prs_multi_anchor_cycle",
+        "Static 1..8-anchor cycles; epoch_out emits complete >=3-anchor observations at finalization.")
         .def(py::init(&block::make), py::arg("samp_rate") = 30e6,
              py::arg("anchor_ids") = std::vector<int>{0, 1},
              py::arg("time_delays") = std::vector<double>{0.031, 0.081},

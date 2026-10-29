@@ -1,12 +1,13 @@
 # OFDM PRS / SS-TWR Ranging
 
 GNU Radio OOT blocks for USRP/UHD burst ranging using a custom OFDM PRS-like
-waveform. The current system supports one-anchor operation and statically scheduled
-two-anchor ranging cycles. Positioning remains future work. It is not a
+waveform. The current system supports statically scheduled 1..8-anchor ranging
+cycles and complete positioning epochs from finalized cycles with at least three
+configured anchors. Online position calculation remains future work. It is not a
 standards-complete LTE/NR PRS implementation.
 
 Packet, geometry and one-anchor ranging sections were updated for Phase B.
-The historical sections retain their original provenance. [signal.md](signal.md) is the detailed waveform and DSP reference.
+The historical sections retain their original provenance. [signal.md](docs/signal.md) is the detailed waveform and DSP reference.
 Roadmap, proposed changes, and outstanding experiments are in local
 `Agenda.md`, intentionally excluded from Git.
 
@@ -29,9 +30,10 @@ no standalone time-domain BPSK payload in the current receiver chain.
 | Live range | Integer timestamp SS-TWR plus separate bidirectional corrected range when both fine estimates are valid |
 | Profiling | Optional instrumentation in existing blocks and a timing collector |
 | Anchor identity | Packet-level anchor ID 0–7; responder POLL fine delay transported in RESPONSE |
-| Two-anchor ranging cycles | Implemented with static windows, packet identity, duplicate suppression and bounded cycle completion; synthetic QA verified |
-| RF validation | One-anchor Phase B reported successful by the user; two-anchor Phase C RF validation pending |
-| Positioning epochs / online positioning | Not implemented |
+| Multi-anchor ranging cycles | Implemented for 1..8 configured anchors with static windows, packet identity, duplicate suppression and bounded cycle completion |
+| RF validation | One-anchor Phase B and two-anchor Phase C reported successful by the user; three/four/eight-anchor RF operation is not claimed |
+| Complete positioning epochs | Implemented on `epoch_out`; requires every configured anchor, at least three anchors, and normal cycle finalization; synthetic QA verified |
+| Online position calculation | Not implemented; no anchor coordinate database or Position Solver |
 | DS-TWR, clock-skew correction, pre-FFT PRS CFO correction | Not implemented |
 
 The FFT-ZC algorithm remains experimental in accuracy terms even though the
@@ -92,7 +94,7 @@ configured frame and scheduling assumptions.
 
 ## Waveform and Configuration
 
-See [signal.md](signal.md) for exact bin indexing, spreading, CRC, normalization,
+See [signal.md](docs/signal.md) for exact bin indexing, spreading, CRC, normalization,
 detector equations, and CFO observation lengths. The current shared OFDM
 geometry is 512/64/127 at 30 MS/s, giving 73,152 OFDM samples or 2.4384 ms.
 The Gold CSV is compiled into `lib/DSP/gold127_codes.h`; no CSV is loaded at
@@ -132,7 +134,7 @@ range alongside a separate corrected range. The RESPONSE carries the responder's
 POLL phase estimate, and the initiator adds both directional residuals only when
 their validity/finite checks pass. Invalid correction produces NaN, leaving
 integer range available. Exact packet, Q10 and range equations are in
-[signal.md](signal.md). No clock-skew compensation or FINAL packet is present.
+[signal.md](docs/signal.md). No clock-skew compensation or FINAL packet is present.
 
 Fine delay is relative to the detector-selected FFT window, not absolute ToF,
 and is not restricted to half a sample. Software QA does not validate RF accuracy.
@@ -268,7 +270,7 @@ not proof of a specific clipping location.
   `tx_amp` controls requested OFDM RMS with an OFDM-only 0.9 peak limit.
 
 Detailed historical standalone-BPSK equations remain in
-[signal.md](signal.md#historical-standalone-bpsk-payload).
+[signal.md](docs/signal.md#historical-standalone-bpsk-payload).
 Previously referenced `MC_DS_CDMA_PLAN.md` and
 `CODEX_512_SCRAMBLER_GOLD127_IMPLEMENTATION.md` are absent from this checkout;
 the present description is grounded in source, not unavailable plan files.
@@ -340,7 +342,97 @@ with the unchanged additive source expression in the updated ranging QA.
 That historical software run did not constitute RF validation. The user has
 since reported successful one-anchor Phase-B RF validation.
 
-## Phase C: Static Two-Anchor Ranging Cycles
+## Phase D Milestone 1: Complete Observation Integration
+
+The SS-TWR Solver still calculates one anchor-specific range. The cycle manager
+owns schedule validation, association, duplicate handling, finalization and
+complete-observation storage. It does not recalculate or filter ranges.
+
+The constructor retains its argument order and two-anchor defaults. Configure
+between one and eight unique packet anchor IDs in 0..7 with matching delays:
+
+```python
+cycle = ofdm_prs_ranging.prs_multi_anchor_cycle(
+    samp_rate=30e6,
+    anchor_ids=[0, 1, 2, 3],
+    time_delays=[0.031, 0.081, 0.131, 0.181],  # seconds
+    preamble_len=128, preamble_repeats=17, coarse_sync_len=819,
+    window_before_s=0.002, window_after_s=0.005,
+    processing_grace_s=0.1)
+```
+
+Empty arrays, more than eight anchors, unequal lengths, duplicate/out-of-range
+IDs, invalid delays, 24-bit sample-delay overflow and overlapping complete
+receive windows are rejected. The POLL does not distribute the schedule;
+responders must be statically configured with corresponding identities/delays.
+
+Each active cycle stores at most eight complete accepted metadata dictionaries,
+keyed by decoded `anchor_id`, under its local `cycle_sequence` and `poll_id`.
+An observation contains the unchanged solver metadata plus a stored
+`measurement_timestamp` alias for `t4_rx_time`. Individual `measurement_out`
+PDUs remain unchanged. A finite integer range is sufficient for availability;
+invalid fine correction retains its flag and NaN corrected range. There is no
+range-magnitude screening, phase-quality rejection, weighting or averaging.
+
+At the normal finalized completion point (last capture-window end plus the
+configured hardware-time processing grace), `cycle_out` reports expected,
+received and missing anchors. Only then, if **all** configured anchors have
+accepted ranges and there are at least three anchors, `epoch_out` emits one
+complete positioning epoch. Missing anchors, one/two-anchor configurations and
+shutdown finalization never produce epochs. Early, partial and revised epochs
+are not implemented. Completion cleans both stored observations and solver TX
+state; duplicate and stale-generation checks remain active.
+
+`epoch_out` is a `(metadata_dictionary, PMT_NIL)` PDU. All arrays/vectors use
+the configured `anchor_ids` order, independently of response arrival order:
+
+| Field | PMT type / meaning |
+|---|---|
+| `poll_id`, `cycle_sequence` | unsigned integers; wire POLL identity and local generation |
+| `reference_timestamp` | double; POLL T1 in initiator UHD seconds |
+| `cycle_completion_timestamp` | double; final capture-window end, before grace |
+| `summary_emission_timestamp` | double; hardware RX watermark used to finalize |
+| `expected_anchor_ids`, `observed_anchor_ids` | u32 vectors; identical for a complete epoch |
+| `integer_ranges_m`, `corrected_ranges_m` | f64 vectors; original solver results in metres |
+| `fine_correction_valid_flags` | u8 vector; 0/1 flags, without replacing invalid corrected values |
+| `measurement_timestamps` | f64 vector; per-anchor RESPONSE T4 values in seconds |
+| `per_anchor_quality_diagnostics` | PMT vector of dictionaries with available validity, SNR, phase and acquisition/CFO diagnostics |
+| `measurements` | PMT vector of complete accepted metadata dictionaries, preserving reply delays, directional fine delays and all other diagnostics |
+
+The new `examples/prs_ssrtt_initiator_complete_epoch.grc` and its generated
+Python demonstrate four configurable anchors and print complete epochs. The
+known-working single-link and two-anchor examples are preserved. At 30 MS/s
+the complete RESPONSE is 78147 samples / 2.6049 ms. The example uses 50 ms
+start spacing, leaving 47.3951 ms between nominal bursts and 40.3951 ms between
+the 2 ms-early / 5 ms-late receive windows. Its final window ends 188.6049 ms
+after T1; the 100 ms grace reaches 288.6049 ms. The inherited 500 ms POLL
+strobe leaves ample separation. These are configured margins, not a new RF
+validation claim. See [the schedule contract](docs/signal.md#static-multi-anchor-response-schedule)
+for timing semantics and epoch eligibility.
+
+Focused QA includes 1/2-anchor ranging-only compatibility, complete 3/4/8-anchor
+epochs, no early/partial/shutdown publication, invalid fine correction, ordered
+metadata preservation, duplicates, missing anchors, sequential reuse and cleanup.
+The Position Solver, surveyed coordinates, geometry checks and online position
+calculation remain future work. A positioning epoch is an observation set,
+not a position fix.
+
+Milestone verification (fresh build, October 28): all 14 focused cycle-manager
+tests pass, including the existing complete-packet/two-window acquisition cases.
+Full CTest passes 11/12 targets. `qa_prs_receiver` retains three failures already
+present in the pre-edit baseline: its CSV header expectation differs from the
+current logger, one timestamp test reads the removed `rtt_s` alias, and one fine
+correction test expects the older additive calibration. Those tests and the
+current SS-TWR equation/calibration were not changed. The Phase-C acquisition
+regression checks the same synthetic RTT from canonical T1/T4/decoded delay
+instead of requiring that removed alias. Existing mismatch flags and complete
+summary fields are published again so diagnostics remain machine-readable.
+
+## Historical Phase C Implementation and Software Verification
+
+The following records the original two-anchor delivery. Phase D above
+supersedes its anchor-count and epoch limitations. The user subsequently
+reported successful two-anchor Phase-C RF validation.
 
 `prs_multi_anchor_cycle` is a native message-level coordinator between the
 phase-slope receiver and the unchanged SS-TWR calculation. It creates two

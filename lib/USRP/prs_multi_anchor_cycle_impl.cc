@@ -10,6 +10,7 @@
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <string>
 
 namespace gr {
 namespace ofdm_prs_ranging {
@@ -43,21 +44,27 @@ prs_multi_anchor_cycle_impl::prs_multi_anchor_cycle_impl(double fs,
                 gr::io_signature::make(0, 0, 0)), d_samp_rate(fs),
       d_frame_s(0), d_before(before), d_after(after), d_grace(grace)
 {
-    if (!std::isfinite(fs) || fs <= 0 || ids.size() != 2 || ids.size() != delays.size() ||
+    if (!std::isfinite(fs) || fs <= 0 || ids.empty() || ids.size() > 8 ||
+        ids.size() != delays.size() ||
         l <= 0 || r < 2 || nz <= 0 || !std::isfinite(before) || before < 0 ||
         !std::isfinite(after) || after < 0 || !std::isfinite(grace) || grace < 0) {
-        throw std::invalid_argument("two anchors and finite positive geometry/delays required");
+        throw std::invalid_argument("1..8 anchors, matching delays and finite positive geometry required");
     }
+    // Frame duration in sec
     d_frame_s = phy::frame_samples(l, r, nz, mc_ds_fft_len, mc_ds_cp_len, mc_ds_symbol_count) / fs;
     std::set<int> unique;
     for (size_t i = 0; i < ids.size(); ++i) {
         const double raw = std::round(delays[i] * fs);
+        // Check anchor ID is in range [0, 7], unique, and delay is positive and finite.
+        // Check that the receive window does not overlap with the previous anchor's receive window.
         if (ids[i] < 0 || ids[i] > 7 || !unique.insert(ids[i]).second ||
             !std::isfinite(delays[i]) || delays[i] <= 0 || !std::isfinite(raw) ||
             raw < 1 || raw > 0xffffff || raw / fs <= before) {
             throw std::invalid_argument("invalid anchor identity or reply delay");
         }
+        // Anchor ID
         d_anchors.push_back(ids[i]);
+        // Delay in samples
         d_delays.push_back(static_cast<uint32_t>(raw));
     }
     std::vector<double> starts;
@@ -71,7 +78,7 @@ prs_multi_anchor_cycle_impl::prs_multi_anchor_cycle_impl(double fs,
     for (const auto* port : {"tx_time_in", "clock_in", "measurement_in", "range_in"})
         message_port_register_in(pmt::mp(port));
     for (const auto* port : {"window_out", "solver_tx_out", "solver_measurement_out",
-                             "measurement_out", "cycle_out", "diagnostic_out"})
+                             "measurement_out", "cycle_out", "epoch_out", "diagnostic_out"})
         message_port_register_out(pmt::mp(port));
     set_msg_handler(pmt::mp("tx_time_in"), [this](pmt::pmt_t m) { handle_tx(m); });
     set_msg_handler(pmt::mp("clock_in"), [this](pmt::pmt_t m) { handle_clock(m); });
@@ -95,6 +102,10 @@ bool prs_multi_anchor_cycle_impl::start()
 void prs_multi_anchor_cycle_impl::diagnostic(pmt::pmt_t meta, const char* reason)
 {
     meta = pmt::dict_add(meta, pmt::mp("cycle_diagnostic"), pmt::mp(reason));
+    if (std::string(reason) == "REPLY_DELAY_MISMATCH")
+        meta = pmt::dict_add(meta, pmt::mp("reply_delay_mismatch"), pmt::PMT_T);
+    if (std::string(reason) == "SLOT_IDENTITY_MISMATCH")
+        meta = pmt::dict_add(meta, pmt::mp("slot_identity_mismatch"), pmt::PMT_T);
     message_port_pub(pmt::mp("diagnostic_out"), pmt::cons(meta, pmt::PMT_NIL));
 }
 void prs_multi_anchor_cycle_impl::handle_tx(pmt::pmt_t msg)
@@ -107,25 +118,35 @@ void prs_multi_anchor_cycle_impl::handle_tx(pmt::pmt_t msg)
     const double t1 = dict_ref_double(meta, "tx_time_secs", NAN) + dict_ref_double(meta, "tx_time_frac", 0);
     if (!std::isfinite(t1) || t1 < 0) return;
     if (t1 <= d_last_tx || d_cycles.size() >= 16) { diagnostic(meta, "TX_ORDER_OR_CAPACITY"); return; }
+    // Create a new cycle for this poll.
     cycle c{};
-    c.sequence = ++d_sequence; c.poll = poll; c.t1 = t1; c.end = t1;
+    c.sequence = d_sequence; c.poll = poll; c.t1 = t1; c.end = t1;
+    // Expected response windows for each anchor.
     for (size_t i = 0; i < d_anchors.size(); ++i) {
         const double expected = t1 + d_delays[i] / d_samp_rate;
         c.slots.push_back({d_anchors[i], d_delays[i], expected - d_before,
                            expected + d_frame_s + d_after});
         c.end = std::max(c.end, c.slots.back().end);
     }
+    // Check the new cycle and old cycle are not overlapping and poll ID is not reused.
     for (const auto& entry : d_cycles) {
         if (entry.second.poll == poll || std::min_element(c.slots.begin(), c.slots.end(), [](const slot& a, const slot& b) { return a.start < b.start; })->start < entry.second.end) {
             diagnostic(meta, "ACTIVE_CYCLE_OVERLAP_OR_POLL_REUSE"); return;
         }
     }
+    // Check if the new cycle is already expired.
     if (d_clock >= c.end + d_grace) { diagnostic(meta, "LATE_TX_NOTIFICATION"); return; }
+
     d_last_tx = t1;
+    // Add new cycle to cycle buffer.
     d_cycles.emplace(c.sequence, c);
+
+    // Create the metadata TX for the solver and the response windows.
     auto tx = pmt::dict_add(meta, pmt::mp("cycle_sequence"), pmt::from_uint64(c.sequence));
     tx = pmt::dict_add(tx, pmt::mp("cycle_managed"), pmt::PMT_T);
+    // Sent the cycle metadata to the SS-RTT Solver block.
     message_port_pub(pmt::mp("solver_tx_out"), tx);
+    // Sent the cycle metadata to the Acquisition block.
     for (size_t i = 0; i < c.slots.size(); ++i) {
         const auto& slot = c.slots[i];
         auto window = tx;
@@ -136,9 +157,12 @@ void prs_multi_anchor_cycle_impl::handle_tx(pmt::pmt_t msg)
         window = pmt::dict_add(window, pmt::mp("expected_reply_delay_samples"), pmt::from_uint64(slot.delay));
         message_port_pub(pmt::mp("window_out"), window);
     }
+    ++d_sequence;
 }
 prs_multi_anchor_cycle_impl::cycle* prs_multi_anchor_cycle_impl::locate(pmt::pmt_t meta)
 {
+    // check if the cycle_sequence is valid and locate the cycle in d_cycles.
+    if (!pmt::dict_has_key(meta, pmt::mp("cycle_sequence"))) return nullptr;
     const uint64_t seq = dict_ref_uint64(meta, "cycle_sequence", 0);
     const auto found = d_cycles.find(seq);
     if (found == d_cycles.end() || dict_ref_uint64(meta, "poll_id", 65536) != found->second.poll)
@@ -147,6 +171,8 @@ prs_multi_anchor_cycle_impl::cycle* prs_multi_anchor_cycle_impl::locate(pmt::pmt
 }
 void prs_multi_anchor_cycle_impl::handle_measurement(pmt::pmt_t msg)
 {
+    // Handle measurement from souce->DSP signal path.
+    // This is a response packet from an anchor.
     std::lock_guard<std::mutex> lock(d_mutex);
     auto meta = metadata(msg);
     if (!pmt::is_dict(meta)) return;
@@ -156,7 +182,10 @@ void prs_multi_anchor_cycle_impl::handle_measurement(pmt::pmt_t msg)
         if (found != d_cycles.end()) ++found->second.crc_failures;
         diagnostic(meta, "INVALID_PAYLOAD"); return;
     }
+
     if (dict_ref_uint64(meta, "packet_type", 0) != prs_packet_type_response) return;
+
+    // Check if the measurement is within the expected response window for the cycle and slot.
     auto* c = locate(meta);
     if (!c) { diagnostic(meta, "STALE_OR_UNKNOWN_CYCLE"); return; }
     const auto index = dict_ref_uint64(meta, "response_slot_index", c->slots.size());
@@ -187,13 +216,22 @@ void prs_multi_anchor_cycle_impl::handle_range(pmt::pmt_t msg)
     const auto meta = metadata(msg);
     if (!pmt::is_dict(meta)) return;
     auto* c = locate(meta);
+    // The cycle is not found.
     if (!c) { diagnostic(meta, "LATE_SOLVER_RESULT"); return; }
+    // Check if the anchor_id is valid and the measurement is accepted.
     const auto anchor = dict_ref_uint64(meta, "anchor_id", 8);
     if (anchor > 7) { diagnostic(meta, "UNEXPECTED_SOLVER_RESULT"); return; }
+    // Check if the anchor_id is in the expected anchors and the measurement is finite.
     if (!c->pending.erase(anchor) || !std::isfinite(dict_ref_double(meta, "integer_range_m", NAN))) {
         diagnostic(meta, "UNEXPECTED_SOLVER_RESULT"); return;
     }
+    // The measurement is accepted, mark the anchor as received and publish the measurement.
     c->received.insert(anchor);
+    // T4 is the existing measurement reference; keep a normalized alias in
+    // the stored observation without changing solver calculations or output.
+    auto observation = pmt::dict_add(meta, pmt::mp("measurement_timestamp"),
+        pmt::from_double(dict_ref_double(meta, "t4_rx_time", receive_time(meta))));
+    c->measurements.emplace(anchor, observation);
     message_port_pub(pmt::mp("measurement_out"), msg);
 }
 void prs_multi_anchor_cycle_impl::finish(const cycle& c, const char* reason)
@@ -201,24 +239,67 @@ void prs_multi_anchor_cycle_impl::finish(const cycle& c, const char* reason)
     auto meta = pmt::make_dict();
     std::vector<uint32_t> received, missing;
     for (auto anchor : d_anchors) (c.received.count(anchor) ? received : missing).push_back(anchor);
-    meta = pmt::dict_add(meta, pmt::mp("crc_failure_count"), pmt::from_uint64(c.crc_failures));
-    meta = pmt::dict_add(meta, pmt::mp("poll_tx_timestamp"), pmt::from_double(c.t1));
     meta = pmt::dict_add(meta, pmt::mp("completion_reason"), pmt::mp(reason));
+    meta = pmt::dict_add(meta, pmt::mp("crc_failure_count"), pmt::from_uint64(c.crc_failures));
     meta = pmt::dict_add(meta, pmt::mp("accepted_measurement_count"), pmt::from_uint64(received.size()));
+    meta = pmt::dict_add(meta, pmt::mp("slot_identity_mismatch_count"), pmt::from_uint64(c.identity_mismatches));
+    meta = pmt::dict_add(meta, pmt::mp("reply_delay_mismatch_count"), pmt::from_uint64(c.delay_mismatches));
+    meta = pmt::dict_add(meta, pmt::mp("duplicate_response_count"), pmt::from_uint64(c.duplicates));
+    meta = pmt::dict_add(meta, pmt::mp("summary_emission_timestamp"), pmt::from_double(d_clock));
+    meta = pmt::dict_add(meta, pmt::mp("cycle_completion_timestamp"), pmt::from_double(c.end));
+    meta = pmt::dict_add(meta, pmt::mp("expected_anchor_ids"), pmt::init_u32vector(d_anchors.size(), d_anchors));
     meta = pmt::dict_add(meta, pmt::mp("missing_anchor_ids"), pmt::init_u32vector(missing.size(), missing));
+    meta = pmt::dict_add(meta, pmt::mp("received_anchor_ids"), pmt::init_u32vector(received.size(), received));
+    meta = pmt::dict_add(meta, pmt::mp("poll_tx_timestamp"), pmt::from_double(c.t1));
     meta = pmt::dict_add(meta, pmt::mp("poll_id"), pmt::from_uint64(c.poll));
-    // meta = pmt::dict_add(meta, pmt::mp("cycle_sequence"), pmt::from_uint64(c.sequence));
-    // meta = pmt::dict_add(meta, pmt::mp("cycle_completion_timestamp"), pmt::from_double(c.end));
-    // meta = pmt::dict_add(meta, pmt::mp("summary_emission_timestamp"), pmt::from_double(d_clock));
-    // meta = pmt::dict_add(meta, pmt::mp("expected_anchor_ids"), pmt::init_u32vector(d_anchors.size(), d_anchors));
-    // meta = pmt::dict_add(meta, pmt::mp("received_anchor_ids"), pmt::init_u32vector(received.size(), received));
-    // meta = pmt::dict_add(meta, pmt::mp("duplicate_response_count"), pmt::from_uint64(c.duplicates));
-    // meta = pmt::dict_add(meta, pmt::mp("slot_identity_mismatch_count"), pmt::from_uint64(c.identity_mismatches));
-    // meta = pmt::dict_add(meta, pmt::mp("reply_delay_mismatch_count"), pmt::from_uint64(c.delay_mismatches));
-    
+    meta = pmt::dict_add(meta, pmt::mp("cycle_sequence"), pmt::from_uint64(c.sequence));
+    message_port_pub(pmt::mp("cycle_out"), pmt::cons(meta, pmt::PMT_NIL));
+    // Finalized normal cycles only. Shutdown never publishes an epoch, even
+    // when every range happened to arrive before the scheduled end.
+    if (std::string(reason) == "WINDOWS_EXPIRED" && d_anchors.size() >= 2 &&
+        c.measurements.size() == d_anchors.size()) publish_epoch(c);
     auto expire = pmt::dict_add(meta, pmt::mp("expire_cycle"), pmt::PMT_T);
     message_port_pub(pmt::mp("solver_tx_out"), expire);
-    message_port_pub(pmt::mp("cycle_out"), pmt::cons(meta, pmt::PMT_NIL));
+}
+void prs_multi_anchor_cycle_impl::publish_epoch(const cycle& c)
+{
+    std::vector<double> integer_ranges, corrected_ranges, timestamps;
+    std::vector<uint8_t> fine_flags;
+    auto observations = pmt::make_vector(d_anchors.size(), pmt::PMT_NIL);
+    auto diagnostics = pmt::make_vector(d_anchors.size(), pmt::PMT_NIL);
+    for (size_t i = 0; i < d_anchors.size(); ++i) {
+        const auto& measurement = c.measurements.at(d_anchors[i]);
+        integer_ranges.push_back(dict_ref_double(measurement, "integer_range_m", NAN));
+        corrected_ranges.push_back(dict_ref_double(measurement, "corrected_range_m", NAN));
+        timestamps.push_back(dict_ref_double(measurement, "measurement_timestamp", NAN));
+        fine_flags.push_back(metadata_true(measurement, "fine_correction_valid") ? 1 : 0);
+        pmt::vector_set(observations, i, measurement);
+        auto quality = pmt::make_dict();
+        for (const auto* key : {"frame_id_valid", "valid", "snr", "quality",
+                "coarse_metric", "payload_metric", "phase_slope", "phase_residual",
+                "prs_cp_cfo_hz", "prs_cp_cfo_coherence", "selected_cfo_hz",
+                "prs_channel_cfo_hz", "residual_cfo_hz", "channel_coherence"}) {
+            if (pmt::dict_has_key(measurement, pmt::mp(key)))
+                quality = pmt::dict_add(quality, pmt::mp(key),
+                    pmt::dict_ref(measurement, pmt::mp(key), pmt::PMT_NIL));
+        }
+        pmt::vector_set(diagnostics, i, quality);
+    }
+    auto epoch = pmt::make_dict();
+    epoch = pmt::dict_add(epoch, pmt::mp("cycle_completion_timestamp"), pmt::from_double(c.end));
+    epoch = pmt::dict_add(epoch, pmt::mp("summary_emission_timestamp"), pmt::from_double(d_clock));
+    epoch = pmt::dict_add(epoch, pmt::mp("expected_anchor_ids"), pmt::init_u32vector(d_anchors.size(), d_anchors));
+    epoch = pmt::dict_add(epoch, pmt::mp("fine_correction_valid_flags"), pmt::init_u8vector(fine_flags.size(), fine_flags));
+    epoch = pmt::dict_add(epoch, pmt::mp("per_anchor_quality_diagnostics"), diagnostics);
+    epoch = pmt::dict_add(epoch, pmt::mp("corrected_ranges_m"), pmt::init_f64vector(corrected_ranges.size(), corrected_ranges));
+    epoch = pmt::dict_add(epoch, pmt::mp("integer_ranges_m"), pmt::init_f64vector(integer_ranges.size(), integer_ranges));
+    epoch = pmt::dict_add(epoch, pmt::mp("measurements"), observations);
+    epoch = pmt::dict_add(epoch, pmt::mp("measurement_timestamps"), pmt::init_f64vector(timestamps.size(), timestamps));
+    epoch = pmt::dict_add(epoch, pmt::mp("observed_anchor_ids"), pmt::init_u32vector(d_anchors.size(), d_anchors));
+    epoch = pmt::dict_add(epoch, pmt::mp("reference_timestamp"), pmt::from_double(c.t1));
+    epoch = pmt::dict_add(epoch, pmt::mp("cycle_sequence"), pmt::from_uint64(c.sequence));
+    epoch = pmt::dict_add(epoch, pmt::mp("poll_id"), pmt::from_uint64(c.poll));
+    message_port_pub(pmt::mp("epoch_out"), pmt::cons(epoch, pmt::PMT_NIL));
 }
 void prs_multi_anchor_cycle_impl::handle_clock(pmt::pmt_t msg)
 {

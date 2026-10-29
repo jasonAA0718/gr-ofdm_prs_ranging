@@ -29,6 +29,8 @@ private:
         std::vector<slot> slots;
         std::set<uint32_t> pending;
         std::set<uint32_t> received;
+        // Complete accepted metadata, keyed by decoded packet anchor identity.
+        std::map<uint32_t, pmt::pmt_t> measurements;
         uint64_t duplicates = 0, identity_mismatches = 0, delay_mismatches = 0, crc_failures = 0;
     };
     double d_samp_rate, d_frame_s, d_before, d_after, d_grace;
@@ -43,6 +45,7 @@ private:
     void handle_measurement(pmt::pmt_t msg);
     void handle_range(pmt::pmt_t msg);
     void finish(const cycle& c, const char* reason);
+    void publish_epoch(const cycle& c);
     void diagnostic(pmt::pmt_t meta, const char* reason);
     cycle* locate(pmt::pmt_t meta);
 };

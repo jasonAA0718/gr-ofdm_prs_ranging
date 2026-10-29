@@ -46,7 +46,6 @@ prs_ssrtt_solver_impl::prs_ssrtt_solver_impl(double samp_rate, bool enable_profi
       d_samp_rate(samp_rate),
       d_enable_profiling(enable_profiling)
 {
-    if (!std::isfinite(samp_rate) || samp_rate <= 0) throw std::invalid_argument("invalid solver sample rate");
     message_port_register_in(pmt::mp("tx_time_in"));
     message_port_register_in(pmt::mp("measurement_in"));
     message_port_register_out(pmt::mp("ssrtt_out"));
@@ -63,17 +62,20 @@ void prs_ssrtt_solver_impl::handle_tx_time(pmt::pmt_t msg)
     if (!pmt::is_dict(msg)) {
         return;
     }
+    // Expire cycle erase
     if (metadata_true(msg, "expire_cycle")) {
         const auto poll = dict_ref_uint64(msg, "poll_id", 65536);
         const auto found = d_poll_tx_times.find(poll);
-        if (found != d_poll_tx_times.end() && found->second.managed &&
-            found->second.sequence == dict_ref_uint64(msg, "cycle_sequence", 0)) {
+        // Check the d_poll_tx_times with entry msg poll_id is the same cycle_sequence as the msg, if so, erase it.
+        if (found != d_poll_tx_times.end() && // poll in d_poll_tx_times
+            found->second.managed &&          // only erase if the poll is managed
+            found->second.sequence == dict_ref_uint64(msg, "cycle_sequence", 0)){// same cycle_sequence
             d_poll_tx_times.erase(found);
         }
         return;
     }
-    const uint64_t packet_type =
-        dict_ref_uint64(msg, "packet_type", prs_packet_type_poll);
+    const uint64_t packet_type = dict_ref_uint64(msg, "packet_type", prs_packet_type_poll);
+    // Response packet type do not calculate measurement.
     if (packet_type != prs_packet_type_poll) {
         return;
     }
@@ -82,6 +84,7 @@ void prs_ssrtt_solver_impl::handle_tx_time(pmt::pmt_t msg)
     const double t1 = dict_ref_double(msg, "tx_time_secs", 0.0) +
                       dict_ref_double(msg, "tx_time_frac", 0.0);
     if (!std::isfinite(t1)) return;
+    // Create a poll tx event.
     d_poll_tx_times[poll_id] = poll_tx{t1, dict_ref_uint64(msg, "cycle_sequence", 0),
                                                metadata_true(msg, "cycle_managed")};
     report.checkpoint("tx_time_store");
@@ -97,9 +100,11 @@ void prs_ssrtt_solver_impl::handle_measurement(pmt::pmt_t msg)
         return;
     }
     pmt::pmt_t meta = pmt::car(msg);
+    // check if the frame_id is valid, if not, ignore the measurement.
     if (!pmt::to_bool(pmt::dict_ref(meta, pmt::mp("frame_id_valid"), pmt::PMT_F))) {
         return;
     }
+    // check if the packet_type is response, if not, ignore the measurement.
     if (dict_ref_uint64(meta, "packet_type", 0) != prs_packet_type_response) {
         return;
     }
@@ -112,14 +117,16 @@ void prs_ssrtt_solver_impl::handle_measurement(pmt::pmt_t msg)
     if (found == d_poll_tx_times.end()) {
         return;
     }
-
+    // Check cycle manage is operated or not
+    // if the cycle is managed, check the cycle_sequence is the same as the stored one, 
+    // if not, for old version single link RTT, keep the RTT calculation.
     if (found->second.managed && found->second.sequence != dict_ref_uint64(meta, "cycle_sequence", 0)) return;
     const double t1 = found->second.t1;
     const double t4 = dict_ref_time_tuple(meta, "rx_time", NAN);
     if (!std::isfinite(t4)) {
         return;
     }
-
+    // The range calculation. RTT = t4 - t1 - reply_delay
     const double reply_delay_s = static_cast<double>(reply_delay_samples) / d_samp_rate;
     const double rtt_s = t4 - t1 - reply_delay_s;
     const double tof_s = rtt_s/ 2.0 - 5.808278798530661e-06; // the processing delay of the response packet;
@@ -133,7 +140,6 @@ void prs_ssrtt_solver_impl::handle_measurement(pmt::pmt_t msg)
         ? c_mps / (2.0 * d_samp_rate) * (poll_fine_samples + response_fine_samples) : NAN;
     const double corrected_range_m = fine_valid ? range_m + correction_m : NAN;
     const double response_fine_delay_s = response_fine_samples / d_samp_rate;
-    // const double response_phase_range_correction_m = 0.5 * c_mps * response_fine_delay_s;
     report.checkpoint("ssrtt_calculation");
 
     auto stage_start = report.mark();

@@ -8,8 +8,11 @@
 
 namespace gr {
 namespace ofdm_prs_ranging {
-// Static two-anchor ranging cycles. Delays/margins are seconds in the initiator
+// Static 1..8-anchor ranging cycles. Delays/margins are seconds in the initiator
 // UHD clock domain. window_after_s is the margin AFTER the complete response.
+// epoch_out publishes a (dictionary, NIL) PDU only after normal completion of
+// a cycle with all configured ranges and at least three anchors. Epoch arrays
+// and full measurement metadata follow configured anchor_ids order.
 class OFDM_PRS_RANGING_API prs_multi_anchor_cycle : virtual public gr::block
 {
 public:

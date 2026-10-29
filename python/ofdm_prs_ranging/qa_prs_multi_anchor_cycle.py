@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Focused static two-anchor lifecycle and real packet/acquisition regression."""
+"""N-anchor complete epochs plus Phase-C lifecycle/PHY regression."""
 import math
 import time
 import numpy as np
@@ -52,16 +52,19 @@ class qa_prs_multi_anchor_cycle(gr_unittest.TestCase):
         block.to_basic_block()._post(pmt.intern(port), message)
 
     def setup_cycle(self, **kwargs):
+        self.anchor_count = len(kwargs.get('anchor_ids', [0, 1]))
         self.cycle = prs.prs_multi_anchor_cycle(**kwargs)
         self.solver = prs.prs_ssrtt_solver(self.FS)
         self.ranges, self.summaries, self.diag, self.windows = [blocks.message_debug() for _ in range(4)]
         self.solver_results = blocks.message_debug()
+        self.epochs = blocks.message_debug()
         for source, port, target, target_port in (
             (self.cycle, 'solver_tx_out', self.solver, 'tx_time_in'),
             (self.cycle, 'solver_measurement_out', self.solver, 'measurement_in'),
             (self.solver, 'ssrtt_out', self.cycle, 'range_in'),
             (self.cycle, 'measurement_out', self.ranges, 'store'),
             (self.cycle, 'cycle_out', self.summaries, 'store'),
+            (self.cycle, 'epoch_out', self.epochs, 'store'),
             (self.cycle, 'diagnostic_out', self.diag, 'store'),
             (self.cycle, 'window_out', self.windows, 'store')):
             self.tb.msg_connect(source, port, target, target_port)
@@ -72,8 +75,8 @@ class qa_prs_multi_anchor_cycle(gr_unittest.TestCase):
         previous = self.windows.num_messages()
         self.post(self.cycle, 'tx_time_in', meta(packet_type=1, poll_id=poll,
                   tx_time_secs=math.floor(t1), tx_time_frac=t1 - math.floor(t1)))
-        self.wait_count(self.windows, previous + 2)
-        return [self.windows.get_message(previous + i) for i in range(2)]
+        self.wait_count(self.windows, previous + self.anchor_count)
+        return [self.windows.get_message(previous + i) for i in range(self.anchor_count)]
 
     def response(self, window, anchor=None, delay=None, crc=True, fine=True):
         anchor = int(get(window, 'expected_anchor_id')) if anchor is None else anchor
@@ -98,7 +101,8 @@ class qa_prs_multi_anchor_cycle(gr_unittest.TestCase):
         return self.summaries.get_message(count - 1)
 
     def test_schedule_validation_and_rounding(self):
-        for ids, delays in (([0], [.031]), ([0, 0], self.DELAYS), ([0, 8], self.DELAYS),
+        for ids, delays in (([], []), (list(range(9)), [.031 + .05*i for i in range(9)]),
+                            ([0, 0], self.DELAYS), ([0, 8], self.DELAYS),
                             ([0, 256], self.DELAYS), ([0, 1], [0, .081]),
                             ([0, 1], [float('nan'), .081]), ([0, 1], [float('inf'), .081]),
                             ([0, 1], [.031, .032]), ([0, 1], [.031, 1.0]),
@@ -131,6 +135,126 @@ class qa_prs_multi_anchor_cycle(gr_unittest.TestCase):
         self.assertEqual(list(get(summary, 'received_anchor_ids')), [0, 1])
         self.assertEqual(list(get(summary, 'missing_anchor_ids')), [])
         self.assertEqual(get(summary, 'duplicate_response_count'), 1)
+        self.assertEqual(self.epochs.num_messages(), 0)
+
+    def test_one_anchor_remains_ranging_only(self):
+        self.setup_cycle(anchor_ids=[7], time_delays=[.031])
+        windows = self.open_cycle()
+        self.post(self.cycle, 'measurement_in', self.response(windows[0]))
+        self.wait_count(self.ranges, 1)
+        summary = self.close_cycle(windows, 1)
+        self.assertEqual(list(get(summary, 'expected_anchor_ids')), [7])
+        self.assertEqual(list(get(summary, 'received_anchor_ids')), [7])
+        self.assertEqual(self.epochs.num_messages(), 0)
+
+    def check_complete_epoch(self, count):
+        # Configured order differs from numerical order and message arrival.
+        ids = [3, 1, 6, 2, 0, 7, 4, 5][:count]
+        delays = [.031 + .05*i for i in range(count)]
+        self.setup_cycle(anchor_ids=ids, time_delays=delays)
+        windows = self.open_cycle()
+        for index in reversed(range(count)):
+            message = self.response(windows[index], fine=(index != 1))
+            m = pmt.dict_add(pmt.car(message), pmt.intern('snr'), pmt.from_double(10.0 + index))
+            self.post(self.cycle, 'measurement_in', pmt.cons(m, pmt.PMT_NIL))
+        self.wait_count(self.ranges, count)
+        self.post(self.cycle, 'measurement_in', self.response(windows[0]))
+        self.wait_count(self.diag, 1)
+        self.assertEqual(self.epochs.num_messages(), 0)
+        self.assertEqual(self.summaries.num_messages(), 0)
+        end = max(float(get(w, 'window_end')) for w in windows)
+        # All measurements are already present, but the processing grace and
+        # final receive opportunity must still run to their normal end.
+        self.post(self.cycle, 'clock_in', meta(clock_time=end + .099))
+        time.sleep(.025)
+        self.assertEqual(self.cycle.active_cycle_count(), 1)
+        self.assertEqual(self.epochs.num_messages(), 0)
+        summary = self.close_cycle(windows, 1)
+        self.wait_count(self.epochs, 1)
+        epoch = self.epochs.get_message(0)
+        self.assertEqual(list(get(epoch, 'expected_anchor_ids')), ids)
+        self.assertEqual(list(get(epoch, 'observed_anchor_ids')), ids)
+        self.assertEqual(get(epoch, 'poll_id'), 42)
+        self.assertEqual(get(epoch, 'cycle_sequence'), get(windows[0], 'cycle_sequence'))
+        self.assertEqual(get(epoch, 'reference_timestamp'), 100.0)
+        self.assertAlmostEqual(get(epoch, 'cycle_completion_timestamp'), end)
+        self.assertEqual(get(summary, 'accepted_measurement_count'), count)
+        self.assertEqual(get(summary, 'duplicate_response_count'), 1)
+        observations = pmt.dict_ref(pmt.car(epoch), pmt.intern('measurements'), pmt.PMT_NIL)
+        diagnostics = pmt.dict_ref(pmt.car(epoch), pmt.intern('per_anchor_quality_diagnostics'), pmt.PMT_NIL)
+        by_anchor = {int(get(self.ranges.get_message(i), 'anchor_id')):
+                     self.ranges.get_message(i) for i in range(count)}
+        for index, anchor in enumerate(ids):
+            original = by_anchor[anchor]
+            observation = pmt.vector_ref(observations, index)
+            self.assertEqual(get(observation, 'anchor_id'), anchor)
+            self.assertEqual(get(observation, 'poll_id'), 42)
+            self.assertEqual(get(observation, 'cycle_sequence'), get(epoch, 'cycle_sequence'))
+            self.assertEqual(get(observation, 'reply_delay_samples'), round(delays[index]*self.FS))
+            self.assertAlmostEqual(get(epoch, 'integer_ranges_m')[index], get(original, 'integer_range_m'))
+            self.assertAlmostEqual(get(epoch, 'measurement_timestamps')[index], get(original, 't4_rx_time'))
+            self.assertAlmostEqual(get(observation, 'measurement_timestamp'), get(original, 't4_rx_time'))
+            self.assertEqual(get(pmt.vector_ref(diagnostics, index), 'snr'), 10.0 + index)
+            self.assertEqual(bool(get(epoch, 'fine_correction_valid_flags')[index]), index != 1)
+            if index == 1:
+                self.assertTrue(math.isfinite(get(epoch, 'integer_ranges_m')[index]))
+                self.assertTrue(math.isnan(get(epoch, 'corrected_ranges_m')[index]))
+                self.assertTrue(math.isnan(get(observation, 'poll_fine_delay_samples')))
+            else:
+                self.assertAlmostEqual(get(epoch, 'corrected_ranges_m')[index], get(original, 'corrected_range_m'))
+        self.post(self.cycle, 'clock_in', meta(clock_time=end + 1.0))
+        time.sleep(.025)
+        self.assertEqual(self.epochs.num_messages(), 1)
+        self.assertEqual(self.cycle.active_cycle_count(), 0)
+
+    def test_three_anchors_complete_epoch(self):
+        self.check_complete_epoch(3)
+
+    def test_four_anchors_complete_epoch(self):
+        self.check_complete_epoch(4)
+
+    def test_eight_anchors_complete_epoch(self):
+        self.check_complete_epoch(8)
+
+    def test_four_anchor_missing_and_sequential_epoch_isolation(self):
+        ids = [0, 1, 2, 3]
+        self.setup_cycle(anchor_ids=ids, time_delays=[.031, .081, .131, .181])
+        old = None
+        for cycle_index in range(3):
+            windows = self.open_cycle(poll=65535, t1=100.0 + cycle_index)
+            if old is not None:
+                self.post(self.cycle, 'measurement_in', old)
+                self.post(self.cycle, 'range_in', old)
+            # Complete / missing last anchor / complete: never borrow a range
+            # from the preceding cycle, even when the wire poll ID is reused.
+            accepted = 3 if cycle_index == 1 else 4
+            for index in range(accepted):
+                response = self.response(windows[index])
+                if old is None: old = response
+                self.post(self.cycle, 'measurement_in', response)
+            self.wait_count(self.ranges, 4 if cycle_index == 0 else 7 if cycle_index == 1 else 11)
+            summary = self.close_cycle(windows, cycle_index + 1)
+            self.assertEqual(list(get(summary, 'received_anchor_ids')), ids[:accepted])
+            self.assertEqual(list(get(summary, 'missing_anchor_ids')), ids[accepted:])
+            self.assertEqual(list(get(summary, 'expected_anchor_ids')), ids)
+            expected_epochs = 1 if cycle_index < 2 else 2
+            self.wait_count(self.epochs, expected_epochs)
+        self.assertNotEqual(get(self.epochs.get_message(0), 'cycle_sequence'),
+                            get(self.epochs.get_message(1), 'cycle_sequence'))
+
+    def test_complete_observations_on_shutdown_do_not_publish_epoch(self):
+        self.setup_cycle(anchor_ids=[0, 1, 2], time_delays=[.031, .081, .131])
+        windows = self.open_cycle()
+        for window in windows:
+            self.post(self.cycle, 'measurement_in', self.response(window))
+        self.wait_count(self.ranges, 3)
+        # Invoke the block's shutdown while sinks are still able to receive
+        # messages; normal WINDOW_EXPIRED finalization has not happened.
+        self.cycle.stop()
+        self.wait_count(self.summaries, 1)
+        self.assertEqual(get(self.summaries.get_message(0), 'completion_reason'), 'STOPPED_INCOMPLETE')
+        self.assertEqual(self.epochs.num_messages(), 0)
+        self.assertEqual(self.cycle.active_cycle_count(), 0)
 
     def test_missing_each_anchor_crc_and_fine_invalid(self):
         self.setup_cycle()
@@ -293,7 +417,11 @@ class qa_prs_multi_anchor_cycle(gr_unittest.TestCase):
                         self.assertIn(get(row, 'anchor_id'), expected)
                         self.assertEqual(get(row, 'anchor_id'), get(row, 'expected_anchor_id'))
                         anchor = int(get(row, 'anchor_id'))
-                        self.assertAlmostEqual(get(row, 'rtt_s'), excess_samples[anchor] / fs, delta=1e-10)
+                        # The current solver exposes canonical timestamps and
+                        # decoded delay rather than the redundant rtt_s alias.
+                        rtt = (get(row, 't4_rx_time') - get(row, 't1_tx_time') -
+                               get(row, 'reply_delay_samples') / fs)
+                        self.assertAlmostEqual(rtt, excess_samples[anchor] / fs, delta=1e-10)
                         self.assertTrue(math.isfinite(get(row, 'integer_range_m')))
                         self.assertTrue(get(row, 'fine_correction_valid'))
                         self.assertAlmostEqual(get(row, 'poll_fine_delay_samples'), .25)

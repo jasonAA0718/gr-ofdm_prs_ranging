@@ -1,12 +1,12 @@
 id: ofdm_prs_ranging_prs_multi_anchor_cycle
-label: PRS Two-Anchor Ranging Cycle
+label: PRS Multi-Anchor Ranging Cycle
 category: '[ofdm_prs_ranging]'
 templates:
   imports: from gnuradio import ofdm_prs_ranging
   make: ofdm_prs_ranging.prs_multi_anchor_cycle(${samp_rate}, ${anchor_ids}, ${time_delays}, ${preamble_len}, ${preamble_repeats}, ${coarse_sync_len}, ${window_before_s}, ${window_after_s}, ${processing_grace_s})
 parameters:
 - {id: samp_rate, label: Sample Rate, dtype: real, default: 30e6}
-- {id: anchor_ids, label: Expected Anchor IDs (exactly two), dtype: int_vector, default: '[0, 1]'}
+- {id: anchor_ids, label: Expected Anchor IDs (1..8), dtype: int_vector, default: '[0, 1]'}
 - {id: time_delays, label: Expected Response Delays (seconds), dtype: real_vector, default: '[0.031, 0.081]'}
 - {id: preamble_len, label: Response Preamble Length, dtype: int, default: 128}
 - {id: preamble_repeats, label: Response Preamble Repeats, dtype: int, default: 17}
@@ -25,5 +25,15 @@ outputs:
 - {label: solver_measurement_out, domain: message}
 - {label: measurement_out, domain: message}
 - {label: cycle_out, domain: message}
+- {label: epoch_out, domain: message, optional: true}
 - {label: diagnostic_out, domain: message, optional: true}
+documentation: |-
+  Configure 1..8 unique anchor IDs (0..7) and corresponding static delays in seconds.
+  The POLL does not carry the schedule. Complete receive windows must not overlap.
+  Individual ranges are published on measurement_out; every finalized cycle has a cycle_out summary.
+  epoch_out publishes (metadata, NIL) only at normal finalization after processing grace,
+  when ALL configured anchors have accepted ranges and at least three anchors are configured.
+  Epoch arrays and full measurement dictionaries follow configured anchor_ids order.
+  Invalid fine correction preserves the integer range, NaN corrected value and validity flag.
+  Missing anchors, one/two-anchor cycles and shutdown do not produce epochs. No position is computed.
 file_format: 1
