@@ -9,8 +9,7 @@ namespace gr {
 namespace ofdm_prs_ranging {
 
 
-struct range_observation
-{
+struct range_observation {
     uint32_t anchor_id;
     std::array<double, 3> anchor_pos;
     double range;
@@ -123,37 +122,50 @@ void prs_position_solver_impl::handle_epoch(pmt::pmt_t msg)
         const auto& position = d_anchor_positions_m[anchor_id];
 
         // Store the target range measurement
-        valid_obs.anchor_id  = anchor_id;
-        valid_obs.anchor_pos = {position[0], position[1], position[2]};
+        valid_obs.anchor_id = anchor_id;
+        valid_obs.anchor_pos = { position[0], position[1], position[2] };
         valid_obs.used_fine_correction = use_fine;
-        valid_obs.range     = range;
-        valid_obs.weight    = 1.0;
+        valid_obs.range = range;
+        valid_obs.weight = 1.0;
         obs.push_back(valid_obs);
     }
     // if (obs.size() < 3) {
     //     // Insufficient Observations may add fail diagnostic_out but later.
     //     return;
     // }
+    std::vector<double> selected_ranges;
+    std::vector<uint32_t> selected_anchor_ids;
+    std::vector<uint8_t> selected_fine_flags;
+    for (const auto& measurement : obs) {
+        const uint32_t anchor_id = measurement.anchor_id;
+        const double range = measurement.range;
+        const double weight = measurement.weight;
+        selected_ranges.push_back(range);
+        selected_anchor_ids.push_back(anchor_id);
+        selected_fine_flags.push_back(measurement.used_fine_correction ? 1 : 0);
+    }
 
 
     auto result = pmt::make_dict();
-
-    result = pmt::dict_add( result, 
-                            pmt::mp("select_range"), 
-                            pmt::init_f64vector(obs.range.size(), obs.range));
+    result = pmt::dict_add( result,
+                        pmt::mp("used_fine_correction_flags"),
+                        pmt::init_u8vector(selected_fine_flags.size(), selected_fine_flags));
+    result = pmt::dict_add( result,
+                            pmt::mp("selected_ranges_m"),
+                            pmt::init_f64vector(selected_ranges.size(), selected_ranges));
     result = pmt::dict_add( result, 
                             pmt::mp("positioning_anchor_count"), 
                             pmt::from_uint64(obs.size()));
-    result = pmt::dict_add( result, 
-                            pmt::mp("anchor_id"), 
-                            pmt::init_u32vector(obs.anchor_id.size(),obs.anchor_id));
+    result = pmt::dict_add( result,
+                            pmt::mp("selected_anchor_ids"),
+                            pmt::init_u32vector(selected_anchor_ids.size(), selected_anchor_ids));
     result = pmt::dict_add( result,
                             pmt::mp("poll_id"),
                             pmt::dict_ref(meta, pmt::mp("poll_id"), pmt::PMT_NIL));
-    
+
+
 
     message_port_pub(pmt::mp("diagnostic_out"), pmt::cons(result, pmt::PMT_NIL));
-    
 }
 
 
