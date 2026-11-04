@@ -56,7 +56,7 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         ##################################################
 
         self.uhd_usrp_source_0_0 = uhd.usrp_source(
-            ",".join(("serial=32712EF", "recv_buff_size=25000000,num_recv_frames=1024")),
+            ",".join(("serial=34D0563", "recv_buff_size=25000000,num_recv_frames=1024")),
             uhd.stream_args(
                 cpu_format="fc32",
                 args='',
@@ -73,7 +73,7 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         self.uhd_usrp_source_0_0.set_rx_agc(True, 0)
         self.uhd_usrp_source_0_0.set_min_output_buffer(1048576)
         self.uhd_usrp_sink_0 = uhd.usrp_sink(
-            ",".join(("serial=32712EF", '')),
+            ",".join(("serial=34D0563", '')),
             uhd.stream_args(
                 cpu_format="fc32",
                 args='',
@@ -105,14 +105,12 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger(obs_log, 1, False)
         self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 512, 512, 127, 13990001, False, 2)
         self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/complete_epoch_acquisition.csv", "initiator", 1)
-        self.positioning_epoch_debug_0 = blocks.message_debug(False, gr.log_levels.trace)
         self.ofdm_prs_ranging_prs_position_solver_0 = ofdm_prs_ranging.prs_position_solver(
             [0, 1, 2],
             [[0,0,0], [6,0,0], [0,8,0]],
             0.0
         )
         self.cycle_summary_debug = blocks.message_debug(False, gr.log_levels.info)
-        self.cycle_diagnostic_debug_0 = blocks.message_debug(False, gr.log_levels.err)
         self.cycle_diagnostic_debug = blocks.message_debug(False, gr.log_levels.err)
         self.blocks_message_strobe_0 = blocks.message_strobe(pmt.PMT_T, 500)
 
@@ -121,8 +119,6 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         # Connections
         ##################################################
         self.msg_connect((self.blocks_message_strobe_0, 'strobe'), (self.prs_rx_timekeeper_0, 'trigger_in'))
-        self.msg_connect((self.ofdm_prs_ranging_prs_position_solver_0, 'diagnostic_out'), (self.cycle_diagnostic_debug_0, 'print'))
-        self.msg_connect((self.ofdm_prs_ranging_prs_position_solver_0, 'position_out'), (self.positioning_epoch_debug_0, 'print'))
         self.msg_connect((self.prs_channel_estimator_0, 'event_out'), (self.prs_acquisition_logger_0, 'frame_in'))
         self.msg_connect((self.prs_channel_estimator_0, 'channel_out'), (self.prs_phase_slope_estimator_0, 'channel_in'))
         self.msg_connect((self.prs_fft_receiver_0, 'symbols_out'), (self.prs_channel_estimator_0, 'symbols_in'))
@@ -130,12 +126,11 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         self.msg_connect((self.prs_frame_detector_0_0, 'frame_out'), (self.prs_fft_receiver_0, 'frame_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'diagnostic_out'), (self.cycle_diagnostic_debug, 'print'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'cycle_out'), (self.cycle_summary_debug, 'print'))
-        self.msg_connect((self.prs_multi_anchor_cycle_0, 'cycle_out'), (self.cycle_summary_debug, 'store'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'epoch_out'), (self.ofdm_prs_ranging_prs_position_solver_0, 'epoch_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'measurement_out'), (self.prs_csv_logger_0, 'measurement_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'window_out'), (self.prs_frame_detector_0_0, 'tx_time_in'))
-        self.msg_connect((self.prs_multi_anchor_cycle_0, 'solver_measurement_out'), (self.prs_ssrtt_solver_0, 'measurement_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'solver_tx_out'), (self.prs_ssrtt_solver_0, 'tx_time_in'))
+        self.msg_connect((self.prs_multi_anchor_cycle_0, 'solver_measurement_out'), (self.prs_ssrtt_solver_0, 'measurement_in'))
         self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_multi_anchor_cycle_0, 'measurement_in'))
         self.msg_connect((self.prs_rx_timekeeper_0, 'clock_out'), (self.prs_multi_anchor_cycle_0, 'clock_in'))
         self.msg_connect((self.prs_rx_timekeeper_0, 'timed_trigger_out'), (self.prs_source, 'trigger'))

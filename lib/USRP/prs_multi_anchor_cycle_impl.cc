@@ -253,7 +253,16 @@ void prs_multi_anchor_cycle_impl::finish(const cycle& c, const char* reason)
     meta = pmt::dict_add(meta, pmt::mp("poll_tx_timestamp"), pmt::from_double(c.t1));
     meta = pmt::dict_add(meta, pmt::mp("poll_id"), pmt::from_uint64(c.poll));
     meta = pmt::dict_add(meta, pmt::mp("cycle_sequence"), pmt::from_uint64(c.sequence));
-    message_port_pub(pmt::mp("cycle_out"), pmt::cons(meta, pmt::PMT_NIL));
+    // Per-anchor SNR follows expected_anchor_ids; unavailable values stay NaN.
+    std::vector<double> anchor_snrs_db;
+    for (auto anchor : d_anchors) {
+        const auto measurement = c.measurements.find(anchor);
+        anchor_snrs_db.push_back(measurement == c.measurements.end()
+            ? NAN : dict_ref_double(measurement->second, "snr", NAN));
+    }
+    const auto summary = pmt::dict_add(meta, pmt::mp("anchor_snrs_db"),
+        pmt::init_f64vector(anchor_snrs_db.size(), anchor_snrs_db));
+    message_port_pub(pmt::mp("cycle_out"), pmt::cons(summary, pmt::PMT_NIL));
     // Finalized normal cycles only. Shutdown never publishes an epoch, even
     // when every range happened to arrive before the scheduled end.
     if (std::string(reason) == "WINDOWS_EXPIRED" && d_anchors.size() >= 2 &&

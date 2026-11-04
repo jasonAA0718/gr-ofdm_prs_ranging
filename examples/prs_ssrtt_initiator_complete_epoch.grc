@@ -201,7 +201,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1432, 184.0]
+    coordinate: [1288, 72.0]
     rotation: 0
     state: disabled
 - name: zc_length
@@ -245,22 +245,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1232, 1648.0]
-    rotation: 0
-    state: enabled
-- name: cycle_diagnostic_debug_0
-  id: blocks_message_debug
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: Ranging cycle summary/diagnostics; epoch_out is separate.
-    en_uvec: 'False'
-    log_level: err
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [1800, 1664.0]
+    coordinate: [1224, 1616.0]
     rotation: 0
     state: enabled
 - name: cycle_summary_debug
@@ -275,7 +260,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1232, 1328.0]
+    coordinate: [1224, 1344.0]
     rotation: 0
     state: enabled
 - name: ofdm_prs_ranging_prs_position_solver_0
@@ -293,22 +278,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1248, 1528.0]
-    rotation: 0
-    state: enabled
-- name: positioning_epoch_debug_0
-  id: blocks_message_debug
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: Complete observations from all configured anchors; no position calculation.
-    en_uvec: 'False'
-    log_level: trace
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [1792, 1512.0]
+    coordinate: [1224, 1520.0]
     rotation: 0
     state: enabled
 - name: prs_acquisition_logger_0
@@ -645,7 +615,7 @@ blocks:
     clock_source6: ''
     clock_source7: ''
     comment: ''
-    dev_addr: '"serial=32712EF"'
+    dev_addr: '"serial=34D0563"'
     dev_args: ''
     gain0: tx_gain
     gain1: '0'
@@ -986,7 +956,7 @@ blocks:
     dc_offs_enb7: default
     dc_offs_enb8: default
     dc_offs_enb9: default
-    dev_addr: '"serial=32712EF"'
+    dev_addr: '"serial=34D0563"'
     dev_args: '"recv_buff_size=25000000,num_recv_frames=1024"'
     gain0: rx_gain
     gain1: '0'
@@ -1380,17 +1350,12 @@ blocks:
 
 connections:
 - [blocks_message_strobe_0, strobe, prs_rx_timekeeper_0, trigger_in]
-- [ofdm_prs_ranging_prs_position_solver_0, diagnostic_out, cycle_diagnostic_debug_0,
-  print]
-- [ofdm_prs_ranging_prs_position_solver_0, position_out, positioning_epoch_debug_0,
-  print]
 - [prs_channel_estimator_0, channel_out, prs_phase_slope_estimator_0, channel_in]
 - [prs_channel_estimator_0, event_out, prs_acquisition_logger_0, frame_in]
 - [prs_fft_receiver_0, symbols_out, prs_channel_estimator_0, symbols_in]
 - [prs_frame_detector_0_0, event_out, prs_acquisition_logger_0, frame_in]
 - [prs_frame_detector_0_0, frame_out, prs_fft_receiver_0, frame_in]
 - [prs_multi_anchor_cycle_0, cycle_out, cycle_summary_debug, print]
-- [prs_multi_anchor_cycle_0, cycle_out, cycle_summary_debug, store]
 - [prs_multi_anchor_cycle_0, diagnostic_out, cycle_diagnostic_debug, print]
 - [prs_multi_anchor_cycle_0, epoch_out, ofdm_prs_ranging_prs_position_solver_0, epoch_in]
 - [prs_multi_anchor_cycle_0, measurement_out, prs_csv_logger_0, measurement_in]

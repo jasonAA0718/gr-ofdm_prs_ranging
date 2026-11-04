@@ -38,7 +38,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: int(0.031*samp_rate)/samp_rate
+    value: int(0.041*samp_rate)/samp_rate
   states:
     bus_sink: false
     bus_source: false
@@ -67,7 +67,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [960, 40.0]
+    coordinate: [1016, 40.0]
     rotation: 0
     state: enabled
 - name: premble_length
@@ -98,7 +98,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '58'
+    value: '55'
   states:
     bus_sink: false
     bus_source: false
@@ -122,7 +122,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '63'
+    value: '65'
   states:
     bus_sink: false
     bus_source: false
@@ -139,9 +139,9 @@ blocks:
     min_len: '200'
     orient: QtCore.Qt.Horizontal
     rangeType: float
-    start: '40'
-    step: '1'
-    stop: '80'
+    start: '20'
+    step: '0.2'
+    stop: '89.8'
     value: '45'
     widget: counter_slider
   states:
@@ -433,7 +433,7 @@ blocks:
     coordinate: [1528, 1280.0]
     rotation: 0
     state: enabled
-- name: uhd_usrp_sink_0
+- name: uhd_usrp_sink_0_0
   id: uhd_usrp_sink
   parameters:
     affinity: ''
@@ -707,15 +707,15 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1168, 332.0]
+    coordinate: [1424, 380.0]
     rotation: 0
     state: enabled
-- name: uhd_usrp_source_0_0
+- name: uhd_usrp_source_0_0_0
   id: uhd_usrp_source
   parameters:
     affinity: ''
     alias: ''
-    ant0: '"TX/RX"'
+    ant0: '"RX2"'
     ant1: '"RX2"'
     ant10: '"RX2"'
     ant11: '"RX2"'
@@ -1084,7 +1084,7 @@ blocks:
     nchan: '1'
     num_mboards: '1'
     otw: ''
-    rx_agc0: Default
+    rx_agc0: Disabled
     rx_agc1: Default
     rx_agc10: Default
     rx_agc11: Default
@@ -1143,7 +1143,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [40, 172.0]
+    coordinate: [80, 212.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_0
@@ -1313,12 +1313,11 @@ connections:
 - [prs_phase_slope_estimator_0, measurement_out, prs_ssrtt_solver_0, measurement_in]
 - [prs_rx_timekeeper_0, timed_trigger_out, prs_source, trigger]
 - [prs_source, '0', blocks_file_sink_0, '0']
-- [prs_source, '0', uhd_usrp_sink_0, '0']
+- [prs_source, '0', uhd_usrp_sink_0_0, '0']
 - [prs_source, tx_time_out, virtual_sink_1, '0']
 - [prs_ssrtt_solver_0, ssrtt_out, prs_csv_logger_0, measurement_in]
 - [prs_ssrtt_solver_0, ssrtt_out, prs_text_ui_0, measurement_in]
-- [uhd_usrp_source_0_0, '0', blocks_file_sink_0_0, '0']
-- [uhd_usrp_source_0_0, '0', virtual_sink_0, '0']
+- [uhd_usrp_source_0_0_0, '0', virtual_sink_0, '0']
 - [virtual_source_0, '0', prs_frame_detector_0_0, '0']
 - [virtual_source_0_0, '0', prs_rx_timekeeper_0, '0']
 - [virtual_source_1, '0', prs_frame_detector_0_0, tx_time_in]

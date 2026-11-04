@@ -38,19 +38,19 @@ class prs_ssrtt_initiator(gr.top_block):
         ##################################################
         self.samp_rate = samp_rate = 30000000
         self.zc_length = zc_length = 819
-        self.tx_gain = tx_gain = 63
-        self.rx_gain = rx_gain = 58
+        self.tx_gain = tx_gain = 65
+        self.rx_gain = rx_gain = 55
         self.premble_rep = premble_rep = 17
         self.premble_length = premble_length = 128
         self.obs_log = obs_log = "CSV/obs26d6.csv"
         self.center_freq = center_freq = 1060e6
-        self.Reply_Delay = Reply_Delay = int(0.031*samp_rate)/samp_rate
+        self.Reply_Delay = Reply_Delay = int(0.041*samp_rate)/samp_rate
 
         ##################################################
         # Blocks
         ##################################################
 
-        self.uhd_usrp_source_0_0 = uhd.usrp_source(
+        self.uhd_usrp_source_0_0_0 = uhd.usrp_source(
             ",".join(("serial=32712EF", "recv_buff_size=25000000,num_recv_frames=1024")),
             uhd.stream_args(
                 cpu_format="fc32",
@@ -58,16 +58,17 @@ class prs_ssrtt_initiator(gr.top_block):
                 channels=list(range(0,1)),
             ),
         )
-        self.uhd_usrp_source_0_0.set_subdev_spec('A:A', 0)
-        self.uhd_usrp_source_0_0.set_samp_rate(samp_rate)
-        self.uhd_usrp_source_0_0.set_time_unknown_pps(uhd.time_spec(0))
+        self.uhd_usrp_source_0_0_0.set_subdev_spec('A:A', 0)
+        self.uhd_usrp_source_0_0_0.set_samp_rate(samp_rate)
+        self.uhd_usrp_source_0_0_0.set_time_unknown_pps(uhd.time_spec(0))
 
-        self.uhd_usrp_source_0_0.set_center_freq(center_freq, 0)
-        self.uhd_usrp_source_0_0.set_antenna("TX/RX", 0)
-        self.uhd_usrp_source_0_0.set_bandwidth(samp_rate, 0)
-        self.uhd_usrp_source_0_0.set_gain(rx_gain, 0)
-        self.uhd_usrp_source_0_0.set_min_output_buffer(1048576)
-        self.uhd_usrp_sink_0 = uhd.usrp_sink(
+        self.uhd_usrp_source_0_0_0.set_center_freq(center_freq, 0)
+        self.uhd_usrp_source_0_0_0.set_antenna("RX2", 0)
+        self.uhd_usrp_source_0_0_0.set_bandwidth(samp_rate, 0)
+        self.uhd_usrp_source_0_0_0.set_rx_agc(False, 0)
+        self.uhd_usrp_source_0_0_0.set_gain(rx_gain, 0)
+        self.uhd_usrp_source_0_0_0.set_min_output_buffer(1048576)
+        self.uhd_usrp_sink_0_0 = uhd.usrp_sink(
             ",".join(("serial=32712EF", '')),
             uhd.stream_args(
                 cpu_format="fc32",
@@ -76,15 +77,15 @@ class prs_ssrtt_initiator(gr.top_block):
             ),
             "",
         )
-        self.uhd_usrp_sink_0.set_subdev_spec('A:A', 0)
-        self.uhd_usrp_sink_0.set_samp_rate(samp_rate)
-        self.uhd_usrp_sink_0.set_time_unknown_pps(uhd.time_spec(0))
+        self.uhd_usrp_sink_0_0.set_subdev_spec('A:A', 0)
+        self.uhd_usrp_sink_0_0.set_samp_rate(samp_rate)
+        self.uhd_usrp_sink_0_0.set_time_unknown_pps(uhd.time_spec(0))
 
-        self.uhd_usrp_sink_0.set_center_freq(center_freq, 0)
-        self.uhd_usrp_sink_0.set_antenna("TX/RX", 0)
-        self.uhd_usrp_sink_0.set_bandwidth(samp_rate, 0)
-        self.uhd_usrp_sink_0.set_gain(tx_gain, 0)
-        self.uhd_usrp_sink_0.set_min_output_buffer(1048576)
+        self.uhd_usrp_sink_0_0.set_center_freq(center_freq, 0)
+        self.uhd_usrp_sink_0_0.set_antenna("TX/RX", 0)
+        self.uhd_usrp_sink_0_0.set_bandwidth(samp_rate, 0)
+        self.uhd_usrp_sink_0_0.set_gain(tx_gain, 0)
+        self.uhd_usrp_sink_0_0.set_min_output_buffer(1048576)
         self.prs_text_ui_0 = ofdm_prs_ranging.prs_text_ui("initiator", 1.5, 1.0, 3.0, True)
         self.prs_ssrtt_solver_0 = ofdm_prs_ranging.prs_ssrtt_solver(samp_rate, False)
         self.prs_source = ofdm_prs_ranging.prs_timed_burst_source(
@@ -121,9 +122,9 @@ class prs_ssrtt_initiator(gr.top_block):
         self.msg_connect((self.prs_source, 'tx_time_out'), (self.prs_text_ui_0, 'tx_in'))
         self.msg_connect((self.prs_ssrtt_solver_0, 'ssrtt_out'), (self.prs_csv_logger_0, 'measurement_in'))
         self.msg_connect((self.prs_ssrtt_solver_0, 'ssrtt_out'), (self.prs_text_ui_0, 'measurement_in'))
-        self.connect((self.prs_source, 0), (self.uhd_usrp_sink_0, 0))
-        self.connect((self.uhd_usrp_source_0_0, 0), (self.prs_frame_detector_0_0, 0))
-        self.connect((self.uhd_usrp_source_0_0, 0), (self.prs_rx_timekeeper_0, 0))
+        self.connect((self.prs_source, 0), (self.uhd_usrp_sink_0_0, 0))
+        self.connect((self.uhd_usrp_source_0_0_0, 0), (self.prs_frame_detector_0_0, 0))
+        self.connect((self.uhd_usrp_source_0_0_0, 0), (self.prs_rx_timekeeper_0, 0))
 
 
     def get_samp_rate(self):
@@ -131,11 +132,11 @@ class prs_ssrtt_initiator(gr.top_block):
 
     def set_samp_rate(self, samp_rate):
         self.samp_rate = samp_rate
-        self.set_Reply_Delay(int(0.031*self.samp_rate)/self.samp_rate)
-        self.uhd_usrp_sink_0.set_samp_rate(self.samp_rate)
-        self.uhd_usrp_sink_0.set_bandwidth(self.samp_rate, 0)
-        self.uhd_usrp_source_0_0.set_samp_rate(self.samp_rate)
-        self.uhd_usrp_source_0_0.set_bandwidth(self.samp_rate, 0)
+        self.set_Reply_Delay(int(0.041*self.samp_rate)/self.samp_rate)
+        self.uhd_usrp_sink_0_0.set_samp_rate(self.samp_rate)
+        self.uhd_usrp_sink_0_0.set_bandwidth(self.samp_rate, 0)
+        self.uhd_usrp_source_0_0_0.set_samp_rate(self.samp_rate)
+        self.uhd_usrp_source_0_0_0.set_bandwidth(self.samp_rate, 0)
 
     def get_zc_length(self):
         return self.zc_length
@@ -148,14 +149,14 @@ class prs_ssrtt_initiator(gr.top_block):
 
     def set_tx_gain(self, tx_gain):
         self.tx_gain = tx_gain
-        self.uhd_usrp_sink_0.set_gain(self.tx_gain, 0)
+        self.uhd_usrp_sink_0_0.set_gain(self.tx_gain, 0)
 
     def get_rx_gain(self):
         return self.rx_gain
 
     def set_rx_gain(self, rx_gain):
         self.rx_gain = rx_gain
-        self.uhd_usrp_source_0_0.set_gain(self.rx_gain, 0)
+        self.uhd_usrp_source_0_0_0.set_gain(self.rx_gain, 0)
 
     def get_premble_rep(self):
         return self.premble_rep
@@ -180,8 +181,8 @@ class prs_ssrtt_initiator(gr.top_block):
 
     def set_center_freq(self, center_freq):
         self.center_freq = center_freq
-        self.uhd_usrp_sink_0.set_center_freq(self.center_freq, 0)
-        self.uhd_usrp_source_0_0.set_center_freq(self.center_freq, 0)
+        self.uhd_usrp_sink_0_0.set_center_freq(self.center_freq, 0)
+        self.uhd_usrp_source_0_0_0.set_center_freq(self.center_freq, 0)
 
     def get_Reply_Delay(self):
         return self.Reply_Delay
