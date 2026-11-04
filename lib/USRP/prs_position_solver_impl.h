@@ -17,8 +17,8 @@ class prs_position_solver_impl: public  prs_position_solver{
     private:
         double d_vehicle_height_m;
         const std::vector<std::vector<double>> d_anchor_positions_m;
-        const std::vector<int>& d_anchor_ids;
-        void handle_epoch(pmt::pmt_t msg);
+        const std::vector<int> d_anchor_ids;
+        void handle_epoch(pmt::pmt_t msg);     
 };
 
 } // namespace ofdm_prs_ranging

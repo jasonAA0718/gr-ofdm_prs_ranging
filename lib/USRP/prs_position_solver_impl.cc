@@ -1,34 +1,42 @@
 #include "prs_position_solver_impl.h"
 #include <gnuradio/io_signature.h>
-#include <cmath>
-#include <stdexcept>
 #include <pmt/pmt.h>
 #include <array>
-#include <unordered_map>
+#include <cmath>
 #include <cstdint>
-namespace gr{
-namespace ofdm_prs_ranging{
+#include <stdexcept>
+namespace gr {
+namespace ofdm_prs_ranging {
 
-prs_position_solver:: sptr prs_position_solver::make(
-    const std::vector<int>& anchor_ids,
-    const std::vector<std::vector<double>>& anchor_positions_m,
-    double vehicle_height_m)
+
+struct range_observation
+{
+    uint32_t anchor_id;
+    std::array<double, 3> anchor_pos;
+    double range;
+    double weight;
+    bool used_fine_correction;
+};
+
+prs_position_solver::sptr
+prs_position_solver::make(const std::vector<int>& anchor_ids,
+                          const std::vector<std::vector<double>>& anchor_positions_m,
+                          double vehicle_height_m)
 {
     return gnuradio::make_block_sptr<prs_position_solver_impl>(
-    anchor_ids, anchor_positions_m, vehicle_height_m);
+        anchor_ids, anchor_positions_m, vehicle_height_m);
 }
 
 prs_position_solver_impl::prs_position_solver_impl(
-            const std::vector<int>& anchor_ids,
-            const std::vector<std::vector<double>>& anchor_positions_m,
-            double vehicle_height_m)
-            : gr::block(
-                "prs_position_solver",
-                gr::io_signature::make(0,0,0),
-                gr::io_signature::make(0,0,0)),
-                d_vehicle_height_m(vehicle_height_m),
-                d_anchor_positions_m(anchor_positions_m),
-                d_anchor_ids(anchor_ids)          
+    const std::vector<int>& anchor_ids,
+    const std::vector<std::vector<double>>& anchor_positions_m,
+    double vehicle_height_m)
+    : gr::block("prs_position_solver",
+                gr::io_signature::make(0, 0, 0),
+                gr::io_signature::make(0, 0, 0)),
+      d_vehicle_height_m(vehicle_height_m),
+      d_anchor_positions_m(anchor_positions_m),
+      d_anchor_ids(anchor_ids)
 {
     if (anchor_ids.empty() || anchor_ids.size() > 8)
         throw std::invalid_argument("Invalid anchor count");
@@ -36,12 +44,12 @@ prs_position_solver_impl::prs_position_solver_impl(
     if (!std::isfinite(vehicle_height_m))
         throw std::invalid_argument("Invalid vehicle height");
 
-    for (auto id : anchor_ids){
+    for (auto id : anchor_ids) {
 
         if (static_cast<size_t>(id) >= anchor_positions_m.size())
             throw std::invalid_argument("Anchor position not found");
 
-        if (anchor_positions_m[id].size() != 3)  
+        if (anchor_positions_m[id].size() != 3)
             throw std::invalid_argument("XYZ must have 3 elements");
 
         for (double xyz : anchor_positions_m[id]) {
@@ -52,11 +60,7 @@ prs_position_solver_impl::prs_position_solver_impl(
     message_port_register_in(pmt::mp("epoch_in"));
     message_port_register_out(pmt::mp("position_out"));
     message_port_register_out(pmt::mp("diagnostic_out"));
-    set_msg_handler(
-                pmt::mp("epoch_in"),
-                [this](pmt::pmt_t msg){
-                    handle_epoch(msg); 
-                });
+    set_msg_handler(pmt::mp("epoch_in"), [this](pmt::pmt_t msg) { handle_epoch(msg); });
 }
 
 void prs_position_solver_impl::handle_epoch(pmt::pmt_t msg)
@@ -72,49 +76,85 @@ void prs_position_solver_impl::handle_epoch(pmt::pmt_t msg)
         return;
     }
 
-    const auto ids = pmt::dict_ref(
-        meta, pmt::mp("observed_anchor_ids"), pmt::PMT_NIL);
+    const auto pmt_ids =
+        pmt::dict_ref(meta, pmt::mp("observed_anchor_ids"), pmt::PMT_NIL);
 
-    const auto integer_ranges = pmt::dict_ref(
-        meta, pmt::mp("integer_ranges_m"), pmt::PMT_NIL);
+    const auto pmt_integer_ranges =
+        pmt::dict_ref(meta, pmt::mp("integer_ranges_m"), pmt::PMT_NIL);
 
-    const auto corrected_ranges = pmt::dict_ref(
-        meta, pmt::mp("corrected_ranges_m"), pmt::PMT_NIL);
+    const auto pmt_corrected_ranges =
+        pmt::dict_ref(meta, pmt::mp("corrected_ranges_m"), pmt::PMT_NIL);
 
-    const auto fine_flags = pmt::dict_ref(
-        meta, pmt::mp("fine_correction_valid_flags"), pmt::PMT_NIL);
+    const auto pmt_fine_flags =
+        pmt::dict_ref(meta, pmt::mp("fine_correction_valid_flags"), pmt::PMT_NIL);
 
-    if (!pmt::is_u32vector(ids) ||
-        !pmt::is_f64vector(integer_ranges) ||
-        !pmt::is_f64vector(corrected_ranges) ||
-        !pmt::is_u8vector(fine_flags)) {
+    if (!pmt::is_u32vector(pmt_ids) || !pmt::is_f64vector(pmt_integer_ranges) ||
+        !pmt::is_f64vector(pmt_corrected_ranges) || !pmt::is_u8vector(pmt_fine_flags)) {
         return;
     }
 
-    const size_t N = pmt::length(ids);
+    // Not necessary but for first positioning version
+    const size_t N = pmt::length(pmt_ids);
     // Check the length of measurement is reasonable.
-    if (pmt::length(integer_ranges) != N ||
-        pmt::length(corrected_ranges) != N ||
-        pmt::length(fine_flags) != N) {
+    if (pmt::length(pmt_integer_ranges) != N || pmt::length(pmt_corrected_ranges) != N ||
+        pmt::length(pmt_fine_flags) != N) {
         return;
     }
+
+    std::vector<range_observation> obs;
+    for (size_t i = 0; i < N; i++) {
+        double range;
+        // Covert PMT data to C++ data type
+        uint32_t anchor_id = pmt::u32vector_ref(pmt_ids, i);
+        double integer_range = pmt::f64vector_ref(pmt_integer_ranges, i);
+        double corrected_range = pmt::f64vector_ref(pmt_corrected_ranges, i);
+        uint8_t fine_flag = pmt::u8vector_ref(pmt_fine_flags, i);
+        range_observation valid_obs;
+        // Check the valid range
+        const bool use_fine = fine_flag == 1 && std::isfinite(corrected_range);
+        range = use_fine ? corrected_range : integer_range;
+        if (!std::isfinite(range) || range <= 0.0) {
+            continue;
+        }
+        // Call the anchor pos based on anchor id
+        if (anchor_id >= d_anchor_positions_m.size()) {
+            return;
+        }
+        const auto& position = d_anchor_positions_m[anchor_id];
+
+        // Store the target range measurement
+        valid_obs.anchor_id  = anchor_id;
+        valid_obs.anchor_pos = {position[0], position[1], position[2]};
+        valid_obs.used_fine_correction = use_fine;
+        valid_obs.range     = range;
+        valid_obs.weight    = 1.0;
+        obs.push_back(valid_obs);
+    }
+    // if (obs.size() < 3) {
+    //     // Insufficient Observations may add fail diagnostic_out but later.
+    //     return;
+    // }
+
 
     auto result = pmt::make_dict();
 
-    result = pmt::dict_add(
-        result,
-        pmt::mp("parsed_anchor_count"),
-        pmt::from_uint64(N));
+    result = pmt::dict_add( result, 
+                            pmt::mp("select_range"), 
+                            pmt::init_f64vector(obs.range.size(), obs.range));
+    result = pmt::dict_add( result, 
+                            pmt::mp("positioning_anchor_count"), 
+                            pmt::from_uint64(obs.size()));
+    result = pmt::dict_add( result, 
+                            pmt::mp("anchor_id"), 
+                            pmt::init_u32vector(obs.anchor_id.size(),obs.anchor_id));
+    result = pmt::dict_add( result,
+                            pmt::mp("poll_id"),
+                            pmt::dict_ref(meta, pmt::mp("poll_id"), pmt::PMT_NIL));
+    
 
-    result = pmt::dict_add(
-        result,
-        pmt::mp("poll_id"),
-        pmt::dict_ref(meta, pmt::mp("poll_id"), pmt::PMT_NIL));
-
-    message_port_pub(
-        pmt::mp("diagnostic_out"),
-        pmt::cons(result, pmt::PMT_NIL));
-}           
+    message_port_pub(pmt::mp("diagnostic_out"), pmt::cons(result, pmt::PMT_NIL));
+    
+}
 
 
 } // namespace ofdm_prs_ranging

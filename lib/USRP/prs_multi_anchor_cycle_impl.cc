@@ -229,8 +229,7 @@ void prs_multi_anchor_cycle_impl::handle_range(pmt::pmt_t msg)
     c->received.insert(anchor);
     // T4 is the existing measurement reference; keep a normalized alias in
     // the stored observation without changing solver calculations or output.
-    auto observation = pmt::dict_add(meta, pmt::mp("measurement_timestamp"),
-        pmt::from_double(dict_ref_double(meta, "t4_rx_time", receive_time(meta))));
+    auto observation = pmt::dict_add(meta, pmt::mp("measurement_timestamp"), pmt::from_double(dict_ref_double(meta, "t4_rx_time", receive_time(meta))));
     c->measurements.emplace(anchor, observation);
     message_port_pub(pmt::mp("measurement_out"), msg);
 }
@@ -289,8 +288,7 @@ void prs_multi_anchor_cycle_impl::publish_epoch(const cycle& c)
                 "prs_cp_cfo_hz", "prs_cp_cfo_coherence", "selected_cfo_hz",
                 "prs_channel_cfo_hz", "residual_cfo_hz", "channel_coherence"}) {
             if (pmt::dict_has_key(measurement, pmt::mp(key)))
-                quality = pmt::dict_add(quality, pmt::mp(key),
-                    pmt::dict_ref(measurement, pmt::mp(key), pmt::PMT_NIL));
+                quality = pmt::dict_add(quality, pmt::mp(key), pmt::dict_ref(measurement, pmt::mp(key), pmt::PMT_NIL));
         }
         pmt::vector_set(diagnostics, i, quality);
     }
