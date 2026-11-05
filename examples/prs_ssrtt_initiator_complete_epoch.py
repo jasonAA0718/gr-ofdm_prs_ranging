@@ -39,24 +39,24 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         ##################################################
         self.zc_length = zc_length = 819
         self.tx_gain = tx_gain = 62
-        self.time_delays = time_delays = [0.041, 0.0497]
+        self.time_delays = time_delays = [0.041, 0.051, 0.067]
         self.samp_rate = samp_rate = 30000000
-        self.rx_gain = rx_gain = 30
-        self.receive_late_s = receive_late_s = 0.004
-        self.receive_early_s = receive_early_s = 0.002
-        self.processing_grace_s = processing_grace_s = 0.1
+        self.rx_gain = rx_gain = 56
+        self.receive_late_s = receive_late_s = 0.003
+        self.receive_early_s = receive_early_s = 0.001
+        self.processing_grace_s = processing_grace_s = 0.05
         self.premble_rep = premble_rep = 17
         self.premble_length = premble_length = 128
         self.obs_log = obs_log = "CSV/complete_epoch_measurements.csv"
         self.center_freq = center_freq = 1060e6
-        self.anchor_ids = anchor_ids = [0, 1]
+        self.anchor_ids = anchor_ids = [0, 1, 2]
 
         ##################################################
         # Blocks
         ##################################################
 
         self.uhd_usrp_source_0_0 = uhd.usrp_source(
-            ",".join(("serial=34D0563", "recv_buff_size=25000000,num_recv_frames=1024")),
+            ",".join(("serial=32712EF", "recv_buff_size=25000000,num_recv_frames=1024")),
             uhd.stream_args(
                 cpu_format="fc32",
                 args='',
@@ -70,10 +70,10 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         self.uhd_usrp_source_0_0.set_center_freq(center_freq, 0)
         self.uhd_usrp_source_0_0.set_antenna("TX/RX", 0)
         self.uhd_usrp_source_0_0.set_bandwidth(samp_rate, 0)
-        self.uhd_usrp_source_0_0.set_rx_agc(True, 0)
+        self.uhd_usrp_source_0_0.set_gain(rx_gain, 0)
         self.uhd_usrp_source_0_0.set_min_output_buffer(1048576)
         self.uhd_usrp_sink_0 = uhd.usrp_sink(
-            ",".join(("serial=34D0563", '')),
+            ",".join(("serial=32712EF", '')),
             uhd.stream_args(
                 cpu_format="fc32",
                 args='',
@@ -100,7 +100,7 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         self.prs_rx_timekeeper_0 = ofdm_prs_ranging.prs_rx_timekeeper(samp_rate, 0.1)
         self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 512, 512, 1.0, False)
         self.prs_multi_anchor_cycle_0 = ofdm_prs_ranging.prs_multi_anchor_cycle(samp_rate, anchor_ids, time_delays, premble_length, premble_rep, zc_length, receive_early_s, receive_late_s, processing_grace_s)
-        self.prs_frame_detector_0_0 = ofdm_prs_ranging.prs_fft_zc_frame_detector(samp_rate, 512, 64, 512, 127, premble_length, premble_rep, zc_length, 0.5, 10000, 29, 1, 1, 0.0, 0.00166, 0.0077, 0.5, 4096, 512, (4096-512), True, False)
+        self.prs_frame_detector_0_0 = ofdm_prs_ranging.prs_fft_zc_frame_detector(samp_rate, 512, 64, 512, 127, premble_length, premble_rep, zc_length, 0.6, 10000, 29, 1, 1, 0.0, 0.00166, 0.0077, 0.5, 4096, 512, (4096-512), True, False)
         self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 512, 64, 512, 127, False)
         self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger(obs_log, 1, False)
         self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 512, 512, 127, 13990001, False, 2)
@@ -110,8 +110,9 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
             [[0,0,0], [6,0,0], [0,8,0]],
             0.0
         )
+        self.cycle_summary_debug_0_0 = blocks.message_debug(False, gr.log_levels.info)
+        self.cycle_summary_debug_0 = blocks.message_debug(False, gr.log_levels.info)
         self.cycle_summary_debug = blocks.message_debug(False, gr.log_levels.info)
-        self.cycle_diagnostic_debug = blocks.message_debug(False, gr.log_levels.err)
         self.blocks_message_strobe_0 = blocks.message_strobe(pmt.PMT_T, 500)
 
 
@@ -119,12 +120,13 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         # Connections
         ##################################################
         self.msg_connect((self.blocks_message_strobe_0, 'strobe'), (self.prs_rx_timekeeper_0, 'trigger_in'))
+        self.msg_connect((self.ofdm_prs_ranging_prs_position_solver_0, 'position_out'), (self.cycle_summary_debug_0, 'print'))
+        self.msg_connect((self.ofdm_prs_ranging_prs_position_solver_0, 'diagnostic_out'), (self.cycle_summary_debug_0_0, 'print'))
         self.msg_connect((self.prs_channel_estimator_0, 'event_out'), (self.prs_acquisition_logger_0, 'frame_in'))
         self.msg_connect((self.prs_channel_estimator_0, 'channel_out'), (self.prs_phase_slope_estimator_0, 'channel_in'))
         self.msg_connect((self.prs_fft_receiver_0, 'symbols_out'), (self.prs_channel_estimator_0, 'symbols_in'))
         self.msg_connect((self.prs_frame_detector_0_0, 'event_out'), (self.prs_acquisition_logger_0, 'frame_in'))
         self.msg_connect((self.prs_frame_detector_0_0, 'frame_out'), (self.prs_fft_receiver_0, 'frame_in'))
-        self.msg_connect((self.prs_multi_anchor_cycle_0, 'diagnostic_out'), (self.cycle_diagnostic_debug, 'print'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'cycle_out'), (self.cycle_summary_debug, 'print'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'epoch_out'), (self.ofdm_prs_ranging_prs_position_solver_0, 'epoch_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'measurement_out'), (self.prs_csv_logger_0, 'measurement_in'))
@@ -175,6 +177,7 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
 
     def set_rx_gain(self, rx_gain):
         self.rx_gain = rx_gain
+        self.uhd_usrp_source_0_0.set_gain(self.rx_gain, 0)
 
     def get_receive_late_s(self):
         return self.receive_late_s

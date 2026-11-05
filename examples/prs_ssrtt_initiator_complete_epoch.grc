@@ -39,12 +39,12 @@ blocks:
   id: variable
   parameters:
     comment: Delay corresponding anchor ID
-    value: '[0, 1]'
+    value: '[0, 1, 2]'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [296, 120.0]
+    coordinate: [288, 120.0]
     rotation: 0
     state: enabled
 - name: center_freq
@@ -99,7 +99,7 @@ blocks:
   id: variable
   parameters:
     comment: ranging_cycle_time
-    value: '0.1'
+    value: '0.05'
   states:
     bus_sink: false
     bus_source: false
@@ -111,7 +111,7 @@ blocks:
   id: variable
   parameters:
     comment: "Anchor received window \nbefore time"
-    value: '0.002'
+    value: '0.001'
   states:
     bus_sink: false
     bus_source: false
@@ -123,7 +123,7 @@ blocks:
   id: variable
   parameters:
     comment: "Anchor received window \nbefore time"
-    value: '0.004'
+    value: '0.003'
   states:
     bus_sink: false
     bus_source: false
@@ -135,7 +135,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '30'
+    value: '56'
   states:
     bus_sink: false
     bus_source: false
@@ -163,7 +163,7 @@ blocks:
       The minimal slot space:
 
       delay_1 - delay_0 = before + after + frame_length'
-    value: '[0.041, 0.0497]'
+    value: '[0.041, 0.051, 0.067]'
   states:
     bus_sink: false
     bus_source: false
@@ -245,9 +245,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1224, 1616.0]
+    coordinate: [1232, 1616.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: cycle_summary_debug
   id: blocks_message_debug
   parameters:
@@ -261,6 +261,36 @@ blocks:
     bus_source: false
     bus_structure: null
     coordinate: [1224, 1344.0]
+    rotation: 0
+    state: enabled
+- name: cycle_summary_debug_0
+  id: blocks_message_debug
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: Ranging cycle summary/diagnostics; epoch_out is separate.
+    en_uvec: 'False'
+    log_level: info
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1688, 1424.0]
+    rotation: 0
+    state: enabled
+- name: cycle_summary_debug_0_0
+  id: blocks_message_debug
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: Ranging cycle summary/diagnostics; epoch_out is separate.
+    en_uvec: 'False'
+    log_level: info
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1720, 1560.0]
     rotation: 0
     state: enabled
 - name: ofdm_prs_ranging_prs_position_solver_0
@@ -381,7 +411,7 @@ blocks:
     prs_symbols: '127'
     reply_delay_s: '0.0'
     samp_rate: samp_rate
-    threshold: '0.5'
+    threshold: '0.6'
     time_gating: '1'
     window_after_s: '0.0077'
     window_before_s: '0.00166'
@@ -615,7 +645,7 @@ blocks:
     clock_source6: ''
     clock_source7: ''
     comment: ''
-    dev_addr: '"serial=34D0563"'
+    dev_addr: '"serial=32712EF"'
     dev_args: ''
     gain0: tx_gain
     gain1: '0'
@@ -956,7 +986,7 @@ blocks:
     dc_offs_enb7: default
     dc_offs_enb8: default
     dc_offs_enb9: default
-    dev_addr: '"serial=34D0563"'
+    dev_addr: '"serial=32712EF"'
     dev_args: '"recv_buff_size=25000000,num_recv_frames=1024"'
     gain0: rx_gain
     gain1: '0'
@@ -1155,7 +1185,7 @@ blocks:
     nchan: '1'
     num_mboards: '1'
     otw: ''
-    rx_agc0: Enabled
+    rx_agc0: Default
     rx_agc1: Default
     rx_agc10: Default
     rx_agc11: Default
@@ -1253,7 +1283,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1536, 1144.0]
+    coordinate: [1512, 1136.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_0_0_1
@@ -1350,6 +1380,9 @@ blocks:
 
 connections:
 - [blocks_message_strobe_0, strobe, prs_rx_timekeeper_0, trigger_in]
+- [ofdm_prs_ranging_prs_position_solver_0, diagnostic_out, cycle_summary_debug_0_0,
+  print]
+- [ofdm_prs_ranging_prs_position_solver_0, position_out, cycle_summary_debug_0, print]
 - [prs_channel_estimator_0, channel_out, prs_phase_slope_estimator_0, channel_in]
 - [prs_channel_estimator_0, event_out, prs_acquisition_logger_0, frame_in]
 - [prs_fft_receiver_0, symbols_out, prs_channel_estimator_0, symbols_in]

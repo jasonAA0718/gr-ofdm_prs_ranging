@@ -15,9 +15,10 @@ class prs_position_solver_impl: public  prs_position_solver{
             const std::vector<std::vector<double>>& anchor_positions_m,
             double vehicle_height_m);
     private:
-        double d_vehicle_height_m;
+    const std::vector<int> d_anchor_ids;
         const std::vector<std::vector<double>> d_anchor_positions_m;
-        const std::vector<int> d_anchor_ids;
+        double d_vehicle_height_m;
+        std::array<double,3> d_position;
         void handle_epoch(pmt::pmt_t msg);     
 };
 
