@@ -18,7 +18,7 @@ options:
     output_language: python
     placement: (0,0)
     qt_qss_theme: ''
-    realtime_scheduling: '1'
+    realtime_scheduling: ''
     run: 'True'
     run_command: '{python} -u {filename}'
     run_options: prompt
@@ -47,6 +47,18 @@ blocks:
     coordinate: [288, 120.0]
     rotation: 0
     state: enabled
+- name: anchor_ids
+  id: variable
+  parameters:
+    comment: Delay corresponding anchor ID
+    value: '[0]'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [296, 176.0]
+    rotation: 0
+    state: disabled
 - name: center_freq
   id: variable
   parameters:
@@ -99,7 +111,7 @@ blocks:
   id: variable
   parameters:
     comment: ranging_cycle_time
-    value: '0.05'
+    value: '0.01'
   states:
     bus_sink: false
     bus_source: false
@@ -163,7 +175,7 @@ blocks:
       The minimal slot space:
 
       delay_1 - delay_0 = before + after + frame_length'
-    value: '[0.041, 0.051, 0.067]'
+    value: '[0.051, 0.041, 0.067]'
   states:
     bus_sink: false
     bus_source: false
@@ -171,6 +183,22 @@ blocks:
     coordinate: [480, 120.0]
     rotation: 0
     state: enabled
+- name: time_delays
+  id: variable
+  parameters:
+    comment: 'Static schedule in seconds; delays correspond to anchor_ids by index.
+
+      The minimal slot space:
+
+      delay_1 - delay_0 = before + after + frame_length'
+    value: '[0.041]'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [440, 184.0]
+    rotation: 0
+    state: disabled
 - name: tx_gain
   id: variable
   parameters:
@@ -262,7 +290,7 @@ blocks:
     bus_structure: null
     coordinate: [1224, 1344.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: cycle_summary_debug_0
   id: blocks_message_debug
   parameters:

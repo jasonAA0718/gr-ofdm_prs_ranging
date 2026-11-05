@@ -39,12 +39,12 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         ##################################################
         self.zc_length = zc_length = 819
         self.tx_gain = tx_gain = 62
-        self.time_delays = time_delays = [0.041, 0.051, 0.067]
+        self.time_delays = time_delays = [0.051, 0.041, 0.067]
         self.samp_rate = samp_rate = 30000000
         self.rx_gain = rx_gain = 56
         self.receive_late_s = receive_late_s = 0.003
         self.receive_early_s = receive_early_s = 0.001
-        self.processing_grace_s = processing_grace_s = 0.05
+        self.processing_grace_s = processing_grace_s = 0.01
         self.premble_rep = premble_rep = 17
         self.premble_length = premble_length = 128
         self.obs_log = obs_log = "CSV/complete_epoch_measurements.csv"
@@ -112,7 +112,6 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         )
         self.cycle_summary_debug_0_0 = blocks.message_debug(False, gr.log_levels.info)
         self.cycle_summary_debug_0 = blocks.message_debug(False, gr.log_levels.info)
-        self.cycle_summary_debug = blocks.message_debug(False, gr.log_levels.info)
         self.blocks_message_strobe_0 = blocks.message_strobe(pmt.PMT_T, 500)
 
 
@@ -127,7 +126,6 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         self.msg_connect((self.prs_fft_receiver_0, 'symbols_out'), (self.prs_channel_estimator_0, 'symbols_in'))
         self.msg_connect((self.prs_frame_detector_0_0, 'event_out'), (self.prs_acquisition_logger_0, 'frame_in'))
         self.msg_connect((self.prs_frame_detector_0_0, 'frame_out'), (self.prs_fft_receiver_0, 'frame_in'))
-        self.msg_connect((self.prs_multi_anchor_cycle_0, 'cycle_out'), (self.cycle_summary_debug, 'print'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'epoch_out'), (self.ofdm_prs_ranging_prs_position_solver_0, 'epoch_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'measurement_out'), (self.prs_csv_logger_0, 'measurement_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'window_out'), (self.prs_frame_detector_0_0, 'tx_time_in'))
@@ -233,8 +231,6 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
 
 
 def main(top_block_cls=prs_ssrtt_initiator_complete_epoch, options=None):
-    if gr.enable_realtime_scheduling() != gr.RT_OK:
-        gr.logger("realtime").warn("Error: failed to enable real-time scheduling.")
     tb = top_block_cls()
 
     def sig_handler(sig=None, frame=None):

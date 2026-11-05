@@ -264,7 +264,7 @@ void prs_multi_anchor_cycle_impl::finish(const cycle& c, const char* reason)
     message_port_pub(pmt::mp("cycle_out"), pmt::cons(summary, pmt::PMT_NIL));
     // Finalized normal cycles only. Shutdown never publishes an epoch, even
     // when every range happened to arrive before the scheduled end.
-    if (std::string(reason) == "WINDOWS_EXPIRED" && d_anchors.size() >= 2 &&
+    if (std::string(reason) == "WINDOWS_EXPIRED" && d_anchors.size() >= 1 &&
         c.measurements.size() == d_anchors.size()) publish_epoch(c);
     auto expire = pmt::dict_add(meta, pmt::mp("expire_cycle"), pmt::PMT_T);
     message_port_pub(pmt::mp("solver_tx_out"), expire);

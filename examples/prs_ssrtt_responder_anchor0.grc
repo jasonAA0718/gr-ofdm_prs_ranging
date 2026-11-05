@@ -10,7 +10,7 @@ options:
     description: OFDM PRS SS-RTT responder
     gen_cmake: 'On'
     gen_linking: dynamic
-    generate_options: qt_gui
+    generate_options: no_gui
     hier_block_src_path: '.:'
     id: prs_ssrtt_responder_anchor0
     max_nouts: '0'
@@ -38,12 +38,12 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '0.75'
+    value: '0.5'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1112, 48.0]
+    coordinate: [824, 136.0]
     rotation: 0
     state: enabled
 - name: anchor_id
@@ -123,14 +123,14 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '55'
+    value: '62'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
     coordinate: [816, 40.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: rx_gain
   id: variable_qtgui_range
   parameters:
@@ -151,7 +151,7 @@ blocks:
     bus_structure: null
     coordinate: [1080, 172.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: samp_rate
   id: variable
   parameters:
@@ -168,14 +168,14 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '0'
+    value: '60'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
     coordinate: [912, 40.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: tx_gain
   id: variable_qtgui_range
   parameters:
@@ -196,7 +196,7 @@ blocks:
     bus_structure: null
     coordinate: [1008, 28.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: zc_length
   id: variable
   parameters:
@@ -247,7 +247,7 @@ blocks:
     preamble_len: '128'
     preamble_repeats: '17'
     prs_symbols: '127'
-    queue_depth: '1'
+    queue_depth: '2'
     samp_rate: 30e6
     threshold: '0.12'
   states:
@@ -698,7 +698,7 @@ blocks:
     num_mboards: '1'
     otw: ''
     samp_rate: samp_rate
-    sd_spec0: A:A
+    sd_spec0: A:B
     sd_spec1: ''
     sd_spec2: ''
     sd_spec3: ''
@@ -732,7 +732,7 @@ blocks:
   parameters:
     affinity: ''
     alias: ''
-    ant0: '"RX2"'
+    ant0: '"TX/RX"'
     ant1: '"RX2"'
     ant10: '"RX2"'
     ant11: '"RX2"'
@@ -1134,7 +1134,7 @@ blocks:
     rx_agc8: Default
     rx_agc9: Default
     samp_rate: samp_rate
-    sd_spec0: A:A
+    sd_spec0: A:B
     sd_spec1: ''
     sd_spec2: ''
     sd_spec3: ''
@@ -1146,7 +1146,7 @@ blocks:
     start_time: '-1.0'
     stream_args: ''
     stream_chans: '[]'
-    sync: sync
+    sync: pc_clock_next_pps
     time_source0: ''
     time_source1: ''
     time_source2: ''
