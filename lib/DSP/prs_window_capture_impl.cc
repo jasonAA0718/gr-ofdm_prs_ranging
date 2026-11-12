@@ -5,7 +5,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include "prs_timing_helper.h"
 #include "prs_window_capture_impl.h"
 #include <gnuradio/io_signature.h>
 #include <algorithm>
@@ -65,8 +64,7 @@ prs_window_capture::sptr prs_window_capture::make(double samp_rate,
                                                   int candidate_margin_before,
                                                   int candidate_margin_after,
                                                   int queue_depth,
-                                                  bool acquisition_enabled,
-                                                  bool enable_profiling)
+                                                  bool acquisition_enabled)
 {
     return gnuradio::make_block_sptr<prs_window_capture_impl>(samp_rate,
                                                               fft_len,
@@ -81,8 +79,7 @@ prs_window_capture::sptr prs_window_capture::make(double samp_rate,
                                                               candidate_margin_before,
                                                               candidate_margin_after,
                                                               queue_depth,
-                                                              acquisition_enabled,
-                                                              enable_profiling);
+                                                              acquisition_enabled);
 }
 
 prs_window_capture_impl::prs_window_capture_impl(double samp_rate,
@@ -98,8 +95,7 @@ prs_window_capture_impl::prs_window_capture_impl(double samp_rate,
                                                  int candidate_margin_before,
                                                  int candidate_margin_after,
                                                  int queue_depth,
-                                                 bool acquisition_enabled,
-                                                 bool enable_profiling)
+                                                 bool acquisition_enabled)
     : gr::block("prs_window_capture",
                 gr::io_signature::make(1, 1, sizeof(gr_complex)),
                 gr::io_signature::make(0, 0, 0)),
@@ -109,7 +105,6 @@ prs_window_capture_impl::prs_window_capture_impl(double samp_rate,
       d_margin_after(candidate_margin_after),
       d_queue_depth(queue_depth),
       d_acquisition_enabled(acquisition_enabled),
-      d_enable_profiling(enable_profiling),
       d_ring_mask(0),
       d_ring_head(0),
       d_ring_count(0),
@@ -137,7 +132,6 @@ prs_window_capture_impl::prs_window_capture_impl(double samp_rate,
       d_window_queue_full_count(0),
       d_total_samples_consumed(0),
       d_work_calls(0),
-      d_work_duration_ns(0),
       d_inside_work(false),
       d_current_work_samples(0)
 {
@@ -181,7 +175,6 @@ prs_window_capture_impl::prs_window_capture_impl(double samp_rate,
     message_port_register_in(pmt::mp("slot_release"));
     message_port_register_out(pmt::mp("candidate_out"));
     message_port_register_out(pmt::mp("event_out"));
-    message_port_register_out(pmt::mp("timing_out"));
     set_msg_handler(pmt::mp("window_in"),
                     [this](const pmt::pmt_t& msg) { handle_window(msg); });
     set_msg_handler(pmt::mp("slot_release"),
@@ -738,23 +731,14 @@ pmt::pmt_t prs_window_capture_impl::candidate_metadata(uint64_t candidate_id,
         meta, pmt::mp("zc_search_end_offset"), pmt::from_uint64(search_end));
     uint64_t samples_consumed = d_total_samples_consumed;
     uint64_t work_calls = d_work_calls;
-    uint64_t handler_time_ns = d_work_duration_ns;
     if (d_inside_work) {
         samples_consumed += d_current_work_samples;
         ++work_calls;
-        if (d_enable_profiling) {
-            handler_time_ns += static_cast<uint64_t>(
-                std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    std::chrono::steady_clock::now() - d_current_work_start)
-                    .count());
-        }
     }
     meta = pmt::dict_add(
         meta, pmt::mp("block_a_samples_consumed"), pmt::from_uint64(samples_consumed));
     meta =
         pmt::dict_add(meta, pmt::mp("block_a_work_calls"), pmt::from_uint64(work_calls));
-    meta = pmt::dict_add(
-        meta, pmt::mp("block_a_handler_time_ns"), pmt::from_uint64(handler_time_ns));
 
     double value = 0.0;
     if (sample_time(d_candidate_start, value)) {
@@ -798,17 +782,11 @@ void prs_window_capture_impl::finish_candidate()
         auto meta = candidate_metadata(candidate_id, queue_depth, "WINDOW_QUEUE_FULL");
         publish_queue_full(candidate_id, meta);
     } else {
-        profiling::timing_report report(d_enable_profiling, "window_capture");
         auto meta = candidate_metadata(candidate_id, queue_depth, "CANDIDATE_READY");
         const auto pdu = pmt::cons(
             meta, pmt::init_c32vector(d_candidate_samples.size(), d_candidate_samples));
-        report.checkpoint("candidate_pdu_build");
         message_port_pub(pmt::mp("candidate_out"), pdu);
-        report.checkpoint("candidate_pdu_publish");
         message_port_pub(pmt::mp("event_out"), pmt::cons(meta, pmt::PMT_NIL));
-        if (report.enabled()) {
-            message_port_pub(pmt::mp("timing_out"), report.finish(meta));
-        }
     }
 
     d_candidate_samples.clear();
@@ -836,9 +814,6 @@ int prs_window_capture_impl::general_work(int noutput_items,
 {
     (void)noutput_items;
     (void)output_items;
-    if (d_enable_profiling) {
-        d_current_work_start = std::chrono::steady_clock::now();
-    }
     d_inside_work = true;
     d_current_work_samples = 0;
     const auto* input = static_cast<const gr_complex*>(input_items[0]);
@@ -949,12 +924,6 @@ int prs_window_capture_impl::general_work(int noutput_items,
     consume_each(ninput);
     d_total_samples_consumed += static_cast<uint64_t>(ninput);
     ++d_work_calls;
-    if (d_enable_profiling) {
-        d_work_duration_ns += static_cast<uint64_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::steady_clock::now() - d_current_work_start)
-                .count());
-    }
     d_inside_work = false;
     d_current_work_samples = 0;
     return 0;

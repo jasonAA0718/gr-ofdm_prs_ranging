@@ -40,8 +40,7 @@ public:
                      int correlation_fft_len = 2048,
                      int zc_search_before = 1024,
                      int zc_search_after = 1024,
-                     bool cfo_compensation = true,
-                     bool enable_profiling = false);
+                     bool cfo_compensation = true);
 };
 
 } // namespace ofdm_prs_ranging

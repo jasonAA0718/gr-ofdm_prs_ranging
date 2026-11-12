@@ -13,7 +13,6 @@
 #include <pmt/pmt.h>
 #include <unordered_set>
 #include <atomic>
-#include <chrono>
 #include <complex>
 #include <cstdint>
 #include <deque>
@@ -39,8 +38,7 @@ public:
                             int candidate_margin_before,
                             int candidate_margin_after,
                             int queue_depth,
-                            bool acquisition_enabled,
-                            bool enable_profiling);
+                            bool acquisition_enabled);
     ~prs_window_capture_impl() override = default;
 
     void forecast(int noutput_items, gr_vector_int& ninput_items_required) override;
@@ -81,7 +79,6 @@ private:
     int d_margin_after;
     int d_queue_depth;
     std::atomic<bool> d_acquisition_enabled;
-    bool d_enable_profiling;
 
     std::vector<gr_complex> d_ring;
     size_t d_ring_mask;
@@ -122,10 +119,8 @@ private:
 
     uint64_t d_total_samples_consumed;
     uint64_t d_work_calls;
-    uint64_t d_work_duration_ns;
     bool d_inside_work;
     uint64_t d_current_work_samples;
-    std::chrono::steady_clock::time_point d_current_work_start;
 
     void handle_window(const pmt::pmt_t& message);
     void handle_slot_release(const pmt::pmt_t& message);

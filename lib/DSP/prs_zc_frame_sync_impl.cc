@@ -5,12 +5,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include "prs_timing_helper.h"
 #include "prs_zc_frame_sync_impl.h"
 #include <gnuradio/io_signature.h>
 #include <volk/volk.h>
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -59,10 +57,6 @@ bool metadata_int_matches(const pmt::pmt_t& meta, const char* key_name, int expe
     return pmt::is_integer(value) && pmt::to_long(value) == expected;
 }
 
-uint64_t elapsed_ns(profiling::timing_point start, profiling::timing_point stop)
-{
-    return profiling::elapsed_ns(start, stop);
-}
 } // namespace
 
 prs_zc_frame_sync::sptr prs_zc_frame_sync::make(double samp_rate,
@@ -76,8 +70,7 @@ prs_zc_frame_sync::sptr prs_zc_frame_sync::make(double samp_rate,
                                                 float preamble_threshold,
                                                 float zc_threshold,
                                                 int coarse_zc_root,
-                                                int channel_id,
-                                                bool enable_profiling)
+                                                int channel_id)
 {
     return gnuradio::make_block_sptr<prs_zc_frame_sync_impl>(samp_rate,
                                                              fft_len,
@@ -90,8 +83,7 @@ prs_zc_frame_sync::sptr prs_zc_frame_sync::make(double samp_rate,
                                                              preamble_threshold,
                                                              zc_threshold,
                                                              coarse_zc_root,
-                                                             channel_id,
-                                                             enable_profiling);
+                                                             channel_id);
 }
 
 prs_zc_frame_sync_impl::prs_zc_frame_sync_impl(double samp_rate,
@@ -105,14 +97,12 @@ prs_zc_frame_sync_impl::prs_zc_frame_sync_impl(double samp_rate,
                                                float preamble_threshold,
                                                float zc_threshold,
                                                int coarse_zc_root,
-                                               int channel_id,
-                                               bool enable_profiling)
+                                               int channel_id)
     : gr::block("prs_zc_frame_sync",
                 gr::io_signature::make(0, 0, 0),
                 gr::io_signature::make(0, 0, 0)),
       d_preamble_threshold(preamble_threshold),
       d_zc_threshold(zc_threshold),
-      d_enable_profiling(enable_profiling),
       d_next_recv_id(0)
 {
     if (samp_rate <= 0.0 || fft_len <= 0 || cp_len < 0 || active_bins <= 0 ||
@@ -141,7 +131,6 @@ prs_zc_frame_sync_impl::prs_zc_frame_sync_impl(double samp_rate,
     message_port_register_out(pmt::mp("synchronized_frame_out"));
     message_port_register_out(pmt::mp("diagnostics_out"));
     message_port_register_out(pmt::mp("slot_release"));
-    message_port_register_out(pmt::mp("timing_out"));
     set_msg_handler(pmt::mp("candidate_in"),
                     [this](const pmt::pmt_t& msg) { handle_candidate(msg); });
 }
@@ -304,49 +293,21 @@ bool prs_zc_frame_sync_impl::search_zc(size_t search_start,
 
 void prs_zc_frame_sync_impl::handle_candidate(const pmt::pmt_t& message)
 {
-    const auto total_start = profiling::now();
     pmt::pmt_t input_meta = pmt::is_pair(message) ? pmt::car(message) : pmt::PMT_NIL;
     const uint64_t missing_id = std::numeric_limits<uint64_t>::max();
     const uint64_t candidate_id =
         pmt::is_dict(input_meta) ? dict_ref_uint64(input_meta, "candidate_id", missing_id)
                                  : missing_id;
     release_guard release{ this, candidate_id, candidate_id != missing_id };
-    profiling::timing_report timing(d_enable_profiling, "zc_frame_sync");
 
     pmt::pmt_t diagnostics = pmt::is_dict(input_meta) ? input_meta : pmt::make_dict();
-    const auto finish_diagnostics = [&](const char* reason,
-                                        bool success,
-                                        uint64_t cfo_ns,
-                                        uint64_t zc_ns,
-                                        uint64_t extraction_ns) {
+    const auto finish_diagnostics = [&](const char* reason, bool success) {
         diagnostics = pmt::dict_add(
             diagnostics, pmt::mp("success"), success ? pmt::PMT_T : pmt::PMT_F);
         diagnostics =
             pmt::dict_add(diagnostics, pmt::mp("failure_reason"), pmt::mp(reason));
-        diagnostics = pmt::dict_add(
-            diagnostics, pmt::mp("cfo_processing_time_ns"), pmt::from_uint64(cfo_ns));
-        diagnostics = pmt::dict_add(
-            diagnostics, pmt::mp("zc_processing_time_ns"), pmt::from_uint64(zc_ns));
-        diagnostics = pmt::dict_add(diagnostics,
-                                    pmt::mp("frame_extraction_time_ns"),
-                                    pmt::from_uint64(extraction_ns));
-        diagnostics =
-            pmt::dict_add(diagnostics,
-                          pmt::mp("block_b_total_time_ns"),
-                          pmt::from_uint64(elapsed_ns(total_start, profiling::now())));
         message_port_pub(pmt::mp("diagnostics_out"),
                          pmt::cons(diagnostics, pmt::PMT_NIL));
-        if (timing.enabled()) {
-            auto timing_message = timing.finish(diagnostics);
-            for (const char* key_name : { "candidate_id", "window_id" }) {
-                const auto key = pmt::mp(key_name);
-                const auto value = pmt::dict_ref(diagnostics, key, pmt::PMT_NIL);
-                if (!pmt::is_null(value)) {
-                    timing_message = pmt::dict_add(timing_message, key, value);
-                }
-            }
-            message_port_pub(pmt::mp("timing_out"), timing_message);
-        }
     };
 
     try {
@@ -354,12 +315,12 @@ void prs_zc_frame_sync_impl::handle_candidate(const pmt::pmt_t& message)
         size_t sample_count = 0;
         if (!pdu_get_c32_view(message, input_meta, samples, sample_count) ||
             !pmt::is_dict(input_meta)) {
-            finish_diagnostics("INVALID_CANDIDATE", false, 0, 0, 0);
+            finish_diagnostics("INVALID_CANDIDATE", false);
             return;
         }
         diagnostics = input_meta;
         if (!metadata_matches_geometry(input_meta)) {
-            finish_diagnostics("INVALID_GEOMETRY", false, 0, 0, 0);
+            finish_diagnostics("INVALID_GEOMETRY", false);
             return;
         }
 
@@ -398,7 +359,7 @@ void prs_zc_frame_sync_impl::handle_candidate(const pmt::pmt_t& message)
             search_start_u64 > search_end_u64 || search_start_u64 < coarse_rel ||
             !candidate_end_valid || !bounds_fit || first_crossing < candidate_start ||
             first_crossing >= candidate_end) {
-            finish_diagnostics("INVALID_GEOMETRY", false, 0, 0, 0);
+            finish_diagnostics("INVALID_GEOMETRY", false);
             return;
         }
         const size_t search_start = static_cast<size_t>(search_start_u64);
@@ -418,17 +379,12 @@ void prs_zc_frame_sync_impl::handle_candidate(const pmt::pmt_t& message)
                                     pmt::mp("zc_search_end_absolute_index"),
                                     pmt::from_uint64(candidate_start + search_end));
 
-        const auto cfo_start = profiling::now();
         const auto cfo = select_cfo_reference(samples, sample_count);
         if (!cfo.valid) {
-            const uint64_t cfo_ns = elapsed_ns(cfo_start, profiling::now());
-            timing.add("preamble_cfo", cfo_ns);
-            finish_diagnostics("PREAMBLE_INVALID", false, cfo_ns, 0, 0);
+            finish_diagnostics("PREAMBLE_INVALID", false);
             return;
         }
         correct_cfo(samples, sample_count, cfo.cfo_hz);
-        const uint64_t cfo_ns = elapsed_ns(cfo_start, profiling::now());
-        timing.add("preamble_cfo", cfo_ns);
         diagnostics = pmt::dict_add(
             diagnostics, pmt::mp("cfo_reference_index"), pmt::from_uint64(cfo.index));
         diagnostics = pmt::dict_add(diagnostics,
@@ -442,12 +398,9 @@ void prs_zc_frame_sync_impl::handle_candidate(const pmt::pmt_t& message)
         diagnostics = pmt::dict_add(
             diagnostics, pmt::mp("preamble_cfo_hz"), pmt::from_double(cfo.cfo_hz));
 
-        const auto zc_start = profiling::now();
         size_t selected_zc = 0;
         float zc_metric = 0.0f;
         const bool zc_valid = search_zc(search_start, search_end, selected_zc, zc_metric);
-        const uint64_t zc_ns = elapsed_ns(zc_start, profiling::now());
-        timing.add("direct_zc_search", zc_ns);
         const uint64_t selected_zc_abs = candidate_start + selected_zc;
         diagnostics = pmt::dict_add(
             diagnostics, pmt::mp("coarse_metric"), pmt::from_double(zc_metric));
@@ -466,25 +419,20 @@ void prs_zc_frame_sync_impl::handle_candidate(const pmt::pmt_t& message)
         diagnostics = pmt::dict_add(
             diagnostics, pmt::mp("frame_start"), pmt::from_uint64(frame_start_abs));
         if (!zc_valid) {
-            finish_diagnostics("ZC_SYNC", false, cfo_ns, zc_ns, 0);
+            finish_diagnostics("ZC_SYNC", false);
             return;
         }
 
         if (frame_start_local > sample_count || flen > sample_count - frame_start_local) {
-            finish_diagnostics("INVALID_GEOMETRY", false, cfo_ns, zc_ns, 0);
+            finish_diagnostics("INVALID_GEOMETRY", false);
             return;
         }
 
-        const auto extraction_start = profiling::now();
         std::vector<gr_complex> frame(samples + frame_start_local,
                                       samples + frame_start_local + flen);
-        const uint64_t extraction_ns = elapsed_ns(extraction_start, profiling::now());
-        timing.add("frame_extract", extraction_ns);
 
-        const auto cp_cfo_start = profiling::now();
         const auto prs_cp_cfo =
             estimate_prs_cp_cfo(frame.data(), frame.size(), d_cfg, 0.0);
-        timing.add("prs_cp_cfo", elapsed_ns(cp_cfo_start, profiling::now()));
 
         pmt::pmt_t frame_meta = input_meta;
         frame_meta = pmt::dict_add(
@@ -548,13 +496,13 @@ void prs_zc_frame_sync_impl::handle_candidate(const pmt::pmt_t& message)
                          pmt::cons(frame_meta, pmt::init_c32vector(frame.size(), frame)));
         diagnostics = pmt::dict_add(
             diagnostics, pmt::mp("preamble_metric"), pmt::from_double(cfo.metric));
-        finish_diagnostics("NONE", true, cfo_ns, zc_ns, extraction_ns);
+        finish_diagnostics("NONE", true);
     } catch (const std::exception& error) {
         diagnostics = pmt::dict_add(
             diagnostics, pmt::mp("error"), pmt::string_to_symbol(error.what()));
-        finish_diagnostics("PROCESSING_ERROR", false, 0, 0, 0);
+        finish_diagnostics("PROCESSING_ERROR", false);
     } catch (...) {
-        finish_diagnostics("PROCESSING_ERROR", false, 0, 0, 0);
+        finish_diagnostics("PROCESSING_ERROR", false);
     }
 }
 

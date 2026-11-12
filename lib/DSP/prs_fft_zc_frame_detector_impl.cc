@@ -6,7 +6,6 @@
  */
 
 #include "prs_fft_zc_frame_detector_impl.h"
-#include "prs_timing_helper.h"
 #include <gnuradio/fft/fft.h>
 #include <gnuradio/io_signature.h>
 #include <algorithm>
@@ -37,8 +36,7 @@ prs_fft_zc_frame_detector::sptr prs_fft_zc_frame_detector::make(double samp_rate
                                                                 int correlation_fft_len,
                                                                 int zc_search_before,
                                                                 int zc_search_after,
-                                                                bool cfo_compensation,
-                                                                bool enable_profiling)
+                                                                bool cfo_compensation)
 {
     return gnuradio::make_block_sptr<prs_fft_zc_frame_detector_impl>(samp_rate,
                                                                      fft_len,
@@ -60,8 +58,7 @@ prs_fft_zc_frame_detector::sptr prs_fft_zc_frame_detector::make(double samp_rate
                                                                      correlation_fft_len,
                                                                      zc_search_before,
                                                                      zc_search_after,
-                                                                     cfo_compensation,
-                                                                     enable_profiling);
+                                                                     cfo_compensation);
 }
 
 prs_fft_zc_frame_detector_impl::prs_fft_zc_frame_detector_impl(double samp_rate,
@@ -84,8 +81,7 @@ prs_fft_zc_frame_detector_impl::prs_fft_zc_frame_detector_impl(double samp_rate,
                                                                int correlation_fft_len,
                                                                int zc_search_before,
                                                                int zc_search_after,
-                                                               bool cfo_compensation,
-                                                               bool enable_profiling)
+                                                               bool cfo_compensation)
     : gr::block("prs_fft_zc_frame_detector",
                 gr::io_signature::make(1, 1, sizeof(gr_complex)),
                 gr::io_signature::make(0, 0, 0)),
@@ -111,13 +107,6 @@ prs_fft_zc_frame_detector_impl::prs_fft_zc_frame_detector_impl(double samp_rate,
       d_reply_delay_s(reply_delay_s),
       d_window_before_s(window_before_s),
       d_window_after_s(window_after_s),
-      d_enable_profiling(enable_profiling),
-      d_gate_scan_duration_ns(0),
-      d_zc_input_duration_ns(0),
-      d_zc_fft_duration_ns(0),
-      d_zc_multiply_duration_ns(0),
-      d_zc_ifft_duration_ns(0),
-      d_zc_peak_duration_ns(0),
       d_gate_armed(false),
       d_armed_preamble_index(0),
       d_armed_preamble_metric(0.0f),
@@ -173,7 +162,6 @@ prs_fft_zc_frame_detector_impl::prs_fft_zc_frame_detector_impl(double samp_rate,
     message_port_register_in(pmt::mp("prs_cfo_in"));
     message_port_register_out(pmt::mp("frame_out"));
     message_port_register_out(pmt::mp("event_out"));
-    message_port_register_out(pmt::mp("timing_out"));
     set_msg_handler(pmt::mp("tx_time_in"),
                     [this](pmt::pmt_t msg) { handle_tx_time(msg); });
     set_msg_handler(pmt::mp("prs_cfo_in"),
@@ -370,7 +358,6 @@ bool prs_fft_zc_frame_detector_impl::find_preamble_gate(size_t& preamble_index,
                                                         float& metric_out,
                                                         bool require_threshold)
 {
-    profiling::accumulated_timer gate_timer(d_enable_profiling, d_gate_scan_duration_ns);
     const size_t preamble_total =
         static_cast<size_t>(d_cfg.preamble_len * d_cfg.preamble_repeats);
     if (buffered_size() < preamble_total) {
@@ -467,9 +454,6 @@ bool prs_fft_zc_frame_detector_impl::fft_zc_search(size_t first_coarse,
     bool inside_threshold_lobe = false;
     size_t lobe_best_coarse = first_coarse;
     float lobe_best_metric = 0.0f;
-    const auto mark = [this]() {
-        return d_enable_profiling ? profiling::now() : profiling::timing_point();
-    };
 
     for (size_t block_start = first_coarse; block_start <= last_coarse;) {
         const size_t candidate_count =
@@ -479,7 +463,6 @@ bool prs_fft_zc_frame_detector_impl::fft_zc_search(size_t first_coarse,
             return false;
         }
 
-        auto stage_start = mark();
         auto* input = d_zc_fft->get_inbuf();
         std::fill(input, input + d_correlation_fft_len, gr_complex(0.0f, 0.0f));
         // Adjacent blocks overlap by ZC length minus one; only these linear-
@@ -496,37 +479,17 @@ bool prs_fft_zc_frame_detector_impl::fft_zc_search(size_t first_coarse,
                 input[i] = sample;
             }
         }
-        auto stage_stop = mark();
-        if (d_enable_profiling) {
-            d_zc_input_duration_ns += profiling::elapsed_ns(stage_start, stage_stop);
-        }
 
-        stage_start = stage_stop;
         d_zc_fft->execute();
-        stage_stop = mark();
-        if (d_enable_profiling) {
-            d_zc_fft_duration_ns += profiling::elapsed_ns(stage_start, stage_stop);
-        }
 
-        stage_start = stage_stop;
         auto* product = d_zc_ifft->get_inbuf();
         const auto* spectrum = d_zc_fft->get_outbuf();
         for (size_t k = 0; k < fft_len; ++k) {
             product[k] = spectrum[k] * d_zc_spectrum[k];
         }
-        stage_stop = mark();
-        if (d_enable_profiling) {
-            d_zc_multiply_duration_ns += profiling::elapsed_ns(stage_start, stage_stop);
-        }
 
-        stage_start = stage_stop;
         d_zc_ifft->execute();
-        stage_stop = mark();
-        if (d_enable_profiling) {
-            d_zc_ifft_duration_ns += profiling::elapsed_ns(stage_start, stage_stop);
-        }
 
-        stage_start = stage_stop;
         const auto* correlation = d_zc_ifft->get_outbuf();
         double energy = 0.0;
         for (size_t i = 0; i < zc_len; ++i) {
@@ -556,19 +519,12 @@ bool prs_fft_zc_frame_detector_impl::fft_zc_search(size_t first_coarse,
                 best_coarse = lobe_best_coarse;
                 best_metric = lobe_best_metric;
                 found_threshold_peak = true;
-                if (d_enable_profiling) {
-                    d_zc_peak_duration_ns += profiling::elapsed_ns(stage_start, mark());
-                }
                 return true;
             }
             if (i + 1 < candidate_count) {
                 energy -= std::norm(input[i]);
                 energy += std::norm(input[i + zc_len]);
             }
-        }
-        stage_stop = mark();
-        if (d_enable_profiling) {
-            d_zc_peak_duration_ns += profiling::elapsed_ns(stage_start, stage_stop);
         }
         block_start += candidate_count;
     }
@@ -820,38 +776,14 @@ void prs_fft_zc_frame_detector_impl::publish_frame(size_t frame_start_index,
                                                    float preamble_metric,
                                                    float coarse_metric)
 {
-    profiling::timing_report report(d_enable_profiling, "fft_zc_frame_detector");
-    const uint64_t scan_duration_ns = d_gate_scan_duration_ns + d_zc_input_duration_ns +
-                                      d_zc_fft_duration_ns + d_zc_multiply_duration_ns +
-                                      d_zc_ifft_duration_ns + d_zc_peak_duration_ns;
-    report.add("preamble_gate_scan", d_gate_scan_duration_ns);
-    report.add("zc_input_prepare", d_zc_input_duration_ns);
-    report.add("zc_fft_forward", d_zc_fft_duration_ns);
-    report.add("zc_spectrum_multiply", d_zc_multiply_duration_ns);
-    report.add("zc_ifft", d_zc_ifft_duration_ns);
-    report.add("zc_normalize_peak", d_zc_peak_duration_ns);
-    report.add("preamble_zc_scan", scan_duration_ns);
-    d_gate_scan_duration_ns = 0;
-    d_zc_input_duration_ns = 0;
-    d_zc_fft_duration_ns = 0;
-    d_zc_multiply_duration_ns = 0;
-    d_zc_ifft_duration_ns = 0;
-    d_zc_peak_duration_ns = 0;
     const int flen = frame_len(d_cfg);
     const uint64_t abs_start = d_buffer_abs_start + frame_start_index;
     const uint64_t coarse_abs = d_buffer_abs_start + coarse_index;
     const auto frame_begin = d_buffer.begin() + d_buffer_head + frame_start_index;
-    auto stage_start = report.mark();
     std::vector<gr_complex> frame(frame_begin, frame_begin + flen);
-    auto stage_stop = report.mark();
-    report.add("frame_extract", stage_start, stage_stop);
-    stage_start = stage_stop;
     const auto prs_cp_cfo =
         estimate_prs_cp_cfo(frame.data(), frame.size(), d_cfg, d_last_detection_cfo_hz);
-    stage_stop = report.mark();
-    report.add("prs_cp_cfo", stage_start, stage_stop);
 
-    stage_start = stage_stop;
     const uint64_t recv_id = d_next_frame_id++;
     pmt::pmt_t meta = pmt::make_dict();
     meta = pmt::dict_add(meta, pmt::mp("recv_id"), pmt::from_uint64(recv_id));
@@ -920,23 +852,11 @@ void prs_fft_zc_frame_detector_impl::publish_frame(size_t frame_start_index,
         meta = pmt::dict_add(
             meta, pmt::mp("rx_time_tag_offset"), pmt::from_uint64(d_rx_time_tag_offset));
     }
-    stage_stop = report.mark();
-    report.add("metadata_build", stage_start, stage_stop);
 
-    stage_start = stage_stop;
     const auto data = pmt::init_c32vector(frame.size(), frame);
     const auto pdu = pmt::cons(meta, data);
-    stage_stop = report.mark();
-    report.add("frame_pdu_build", stage_start, stage_stop);
-    stage_start = stage_stop;
     message_port_pub(pmt::mp("frame_out"), pdu);
-    stage_stop = report.mark();
-    report.add("frame_pdu_publish", stage_start, stage_stop);
     d_last_frame_start = static_cast<int64_t>(abs_start);
-    report.add("acquisition_total", scan_duration_ns + report.handler_elapsed_ns());
-    if (report.enabled()) {
-        message_port_pub(pmt::mp("timing_out"), report.finish(meta));
-    }
 }
 
 int prs_fft_zc_frame_detector_impl::general_work(int noutput_items,

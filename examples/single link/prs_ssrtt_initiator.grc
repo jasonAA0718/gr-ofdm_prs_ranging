@@ -239,7 +239,6 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
-    enable_profiling: 'False'
     fft_len: '512'
     maxoutbuf: '0'
     mc_ds_gold_code_id: '2'
@@ -261,7 +260,6 @@ blocks:
     alias: ''
     append: '1'
     comment: ''
-    enable_profiling: 'False'
     maxoutbuf: '0'
     minoutbuf: '0'
     path: obs_log
@@ -280,7 +278,6 @@ blocks:
     alias: ''
     comment: ''
     cp_len: '64'
-    enable_profiling: 'False'
     fft_len: '512'
     maxoutbuf: '0'
     minoutbuf: '0'
@@ -306,7 +303,6 @@ blocks:
     comment: Connect UHD Source here
     correlation_fft_len: '4096'
     cp_len: '64'
-    enable_profiling: 'False'
     fft_len: '512'
     maxoutbuf: '0'
     min_frame_gap: '10000'
@@ -337,7 +333,6 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
-    enable_profiling: 'False'
     fft_len: '512'
     max_residual_rms: '1.0'
     maxoutbuf: '0'
@@ -404,7 +399,6 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
-    enable_profiling: 'False'
     maxoutbuf: '0'
     minoutbuf: '0'
     samp_rate: samp_rate

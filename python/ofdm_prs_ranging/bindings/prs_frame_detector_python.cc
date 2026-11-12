@@ -24,6 +24,5 @@ void bind_prs_frame_detector(py::module& m)
              py::arg("reply_delay_s") = 0.05,
              py::arg("window_before_s") = 0.0002,
              py::arg("window_after_s") = 0.004,
-             py::arg("zc_threshold") = 0.35f,
-             py::arg("enable_profiling") = false);
+             py::arg("zc_threshold") = 0.35f);
 }

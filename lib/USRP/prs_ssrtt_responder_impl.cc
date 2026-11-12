@@ -9,7 +9,6 @@
 #include "prs_protocol_metadata.h"
 #include "prs_receiver_utils.h"
 #include "prs_ssrtt_responder_impl.h"
-#include "prs_timing_helper.h"
 #include <gnuradio/io_signature.h>
 #include <cmath>
 #include <algorithm>
@@ -35,24 +34,21 @@ double dict_ref_time_tuple(const pmt::pmt_t& dict, const char* key, double fallb
 
 prs_ssrtt_responder::sptr prs_ssrtt_responder::make(double samp_rate,
                                                     uint64_t reply_delay_samples,
-                                                    bool enable_profiling,
                                                     uint64_t anchor_id)
 {
     return gnuradio::make_block_sptr<prs_ssrtt_responder_impl>(
-        samp_rate, reply_delay_samples, enable_profiling, anchor_id);
+        samp_rate, reply_delay_samples, anchor_id);
 }
 
 prs_ssrtt_responder_impl::prs_ssrtt_responder_impl(double samp_rate,
                                                    uint64_t reply_delay_samples,
-                                                   bool enable_profiling,
                                                     uint64_t anchor_id)
     : gr::block("prs_ssrtt_responder",
                 gr::io_signature::make(0, 0, 0),
                 gr::io_signature::make(0, 0, 0)),
       d_samp_rate(samp_rate),
       d_reply_delay_samples(reply_delay_samples),
-      d_anchor_id(anchor_id),
-      d_enable_profiling(enable_profiling)
+      d_anchor_id(anchor_id)
 {
     if (!std::isfinite(samp_rate) || samp_rate <= 0 || reply_delay_samples > 0xffffff || anchor_id > 7) {
         throw std::invalid_argument("invalid responder sample rate, delay or anchor_id");
@@ -60,14 +56,12 @@ prs_ssrtt_responder_impl::prs_ssrtt_responder_impl(double samp_rate,
     message_port_register_in(pmt::mp("measurement_in"));
     message_port_register_out(pmt::mp("trigger_out"));
     message_port_register_out(pmt::mp("diagnostic_out"));
-    message_port_register_out(pmt::mp("timing_out"));
     set_msg_handler(pmt::mp("measurement_in"),
                     [this](pmt::pmt_t msg) { handle_measurement(msg); });
 }
 
 void prs_ssrtt_responder_impl::handle_measurement(pmt::pmt_t msg)
 {
-    profiling::timing_report report(d_enable_profiling, "ssrtt_responder");
     if (!pmt::is_pair(msg)) {
         return;
     }
@@ -107,9 +101,7 @@ void prs_ssrtt_responder_impl::handle_measurement(pmt::pmt_t msg)
     const double reply_delay_s = static_cast<double>(d_reply_delay_samples) / d_samp_rate;
     const double response_tx_time = poll_rx_time + reply_delay_s;
     const double secs_floor = std::floor(response_tx_time);
-    report.checkpoint("validate_and_schedule");
 
-    auto stage_start = report.mark();
     pmt::pmt_t trigger = pmt::make_dict();
     trigger = pmt::dict_add(
         trigger, pmt::mp("packet_type"), pmt::from_long(prs_packet_type_response));
@@ -126,15 +118,7 @@ void prs_ssrtt_responder_impl::handle_measurement(pmt::pmt_t msg)
     trigger = pmt::dict_add(trigger,
                             pmt::mp("tx_time_frac"),
                             pmt::from_double(response_tx_time - secs_floor));
-    auto stage_stop = report.mark();
-    report.add("trigger_build", stage_start, stage_stop);
-    stage_start = stage_stop;
     message_port_pub(pmt::mp("trigger_out"), trigger);
-    stage_stop = report.mark();
-    report.add("trigger_publish", stage_start, stage_stop);
-    if (report.enabled()) {
-        message_port_pub(pmt::mp("timing_out"), report.finish(meta));
-    }
 }
 
 } // namespace ofdm_prs_ranging

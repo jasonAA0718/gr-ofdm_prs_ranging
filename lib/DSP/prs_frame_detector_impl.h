@@ -34,8 +34,7 @@ public:
                             double reply_delay_s,
                             double window_before_s,
                             double window_after_s,
-                            float zc_threshold,
-                            bool enable_profiling);
+                            float zc_threshold);
     ~prs_frame_detector_impl() override = default;
 
     void forecast(int noutput_items, gr_vector_int& ninput_items_required) override;
@@ -65,8 +64,6 @@ private:
     double d_reply_delay_s;
     double d_window_before_s;
     double d_window_after_s;
-    bool d_enable_profiling;
-    uint64_t d_scan_duration_ns;
 
     struct correlation_window {
         double start;

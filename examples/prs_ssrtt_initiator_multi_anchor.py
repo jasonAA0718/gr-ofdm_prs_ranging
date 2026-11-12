@@ -90,7 +90,7 @@ class prs_ssrtt_initiator_multi_anchor(gr.top_block):
         self.uhd_usrp_sink_0.set_bandwidth(samp_rate, 0)
         self.uhd_usrp_sink_0.set_gain(tx_gain, 0)
         self.uhd_usrp_sink_0.set_min_output_buffer(1048576)
-        self.prs_ssrtt_solver_0 = ofdm_prs_ranging.prs_ssrtt_solver(samp_rate, False)
+        self.prs_ssrtt_solver_0 = ofdm_prs_ranging.prs_ssrtt_solver(samp_rate)
         self.prs_source = ofdm_prs_ranging.prs_timed_burst_source(
             samp_rate, 512, 64, 512, 127,
             premble_length, premble_rep, zc_length,
@@ -98,12 +98,12 @@ class prs_ssrtt_initiator_multi_anchor(gr.top_block):
             0.1, 0.7, 13990001, 1,
             True, 25, 2)
         self.prs_rx_timekeeper_0 = ofdm_prs_ranging.prs_rx_timekeeper(samp_rate, 0.1)
-        self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 512, 512, 1.0, False)
+        self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 512, 512, 1.0)
         self.prs_multi_anchor_cycle_0 = ofdm_prs_ranging.prs_multi_anchor_cycle(samp_rate, anchor_ids, time_delays, premble_length, premble_rep, zc_length, receive_early_s, receive_late_s, processing_grace_s)
-        self.prs_frame_detector_0_0 = ofdm_prs_ranging.prs_fft_zc_frame_detector(samp_rate, 512, 64, 512, 127, premble_length, premble_rep, zc_length, 0.5, 10000, 29, 1, 1, 0.0, 0.00166, 0.0077, 0.5, 4096, 512, (4096-512), True, False)
-        self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 512, 64, 512, 127, False)
-        self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger(obs_log, 1, False)
-        self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 512, 512, 127, 13990001, False, 2)
+        self.prs_frame_detector_0_0 = ofdm_prs_ranging.prs_fft_zc_frame_detector(samp_rate, 512, 64, 512, 127, premble_length, premble_rep, zc_length, 0.5, 10000, 29, 1, 1, 0.0, 0.00166, 0.0077, 0.5, 4096, 512, (4096-512), True)
+        self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 512, 64, 512, 127)
+        self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger(obs_log, 1)
+        self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 512, 512, 127, 13990001, 2)
         self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/multi_anchor_acquisition.csv", "initiator", 1)
         self.cycle_summary_debug = blocks.message_debug(True, gr.log_levels.info)
         self.cycle_diagnostic_debug = blocks.message_debug(True, gr.log_levels.info)

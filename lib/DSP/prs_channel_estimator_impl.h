@@ -22,7 +22,6 @@ public:
                                int active_bins,
                                int prs_symbols,
                                uint32_t seed,
-                               bool enable_profiling,
                                int mc_ds_gold_code_id);
     ~prs_channel_estimator_impl() override = default;
 
@@ -32,7 +31,6 @@ private:
     std::vector<gr_complex> d_full_channel;
     std::vector<gr_complex> d_channel;
     std::vector<double> d_channel_energy;
-    bool d_enable_profiling;
     void handle_symbols(pmt::pmt_t msg);
 };
 

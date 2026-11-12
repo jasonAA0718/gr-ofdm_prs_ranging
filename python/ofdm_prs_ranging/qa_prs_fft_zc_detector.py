@@ -16,7 +16,7 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
     def tearDown(self):
         self.tb = None
 
-    def run_detector(self, samples, profiling=False):
+    def run_detector(self, samples):
         source = blocks.vector_source_c(samples, False)
         detector = ofdm_prs_ranging.prs_fft_zc_frame_detector(
             samp_rate=30e6,
@@ -28,15 +28,12 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
             correlation_fft_len=2048,
             zc_search_before=1024,
             zc_search_after=1024,
-            enable_profiling=profiling,
         )
         frame_debug = blocks.message_debug()
-        timing_debug = blocks.message_debug()
         self.tb.connect(source, detector)
         self.tb.msg_connect((detector, "frame_out"), (frame_debug, "store"))
-        self.tb.msg_connect((detector, "timing_out"), (timing_debug, "store"))
         self.tb.run()
-        return frame_debug, timing_debug
+        return frame_debug
 
     def test_clean_cfo_frame_finds_exact_boundary(self):
         tx = ofdm_prs_ranging.prs_timed_burst_source(
@@ -55,7 +52,7 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
             (numpy.zeros(prefix, numpy.complex64), frame, numpy.zeros(2048, numpy.complex64))
         )
 
-        frame_debug, timing_debug = self.run_detector(samples, profiling=True)
+        frame_debug = self.run_detector(samples)
 
         self.assertEqual(frame_debug.num_messages(), 1)
         metadata = pmt.car(frame_debug.get_message(0))
@@ -90,22 +87,6 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
             )),
             1024,
         )
-        self.assertEqual(timing_debug.num_messages(), 1)
-        timing = timing_debug.get_message(0)
-        self.assertEqual(
-            pmt.symbol_to_string(pmt.dict_ref(timing, pmt.intern("block"), pmt.PMT_NIL)),
-            "fft_zc_frame_detector",
-        )
-        stages = pmt.dict_ref(timing, pmt.intern("stages"), pmt.PMT_NIL)
-        for stage in (
-            "preamble_gate_scan",
-            "zc_input_prepare",
-            "zc_fft_forward",
-            "zc_spectrum_multiply",
-            "zc_ifft",
-            "zc_normalize_peak",
-        ):
-            self.assertFalse(pmt.is_null(pmt.dict_ref(stages, pmt.intern(stage), pmt.PMT_NIL)))
 
     def test_prs_channel_cfo_feedback_drives_next_acquisition(self):
         samp_rate = 30e6
@@ -176,7 +157,7 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
             (numpy.zeros(1000, numpy.complex64), repeated, numpy.zeros(60000, numpy.complex64))
         )
 
-        frame_debug, _ = self.run_detector(samples)
+        frame_debug = self.run_detector(samples)
 
         self.assertEqual(frame_debug.num_messages(), 0)
 

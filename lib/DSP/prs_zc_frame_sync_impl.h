@@ -31,8 +31,7 @@ public:
                            float preamble_threshold,
                            float zc_threshold,
                            int coarse_zc_root,
-                           int channel_id,
-                           bool enable_profiling);
+                           int channel_id);
     ~prs_zc_frame_sync_impl() override = default;
 
 private:
@@ -55,7 +54,6 @@ private:
     prs_rx_config d_cfg;
     float d_preamble_threshold;
     float d_zc_threshold;
-    bool d_enable_profiling;
     uint64_t d_next_recv_id;
     std::vector<gr_complex> d_coarse;
     std::vector<gr_complex> d_scratch;

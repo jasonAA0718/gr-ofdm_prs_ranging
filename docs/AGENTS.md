@@ -10,6 +10,43 @@
   into this branch as an incidental change.
 - Inspect the working tree before editing and preserve unrelated user changes.
 
+## Change Authorization and Approval
+
+- Before modifying any project file, discuss the proposed changes with the user
+  and obtain explicit approval. This applies to source code, documentation,
+  configuration, tests, scripts, generated files, and build-system files.
+- Requests to investigate, review, explain, debug, or propose a solution do not
+  authorize edits. Read-only inspection and analysis may proceed without approval.
+- Before requesting approval, describe the motivation, affected files, proposed
+  changes, potential side effects or compatibility risks, and planned tests.
+  Prefer a minimal change plan or patch for review.
+- Approval covers only the discussed scope. Request further approval before
+  making additional changes, unrelated improvements, refactoring, or cleanup.
+- Commands that create, overwrite, delete, or regenerate files require approval
+  unless those effects were included in an already-approved task. Normal build
+  and test artifacts may be generated within an explicitly approved build/test
+  scope; disclose expected side effects beforehand. Request separate approval
+  for dependency installation, system configuration changes, or data deletion.
+- Never commit, push, reset, clean, or discard user changes without explicit
+  authorization.
+- After approved edits, report changed files, behavior changes, tests actually
+  performed, and unresolved issues.
+
+## Language and Communication
+
+- Always respond to the user in Traditional Chinese (Taiwan usage), even when
+  instructions are written in English, unless the user explicitly requests a
+  different response language.
+- Retain English technical terminology where appropriate, including APIs,
+  algorithms, protocols, signal-processing and software-engineering terms.
+- Do not translate code identifiers, class/function/variable names, file paths,
+  or command-line instructions.
+- Explain proposed changes, debugging results, reasoning, and implementation
+  reports in Traditional Chinese. Distinguish verified facts, assumptions, and
+  proposals; use objective, precise language without unnecessary filler.
+- Preserve existing project language conventions for source code, comments,
+  commit messages, and documentation unless the user explicitly requests otherwise.
+
 ## Authority and Documentation Ownership
 
 - Follow the user's task and constraints first. These rules govern agent work;
@@ -24,14 +61,20 @@
   geometry, or architecture. Resolve intent before making a dependent change.
 - Treat labeled historical sections as provenance, not current specifications.
   Distinguish code availability, example selection, synthetic QA, and RF validation.
-- Update implemented equations/parameters in signal.md, architecture/status and
-  experimental history in README.md, and future work in Agenda.md. Avoid copying
+- When implementation changes require documentation synchronization, propose
+  updates to implemented equations/parameters in signal.md, architecture/status
+  and experimental history in README.md, and future work in Agenda.md. Obtain
+  approval for those documentation edits before applying them. Avoid copying
   detailed mathematics into README.md or maintaining a second specification here.
 - Agenda.md is intentionally Git-ignored and may be absent in another checkout.
   Do not force-add it or assume its contents were shared. Report missing sources
   when relevant. Keep useful experimental history labeled and do not invent results.
 
 ## Waveform and Receiver Constraints
+
+- Treat numerical system parameters below as the documented current implementation
+  baseline, not permanent specifications. Verify them against current source and
+  signal.md; report discrepancies before proposing or making dependent changes.
 
 - Preserve `fft_len=512`, `cp_len=64`, `active_bins=512`, and `prs_symbols=127`
   unless the task explicitly changes the waveform. Use 30 MS/s for documented
@@ -67,9 +110,9 @@
 - Do not silently change the hard-coded SS-TWR calibration. Verify the current
   expression in source and its timestamp/reference convention before modifying
   it. Historical calibration values may not remain valid after waveform,
-  detector, or timestamp-reference changes. Report uncertainty instead of
-  silently recalibrating.
-  inspect and report the current expression and confirm its intended reference.
+  detector, or timestamp-reference changes. Inspect and report the current
+  expression, confirm its intended reference, and report uncertainty instead
+  of silently recalibrating.
 - Keep live integer `range_m` distinct from offline bidirectional phase
   correction. `fine_delay` is relative to the selected FFT window, not absolute
   ToF and not guaranteed within half a sample. Do not add DS-TWR, clock-skew
@@ -104,7 +147,8 @@
 
 ## Build and Test
 
-For implementation changes, configure/build and run focused QA appropriate to
+Within an approved implementation and build/test scope, configure/build and run
+focused QA appropriate to
 the change; run the full suite for shared waveform, API or timing changes:
 
 ```bash
@@ -135,14 +179,11 @@ ctest --test-dir build --output-on-failure
   waveform amplitude from calibrated conducted or radiated RF power.
 ## Priorities and Assumptions to Avoid
 
-Use the following order when choosing among otherwise-unassigned roadmap work:
-
-1. Link-budget and operational-range validation.
-2. Multi-responder ranging validation.
-3. Fine-ranging calibration across distance.
-4. Multi-anchor positioning.
-5. Integrated payload robustness validation.
-6. Update-rate and processing-latency optimization.
+- Use local `Agenda.md` as the reference for current research priorities and
+  proposed experiments when available; it does not authorize starting a task.
+- Do not initiate roadmap work without an explicit user request. If priorities
+  conflict with current instructions or project evidence, report the conflict
+  rather than selecting work independently.
 
 - Do not label `snr`, `tx_amp`, normalized gain or uncalibrated FFT power as dBm.
   Separate calibrated RF measurements from relative DSP metrics and record

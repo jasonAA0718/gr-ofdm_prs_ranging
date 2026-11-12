@@ -7,7 +7,6 @@
 
 #include "prs_csv_logger_impl.h"
 #include "prs_protocol_metadata.h"
-#include "prs_timing_helper.h"
 #include <gnuradio/io_signature.h>
 #include <iomanip>
 
@@ -19,19 +18,17 @@ constexpr double c_mps = 299792458.0;
 }
 
 prs_csv_logger::sptr
-prs_csv_logger::make(const std::string& path, bool append, bool enable_profiling)
+prs_csv_logger::make(const std::string& path, bool append)
 {
-    return gnuradio::make_block_sptr<prs_csv_logger_impl>(path, append, enable_profiling);
+    return gnuradio::make_block_sptr<prs_csv_logger_impl>(path, append);
 }
 
 prs_csv_logger_impl::prs_csv_logger_impl(const std::string& path,
-                                         bool append,
-                                         bool enable_profiling)
+                                         bool append)
     : gr::block("prs_csv_logger",
                 gr::io_signature::make(0, 0, 0),
                 gr::io_signature::make(0, 0, 0)),
-      d_file(path, append ? std::ios::app : std::ios::trunc),
-      d_enable_profiling(enable_profiling)
+      d_file(path, append ? std::ios::app : std::ios::trunc)
 {
     if (!append || d_file.tellp() == 0) {
         d_file << "direction,poll_id,anchor_id,"
@@ -45,7 +42,6 @@ prs_csv_logger_impl::prs_csv_logger_impl(const std::string& path,
                   "channel_coherence,phase_slope_rad_per_hz,phase_residual,snr,quality\n";
     }
     message_port_register_in(pmt::mp("measurement_in"));
-    message_port_register_out(pmt::mp("timing_out"));
     set_msg_handler(pmt::mp("measurement_in"),
                     [this](pmt::pmt_t msg) { handle_measurement(msg); });
 }
@@ -59,7 +55,6 @@ prs_csv_logger_impl::~prs_csv_logger_impl()
 
 void prs_csv_logger_impl::handle_measurement(pmt::pmt_t msg)
 {
-    profiling::timing_report report(d_enable_profiling, "csv_logger");
     if (!pmt::is_pair(msg) || !d_file.is_open()) {
         return;
     }
@@ -70,8 +65,6 @@ void prs_csv_logger_impl::handle_measurement(pmt::pmt_t msg)
             ? "poll_rx"
             : (packet_type == prs_packet_type_response ? "response_rx" : "unknown");
 
-    report.checkpoint("input_decode");
-    auto stage_start = report.mark();
     d_file << std::setprecision(15);
     d_file << direction << ',' << dict_ref_uint64(meta, "poll_id", 0) << ','
            << dict_ref_uint64(meta, "anchor_id", 0) << ','
@@ -103,15 +96,7 @@ void prs_csv_logger_impl::handle_measurement(pmt::pmt_t msg)
            << dict_ref_double(meta, "phase_residual", 0.0) << ','
            << dict_ref_double(meta, "snr", 0.0) << ','
            << dict_ref_double(meta, "quality", 0.0) << '\n';
-    auto stage_stop = report.mark();
-    report.add("format_write", stage_start, stage_stop);
-    stage_start = stage_stop;
     d_file.flush();
-    stage_stop = report.mark();
-    report.add("file_flush", stage_start, stage_stop);
-    if (report.enabled()) {
-        message_port_pub(pmt::mp("timing_out"), report.finish(meta));
-    }
 }
 
 } // namespace ofdm_prs_ranging

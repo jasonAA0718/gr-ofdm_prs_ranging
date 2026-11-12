@@ -3,17 +3,15 @@ label: PRS FFT Receiver
 category: '[ofdm_prs_ranging]'
 templates:
   imports: from gnuradio import ofdm_prs_ranging
-  make: ofdm_prs_ranging.prs_fft_receiver(${samp_rate}, ${fft_len}, ${cp_len}, ${active_bins}, ${prs_symbols}, ${enable_profiling})
+  make: ofdm_prs_ranging.prs_fft_receiver(${samp_rate}, ${fft_len}, ${cp_len}, ${active_bins}, ${prs_symbols})
 parameters:
 - {id: samp_rate, label: Sample Rate, dtype: real, default: 10e6}
 - {id: fft_len, label: FFT Length, dtype: int, default: 512}
 - {id: cp_len, label: CP Length, dtype: int, default: 64}
 - {id: active_bins, label: Active Bins, dtype: int, default: 512}
 - {id: prs_symbols, label: PRS Symbols, dtype: int, default: 127}
-- {id: enable_profiling, label: Enable Profiling, dtype: bool, default: 'False'}
 inputs:
 - {label: frame_in, domain: message}
 outputs:
 - {label: symbols_out, domain: message}
-- {label: timing_out, domain: message, optional: true}
 file_format: 1

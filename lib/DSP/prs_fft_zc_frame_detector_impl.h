@@ -40,8 +40,7 @@ public:
                                    int correlation_fft_len,
                                    int zc_search_before,
                                    int zc_search_after,
-                                   bool cfo_compensation,
-                                   bool enable_profiling);
+                                   bool cfo_compensation);
     ~prs_fft_zc_frame_detector_impl() override = default;
 
     void forecast(int noutput_items, gr_vector_int& ninput_items_required) override;
@@ -79,13 +78,6 @@ private:
     double d_reply_delay_s;
     double d_window_before_s;
     double d_window_after_s;
-    bool d_enable_profiling;
-    uint64_t d_gate_scan_duration_ns;
-    uint64_t d_zc_input_duration_ns;
-    uint64_t d_zc_fft_duration_ns;
-    uint64_t d_zc_multiply_duration_ns;
-    uint64_t d_zc_ifft_duration_ns;
-    uint64_t d_zc_peak_duration_ns;
     bool d_gate_armed;
     size_t d_armed_preamble_index;
     float d_armed_preamble_metric;

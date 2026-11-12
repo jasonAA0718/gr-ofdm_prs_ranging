@@ -23,7 +23,6 @@ public:
                      int active_bins = 512,
                      int prs_symbols = 127,
                      uint32_t seed = 13990001,
-                     bool enable_profiling = false,
                      int mc_ds_gold_code_id = 2);
 };
 

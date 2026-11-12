@@ -404,7 +404,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
             (native[:, 256:], native[:, :256]), axis=1).reshape(-1)
 
         estimator = ofdm_prs_ranging.prs_channel_estimator(
-            10e6, 512, 512, 127, 13990001, False, 2)
+            10e6, 512, 512, 127, 13990001, 2)
         debug = blocks.message_debug()
         symbols = pmt.init_c32vector(
             len(signed_order), [complex(value) for value in signed_order])
@@ -444,7 +444,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
                     rotations[:, None]).reshape(-1)
 
         estimator = ofdm_prs_ranging.prs_channel_estimator(
-            samp_rate, 512, 512, 127, 13990001, False, 2)
+            samp_rate, 512, 512, 127, 13990001, 2)
         debug = blocks.message_debug()
         phase = ofdm_prs_ranging.prs_phase_slope_estimator(
             samp_rate, 512, 512, 1.0)
@@ -864,7 +864,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
                 ofdm_prs_ranging.prs_ssrtt_responder(anchor_id=anchor)
         with self.assertRaises(ValueError):
             ofdm_prs_ranging.prs_ssrtt_responder(reply_delay_samples=0x1000000)
-        responder = ofdm_prs_ranging.prs_ssrtt_responder(30e6, 1500000, False, 7)
+        responder = ofdm_prs_ranging.prs_ssrtt_responder(30e6, 1500000, 7)
         debug = blocks.message_debug()
         self.tb.msg_connect(responder, "trigger_out", debug, "store")
         cases = [(0.25, True, True, 256), (-0.375, True, True, -384),
@@ -902,7 +902,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
         fft = ofdm_prs_ranging.prs_fft_receiver(samp_rate=fs)
         channel = ofdm_prs_ranging.prs_channel_estimator(samp_rate=fs)
         phase = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate=fs)
-        responder = ofdm_prs_ranging.prs_ssrtt_responder(fs, 1500000, False, 7)
+        responder = ofdm_prs_ranging.prs_ssrtt_responder(fs, 1500000, 7)
         trigger_debug = blocks.message_debug()
         sink = blocks.vector_sink_c()
         head = blocks.head(gr.sizeof_gr_complex, response.frame_len())

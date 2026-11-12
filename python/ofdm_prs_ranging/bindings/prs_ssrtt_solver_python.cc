@@ -8,6 +8,5 @@ void bind_prs_ssrtt_solver(py::module& m)
     py::class_<block, gr::block, gr::basic_block, std::shared_ptr<block>>(
         m, "prs_ssrtt_solver")
         .def(py::init(&block::make),
-             py::arg("samp_rate") = 10e6,
-             py::arg("enable_profiling") = false);
+             py::arg("samp_rate") = 10e6);
 }

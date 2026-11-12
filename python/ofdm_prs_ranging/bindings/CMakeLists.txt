@@ -39,7 +39,6 @@ list(APPEND ofdm_prs_ranging_python_files
     prs_ssrtt_solver_python.cc
     prs_position_solver_python.cc
     prs_csv_logger_python.cc
-    prs_timing_collector_python.cc
     prs_timed_burst_source_python.cc
     zc_manual_ping_source_python.cc
     zc_peak_detector_python.cc

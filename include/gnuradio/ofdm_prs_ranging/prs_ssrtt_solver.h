@@ -18,7 +18,7 @@ class OFDM_PRS_RANGING_API prs_ssrtt_solver : virtual public gr::block
 {
 public:
     typedef std::shared_ptr<prs_ssrtt_solver> sptr;
-    static sptr make(double samp_rate = 10e6, bool enable_profiling = false);
+    static sptr make(double samp_rate = 10e6);
 };
 
 } // namespace ofdm_prs_ranging

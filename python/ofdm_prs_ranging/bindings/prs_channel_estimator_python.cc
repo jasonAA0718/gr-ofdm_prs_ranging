@@ -13,6 +13,5 @@ void bind_prs_channel_estimator(py::module& m)
              py::arg("active_bins") = 512,
              py::arg("prs_symbols") = 127,
              py::arg("seed") = 13990001,
-             py::arg("enable_profiling") = false,
              py::arg("mc_ds_gold_code_id") = 2);
 }

@@ -31,8 +31,7 @@ public:
                      float preamble_threshold = 0.09f,
                      float zc_threshold = 0.35f,
                      int coarse_zc_root = 25,
-                     int channel_id = 0,
-                     bool enable_profiling = false);
+                     int channel_id = 0);
 };
 
 } // namespace ofdm_prs_ranging

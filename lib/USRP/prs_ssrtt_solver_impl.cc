@@ -9,7 +9,6 @@
 #include "prs_protocol_metadata.h"
 #include "prs_receiver_utils.h"
 #include "prs_ssrtt_solver_impl.h"
-#include "prs_timing_helper.h"
 #include <gnuradio/io_signature.h>
 #include <cmath>
 #include <stdexcept>
@@ -34,22 +33,20 @@ double dict_ref_time_tuple(const pmt::pmt_t& dict, const char* key, double fallb
 }
 } // namespace
 
-prs_ssrtt_solver::sptr prs_ssrtt_solver::make(double samp_rate, bool enable_profiling)
+prs_ssrtt_solver::sptr prs_ssrtt_solver::make(double samp_rate)
 {
-    return gnuradio::make_block_sptr<prs_ssrtt_solver_impl>(samp_rate, enable_profiling);
+    return gnuradio::make_block_sptr<prs_ssrtt_solver_impl>(samp_rate);
 }
 
-prs_ssrtt_solver_impl::prs_ssrtt_solver_impl(double samp_rate, bool enable_profiling)
+prs_ssrtt_solver_impl::prs_ssrtt_solver_impl(double samp_rate)
     : gr::block("prs_ssrtt_solver",
                 gr::io_signature::make(0, 0, 0),
                 gr::io_signature::make(0, 0, 0)),
-      d_samp_rate(samp_rate),
-      d_enable_profiling(enable_profiling)
+      d_samp_rate(samp_rate)
 {
     message_port_register_in(pmt::mp("tx_time_in"));
     message_port_register_in(pmt::mp("measurement_in"));
     message_port_register_out(pmt::mp("ssrtt_out"));
-    message_port_register_out(pmt::mp("timing_out"));
     set_msg_handler(pmt::mp("tx_time_in"),
                     [this](pmt::pmt_t msg) { handle_tx_time(msg); });
     set_msg_handler(pmt::mp("measurement_in"),
@@ -58,7 +55,6 @@ prs_ssrtt_solver_impl::prs_ssrtt_solver_impl(double samp_rate, bool enable_profi
 
 void prs_ssrtt_solver_impl::handle_tx_time(pmt::pmt_t msg)
 {
-    profiling::timing_report report(d_enable_profiling, "ssrtt_solver");
     if (!pmt::is_dict(msg)) {
         return;
     }
@@ -87,15 +83,10 @@ void prs_ssrtt_solver_impl::handle_tx_time(pmt::pmt_t msg)
     // Create a poll tx event.
     d_poll_tx_times[poll_id] = poll_tx{t1, dict_ref_uint64(msg, "cycle_sequence", 0),
                                                metadata_true(msg, "cycle_managed")};
-    report.checkpoint("tx_time_store");
-    if (report.enabled()) {
-        message_port_pub(pmt::mp("timing_out"), report.finish(msg));
-    }
 }
 
 void prs_ssrtt_solver_impl::handle_measurement(pmt::pmt_t msg)
 {
-    profiling::timing_report report(d_enable_profiling, "ssrtt_solver");
     if (!pmt::is_pair(msg)) {
         return;
     }
@@ -140,9 +131,7 @@ void prs_ssrtt_solver_impl::handle_measurement(pmt::pmt_t msg)
         ? c_mps / (2.0 * d_samp_rate) * (poll_fine_samples + response_fine_samples) : NAN;
     const double corrected_range_m = fine_valid ? range_m + correction_m : NAN;
     const double response_fine_delay_s = response_fine_samples / d_samp_rate;
-    report.checkpoint("ssrtt_calculation");
 
-    auto stage_start = report.mark();
     meta = pmt::dict_add(meta, pmt::mp("t1_tx_time"), pmt::from_double(t1));
     meta = pmt::dict_add(meta, pmt::mp("t4_rx_time"), pmt::from_double(t4));
     meta = pmt::dict_add(meta, pmt::mp("calibration_time"), pmt::from_double(5.808278798530661e-06));
@@ -152,17 +141,9 @@ void prs_ssrtt_solver_impl::handle_measurement(pmt::pmt_t msg)
     meta = pmt::dict_add(meta, pmt::mp("response_fine_delay_samples"), pmt::from_double(response_fine_samples));
     meta = pmt::dict_add(meta, pmt::mp("fine_range_correction_m"), pmt::from_double(correction_m));
     meta = pmt::dict_add(meta, pmt::mp("fine_correction_valid"), fine_valid ? pmt::PMT_T : pmt::PMT_F);
-    auto stage_stop = report.mark();
-    report.add("metadata_build", stage_start, stage_stop);
 
-    stage_start = stage_stop;
     const auto output = pmt::cons(meta, pmt::PMT_NIL);
     message_port_pub(pmt::mp("ssrtt_out"), output);
-    stage_stop = report.mark();
-    report.add("output_publish", stage_start, stage_stop);
-    if (report.enabled()) {
-        message_port_pub(pmt::mp("timing_out"), report.finish(meta));
-    }
 }
 
 } // namespace ofdm_prs_ranging

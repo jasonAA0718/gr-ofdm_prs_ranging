@@ -12,6 +12,5 @@ void bind_prs_fft_receiver(py::module& m)
              py::arg("fft_len") = 512,
              py::arg("cp_len") = 64,
              py::arg("active_bins") = 512,
-             py::arg("prs_symbols") = 127,
-             py::arg("enable_profiling") = false);
+             py::arg("prs_symbols") = 127);
 }

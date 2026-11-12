@@ -34,8 +34,7 @@ public:
                      double reply_delay_s = 0.05,
                      double window_before_s = 0.0002,
                      double window_after_s = 0.004,
-                     float zc_threshold = 0.35f,
-                     bool enable_profiling = false);
+                     float zc_threshold = 0.35f);
 };
 
 } // namespace ofdm_prs_ranging

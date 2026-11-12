@@ -33,8 +33,7 @@ public:
                      int candidate_margin_before = 4096,
                      int candidate_margin_after = 4096,
                      int queue_depth = 3,
-                     bool acquisition_enabled = true,
-                     bool enable_profiling = false);
+                     bool acquisition_enabled = true);
 };
 
 } // namespace ofdm_prs_ranging

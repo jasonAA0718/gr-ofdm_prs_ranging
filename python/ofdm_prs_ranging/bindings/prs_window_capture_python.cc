@@ -21,6 +21,5 @@ void bind_prs_window_capture(py::module& m)
              py::arg("candidate_margin_before") = 4096,
              py::arg("candidate_margin_after") = 4096,
              py::arg("queue_depth") = 3,
-             py::arg("acquisition_enabled") = true,
-             py::arg("enable_profiling") = false);
+             py::arg("acquisition_enabled") = true);
 }

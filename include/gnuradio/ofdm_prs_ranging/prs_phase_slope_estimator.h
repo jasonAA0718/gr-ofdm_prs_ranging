@@ -21,8 +21,7 @@ public:
     static sptr make(double samp_rate = 10e6,
                      int fft_len = 512,
                      int active_bins = 512,
-                     float max_residual_rms = 1.0f,
-                     bool enable_profiling = false);
+                     float max_residual_rms = 1.0f);
 };
 
 } // namespace ofdm_prs_ranging

@@ -317,7 +317,7 @@ class qa_prs_multi_anchor_cycle(gr_unittest.TestCase):
         # Completed cycles leave no active coordinator state.
 
     def test_responder_duplicate_poll_and_time_limited_reuse(self):
-        responder = prs.prs_ssrtt_responder(self.FS, 930000, False, 0)
+        responder = prs.prs_ssrtt_responder(self.FS, 930000, 0)
         debug, diag = blocks.message_debug(), blocks.message_debug()
         self.tb.msg_connect(responder, 'trigger_out', debug, 'store')
         self.tb.msg_connect(responder, 'diagnostic_out', diag, 'store')

@@ -34,7 +34,6 @@ class qa_prs_window_capture(gr_unittest.TestCase):
             candidate_margin_after=self.MARGIN,
             queue_depth=queue_depth,
             acquisition_enabled=enabled,
-            enable_profiling=True,
         )
 
     @staticmethod
@@ -151,7 +150,6 @@ class qa_prs_window_capture(gr_unittest.TestCase):
         self.assertGreater(search_end, first_rel + self.L * self.R)
         self.assertGreater(self._uint(meta, "block_a_samples_consumed"), 0)
         self.assertGreater(self._uint(meta, "block_a_work_calls"), 0)
-        self.assertGreater(self._uint(meta, "block_a_handler_time_ns"), 0)
         candidate_time = pmt.dict_ref(
             meta, pmt.intern("candidate_rx_time"), pmt.PMT_NIL)
         self.assertTrue(pmt.is_tuple(candidate_time))

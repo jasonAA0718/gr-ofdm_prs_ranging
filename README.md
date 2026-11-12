@@ -24,11 +24,10 @@ no standalone time-domain BPSK payload in the current receiver chain.
 | Timed POLL/RESPONSE SS-TWR | Implemented using UHD sample timestamps and timed TX |
 | Integrated OFDM payload | Implemented; 512 bins, 127 Gold chips, fixed data scrambler |
 | Local-ZC detector | Available as `prs_frame_detector` |
-| FFT-ZC detector | Available as `prs_fft_zc_frame_detector`; selected by the main and profiling GRCs |
+| FFT-ZC detector | Available as `prs_fft_zc_frame_detector`; selected by the main GRCs |
 | CFO handling | CP estimate plus post-FFT pilot/data phase alignment; optional FFT-ZC CFO feedback |
 | Fine delay | Weighted phase-slope estimate from the averaged 384 pilot bins |
 | Live range | Integer timestamp SS-TWR plus separate bidirectional corrected range when both fine estimates are valid |
-| Profiling | Optional instrumentation in existing blocks and a timing collector |
 | Anchor identity | Packet-level anchor ID 0–7; responder POLL fine delay transported in RESPONSE |
 | Multi-anchor ranging cycles | Implemented for 1..8 configured anchors with static windows, packet identity, duplicate suppression and bounded cycle completion |
 | RF validation | One-anchor Phase B and two-anchor Phase C reported successful by the user; three/four/eight-anchor RF operation is not claimed |
@@ -41,9 +40,9 @@ examples select it. Availability, example selection, and experimental validation
 are separate facts.
 
 Source ownership is `lib/DSP` for waveform/receiver processing,
-`lib/USRP` for UHD-oriented timing and SS-TWR, and `lib/Profiling` for timing
-collection. The older standalone ZC ranging blocks remain separate from this
-OFDM pipeline. This branch does not build a Pluto/IIO path.
+`lib/USRP` for UHD-oriented timing and SS-TWR. The older standalone ZC ranging
+blocks remain separate from this OFDM pipeline. This branch does not build a
+Pluto/IIO path.
 
 ## Architecture and Message Flow
 
@@ -112,7 +111,7 @@ external positional callers must remove the former ninth and tenth arguments.
 No ignored compatibility arguments are retained. Rebuild/reinstall consumers.
 
 The main examples use 128/17/819 preamble period/repeats/ZC, 31 ms replies,
-and 30 MS/s at 1060 MHz. The profiling pair uses 256/4/419 and 50 ms replies.
+and 30 MS/s at 1060 MHz.
 Runtime gain, thresholds, delays, receive margins and strobe settings remain
 configurable. The user's main initiator threshold selections are preserved.
 The split acquisition example and committed responder Python use
@@ -120,10 +119,10 @@ The split acquisition example and committed responder Python use
 samples while the downstream FFT receives original samples. Monolithic paths
 retain disabled preamble CFO. No acquisition redesign was made in Phase B.
 
-Responder `anchor_id` is appended after the existing profiling argument.
+Responder `anchor_id` follows `reply_delay_samples` in the constructor.
 Packet identity is authoritative; channel labels, ZC roots and Gold codes do
 not substitute for anchor identity or establish overlapping-response separation.
-All modified measurement/profiling CSV identity columns now use `poll_id` and
+All modified measurement CSV identity columns now use `poll_id` and
 `anchor_id`; use new output files rather than appending to old-schema CSVs.
 
 ## Ranging and Diagnostics
@@ -169,49 +168,26 @@ expired unanswered polls; response percentage includes all transmitted polls.
 A stale valid-frame timestamp produces `NO SIGNAL`. It displays the same
 relative SNR and live integer range, not an offline phase-corrected result.
 
-## Processing-Time Profiling
+## Profiling Removal
 
-The available profiling flowgraphs are:
+Development processing-time instrumentation and `prs_timing_collector` have
+been removed. Blocks no longer accept `enable_profiling` or publish `timing_out`.
+Split acquisition diagnostics no longer include `block_a_handler_time_ns`,
+`cfo_processing_time_ns`, `zc_processing_time_ns`, `frame_extraction_time_ns`,
+or `block_b_total_time_ns`. Acquisition outcomes and sample/UHD timestamps
+remain available.
 
-```text
-examples/prs_ssrtt_initiator_fft_zc_profiling.grc
-examples/prs_ssrtt_responder_fft_zc_profiling.grc
-```
+External C++ and Python callers must remove the former profiling argument.
+In particular, `prs_channel_estimator` now takes `mc_ds_gold_code_id` immediately
+after `seed`, and `prs_ssrtt_responder` takes `anchor_id` immediately after
+`reply_delay_samples`. Update external GRC files to remove the parameter and
+any connections to `timing_out`; remove timing collector blocks. Rebuild and
+reinstall before running flowgraphs. UHD timing, timed TX, ranging calibration,
+and the waveform are unchanged by this removal.
 
-The older `prs_ssrtt_initiator_profiling.grc` and responder counterpart are
-not present in this checkout. Existing blocks contain optional instrumentation;
-there is no copied parallel DSP implementation. Reports go through
-`timing_out` to `prs_timing_collector`.
-
-| Block | Timed work |
-|---|---|
-| Local/FFT-ZC detector | Accumulated acquisition scanning; extraction, CP CFO, metadata and publication |
-| FFT receiver | CP removal/copy, 127 FFTs, bin reordering, output construction/publication |
-| Channel estimator | Pilot removal, channel CFO, phase alignment, averaging/SNR, payload decode and publications |
-| Phase-slope estimator | Phase extraction/unwrap, weighted fit, residual/quality, publication |
-| SS-RTT responder | POLL validation, response-trigger construction/publication |
-| SS-RTT solver | POLL timestamp storage or RESPONSE range processing/publication |
-| Measurement CSV logger | Formatting, writing, flushing |
-
-The helper uses `std::chrono::steady_clock` elapsed wall time.
-`handler_total` runs from timing-report construction near handler entry to
-entry into `finish()`, after normal output publication. It includes OS
-preemption and instrumentation overhead within that interval; it excludes
-queue waiting, downstream execution, and building/publishing the timing report.
-Repeated operations are accumulated into a stage duration.
-
-Detector scanning spans scheduler calls. `preamble_zc_scan` sums timed search
-regions; detector `handler_total` describes the publication handler.
-`acquisition_total` combines scan time and that publication path. It is not
-elapsed RF acquisition time. Stage subtotals and handler totals overlap and
-must not be summed as independent costs.
-
-The FFT detector additionally separates gate scanning, input preparation,
-forward FFT, spectrum multiplication, inverse FFT, and normalization/peak
-selection. The collector buffers reports and calculates count, mean, median,
-p95, p99, and maximum on normal shutdown. UHD source/sink, RX timekeeper,
-timed burst source, acquisition logger, and collector are not instrumented by
-this set. These results alone do not measure complete end-to-end latency.
+CMake installation does not prune files from previous installations. If an old
+installation exists, also remove its obsolete `prs_timing_collector.h` and
+`ofdm_prs_ranging_prs_timing_collector.block.yml` from that installation prefix.
 
 ## Experimental History
 

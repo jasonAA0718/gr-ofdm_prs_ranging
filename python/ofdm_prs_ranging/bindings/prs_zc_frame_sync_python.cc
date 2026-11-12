@@ -19,6 +19,5 @@ void bind_prs_zc_frame_sync(py::module& m)
              py::arg("preamble_threshold") = 0.09f,
              py::arg("zc_threshold") = 0.35f,
              py::arg("coarse_zc_root") = 25,
-             py::arg("channel_id") = 0,
-             py::arg("enable_profiling") = false);
+             py::arg("channel_id") = 0);
 }

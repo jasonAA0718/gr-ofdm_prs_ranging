@@ -3,7 +3,7 @@ label: PRS Window Capture
 category: '[ofdm_prs_ranging]'
 templates:
   imports: from gnuradio import ofdm_prs_ranging
-  make: ofdm_prs_ranging.prs_window_capture(${samp_rate}, ${fft_len}, ${cp_len}, ${active_bins}, ${prs_symbols}, ${preamble_len}, ${preamble_repeats}, ${coarse_sync_len}, ${threshold}, ${min_frame_gap}, ${candidate_margin_before}, ${candidate_margin_after}, ${queue_depth}, ${acquisition_enabled}, ${enable_profiling})
+  make: ofdm_prs_ranging.prs_window_capture(${samp_rate}, ${fft_len}, ${cp_len}, ${active_bins}, ${prs_symbols}, ${preamble_len}, ${preamble_repeats}, ${coarse_sync_len}, ${threshold}, ${min_frame_gap}, ${candidate_margin_before}, ${candidate_margin_after}, ${queue_depth}, ${acquisition_enabled})
 parameters:
 - {id: samp_rate, label: Sample Rate, dtype: real, default: 30e6}
 - {id: fft_len, label: FFT Length, dtype: int, default: 512}
@@ -19,7 +19,6 @@ parameters:
 - {id: candidate_margin_after, label: Candidate Margin After, dtype: int, default: 4096}
 - {id: queue_depth, label: Candidate Queue Depth, dtype: int, default: 3}
 - {id: acquisition_enabled, label: Acquisition Enabled, dtype: bool, default: 'True'}
-- {id: enable_profiling, label: Enable Profiling, dtype: bool, default: 'False'}
 inputs:
 - {label: in, domain: stream, dtype: complex}
 - {label: window_in, domain: message, optional: true}
@@ -27,5 +26,4 @@ inputs:
 outputs:
 - {label: candidate_out, domain: message}
 - {label: event_out, domain: message, optional: true}
-- {label: timing_out, domain: message, optional: true}
 file_format: 1

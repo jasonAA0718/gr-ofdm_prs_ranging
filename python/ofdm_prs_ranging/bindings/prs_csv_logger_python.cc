@@ -9,6 +9,5 @@ void bind_prs_csv_logger(py::module& m)
         m, "prs_csv_logger")
         .def(py::init(&block::make),
              py::arg("path") = "prs_measurements.csv",
-             py::arg("append") = true,
-             py::arg("enable_profiling") = false);
+             py::arg("append") = true);
 }

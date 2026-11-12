@@ -22,8 +22,7 @@ public:
                      int fft_len = 512,
                      int cp_len = 64,
                      int active_bins = 512,
-                     int prs_symbols = 127,
-                     bool enable_profiling = false);
+                     int prs_symbols = 127);
 };
 
 } // namespace ofdm_prs_ranging

@@ -43,9 +43,10 @@ N_{\text{PRS}} = 127(512 + 64) = 73152
 ```
 
 Acquisition geometry is configurable and must match the peer transmitter.
-The main examples use preamble period/repeats/ZC length 128/17/819;
-the FFT-ZC profiling pair uses 256/4/419. All configure 30 MS/s and
-1060 MHz. Leading and tail guards are fixed at 1000 samples each in
+The main examples use preamble period/repeats/ZC length 128/17/819,
+30 MS/s and 1060 MHz. Historical numerical examples below use 256/4/419;
+these are calculation references rather than supplied flowgraphs.
+Leading and tail guards are fixed at 1000 samples each in
 `lib/DSP/prs_phy_geometry.h`; constructors and GRC do not expose guard controls.
 The TX timestamp is the first complete-burst sample, including the leading guard.
 
@@ -184,7 +185,7 @@ the next acquisition reference. Metadata uses `INITIAL_BIN`, `PRS_FLL`,
 or `DISABLED`. This feedback does not derotate the raw PRS frame sent to
 the FFT receiver. Within the bootstrap bank, accepted threshold peaks take
 priority, then earlier candidate indices, then larger metric at the same index.
-For the profiling ZC length 419, the observation lasts only 13.967 us at
+For the historical example ZC length 419, the observation lasts only 13.967 us at
 30 MS/s; 100 Hz hypotheses are very close compared with its reciprocal span
 of approximately 71.6 kHz. The bank is an acquisition aid, not a precise
 first-frame frequency measurement.
@@ -522,7 +523,7 @@ Fs = 30 MHz
 NFFT = 512, NCP = 64, M = 127, K = 384 pilot bins
 ```
 
-Preamble counts below use the matched profiling pair: Lp=256, R=4.
+Historical preamble calculations below use Lp=256, R=4.
 
 ### Repeated-Preamble CFO
 
@@ -554,7 +555,8 @@ and estimates
 ```
 
 This calculation uses `L_p(R-1)` complex correlation products, covers all
-`L_pR` preamble samples, and has correlation lag `L_p`. For the profiling preamble geometry (if this disabled method were used):
+`L_pR` preamble samples, and has correlation lag `L_p`. For the historical
+preamble geometry (if this disabled method were used):
 
 ```text
 correlation products = 256(4-1) = 768

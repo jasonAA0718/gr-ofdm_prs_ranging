@@ -20,14 +20,12 @@ class prs_ssrtt_responder_impl : public prs_ssrtt_responder
 public:
     prs_ssrtt_responder_impl(double samp_rate,
                              uint64_t reply_delay_samples,
-                             bool enable_profiling,
                              uint64_t anchor_id);
 
 private:
     double d_samp_rate;
     uint64_t d_reply_delay_samples;
     uint64_t d_anchor_id;
-    bool d_enable_profiling;
     std::unordered_map<uint64_t, double> d_recent_polls;
     double d_latest_poll_time = -1.0;
 

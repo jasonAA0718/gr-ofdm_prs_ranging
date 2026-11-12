@@ -19,13 +19,12 @@ namespace ofdm_prs_ranging {
 class prs_ssrtt_solver_impl : public prs_ssrtt_solver
 {
 public:
-    explicit prs_ssrtt_solver_impl(double samp_rate, bool enable_profiling);
+    explicit prs_ssrtt_solver_impl(double samp_rate);
 
 private:
     double d_samp_rate;
     struct poll_tx { double t1; uint64_t sequence; bool managed; };
     std::unordered_map<uint64_t, poll_tx> d_poll_tx_times;
-    bool d_enable_profiling;
 
     void handle_tx_time(pmt::pmt_t msg);
     void handle_measurement(pmt::pmt_t msg);

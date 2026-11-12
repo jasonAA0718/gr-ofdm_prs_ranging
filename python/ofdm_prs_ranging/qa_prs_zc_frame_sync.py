@@ -44,7 +44,6 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
             self.ZC_THRESHOLD,
             self.ROOT,
             self.CHANNEL,
-            True,
         )
 
     def _period(self):
@@ -152,11 +151,9 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
         frames = blocks.message_debug()
         diagnostics = blocks.message_debug()
         releases = blocks.message_debug()
-        timing = blocks.message_debug()
         tb.msg_connect(sync, "synchronized_frame_out", frames, "store")
         tb.msg_connect(sync, "diagnostics_out", diagnostics, "store")
         tb.msg_connect(sync, "slot_release", releases, "store")
-        tb.msg_connect(sync, "timing_out", timing, "store")
         tb.start()
         sync.to_basic_block()._post(pmt.intern("candidate_in"), candidate)
         deadline = time.monotonic() + 2.0
@@ -166,7 +163,6 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
         tb.wait()
         self.assertEqual(releases.num_messages(), 1)
         self.assertEqual(diagnostics.num_messages(), 1)
-        self.assertEqual(timing.num_messages(), 1)
         return frames, self._meta(diagnostics.get_message(0)), releases.get_message(0)
 
     def test_zero_cfo_frame_and_metadata_contract(self):
@@ -317,12 +313,12 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
         capture = ofdm_prs_ranging.prs_window_capture(
             self.FS, self.FFT, self.CP, self.ACTIVE, self.NSYM, self.L, self.R,
             self.NZ, self.PREAMBLE_THRESHOLD, 300, 64, 64,
-            1, True, False)
+            1, True)
         sync = self._sync()
         legacy = ofdm_prs_ranging.prs_frame_detector(
             self.FS, self.FFT, self.CP, self.ACTIVE, self.NSYM, self.L, self.R,
             self.NZ, self.PREAMBLE_THRESHOLD, 300, self.ROOT,
-            self.CHANNEL, False, 0.05, 0.0002, 0.004, self.ZC_THRESHOLD, False)
+            self.CHANNEL, False, 0.05, 0.0002, 0.004, self.ZC_THRESHOLD)
         frames = blocks.message_debug()
         legacy_frames = blocks.message_debug()
         diagnostics = blocks.message_debug()

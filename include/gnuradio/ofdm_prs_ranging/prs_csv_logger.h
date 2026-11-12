@@ -19,8 +19,7 @@ class OFDM_PRS_RANGING_API prs_csv_logger : virtual public gr::block
 public:
     typedef std::shared_ptr<prs_csv_logger> sptr;
     static sptr make(const std::string& path = "prs_measurements.csv",
-                     bool append = true,
-                     bool enable_profiling = false);
+                     bool append = true);
 };
 
 } // namespace ofdm_prs_ranging

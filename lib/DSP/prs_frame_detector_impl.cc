@@ -6,7 +6,6 @@
  */
 
 #include "prs_frame_detector_impl.h"
-#include "prs_timing_helper.h"
 #include <gnuradio/io_signature.h>
 #include <algorithm>
 #include <cmath>
@@ -33,8 +32,7 @@ prs_frame_detector::sptr prs_frame_detector::make(double samp_rate,
                                                   double reply_delay_s,
                                                   double window_before_s,
                                                   double window_after_s,
-                                                  float zc_threshold,
-                                                  bool enable_profiling)
+                                                  float zc_threshold)
 {
     return gnuradio::make_block_sptr<prs_frame_detector_impl>(samp_rate,
                                                               fft_len,
@@ -52,8 +50,7 @@ prs_frame_detector::sptr prs_frame_detector::make(double samp_rate,
                                                               reply_delay_s,
                                                               window_before_s,
                                                               window_after_s,
-                                                              zc_threshold,
-                                                              enable_profiling);
+                                                              zc_threshold);
 }
 
 prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
@@ -72,8 +69,7 @@ prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
                                                  double reply_delay_s,
                                                  double window_before_s,
                                                  double window_after_s,
-                                                 float zc_threshold,
-                                                 bool enable_profiling)
+                                                 float zc_threshold)
     : gr::block("prs_frame_detector",
                 gr::io_signature::make(1, 1, sizeof(gr_complex)),
                 gr::io_signature::make(0, 0, 0)),
@@ -93,9 +89,7 @@ prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
       d_time_gating(time_gating),
       d_reply_delay_s(reply_delay_s),
       d_window_before_s(window_before_s),
-      d_window_after_s(window_after_s),
-      d_enable_profiling(enable_profiling),
-      d_scan_duration_ns(0)
+      d_window_after_s(window_after_s)
 {
     if (samp_rate <= 0.0) {
         throw std::invalid_argument("samp_rate must be positive");
@@ -123,7 +117,6 @@ prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
     message_port_register_in(pmt::mp("tx_time_in"));
     message_port_register_out(pmt::mp("frame_out"));
     message_port_register_out(pmt::mp("event_out"));
-    message_port_register_out(pmt::mp("timing_out"));
     set_msg_handler(pmt::mp("tx_time_in"),
                     [this](pmt::pmt_t msg) { handle_tx_time(msg); });
 }
@@ -326,10 +319,6 @@ bool prs_frame_detector_impl::complete_attempt(double frame_time, uint64_t& atte
 
 void prs_frame_detector_impl::publish_failed_attempt(const correlation_window& window)
 {
-    profiling::timing_report report(d_enable_profiling, "frame_detector");
-    const uint64_t scan_duration_ns = d_scan_duration_ns;
-    d_scan_duration_ns = 0;
-    report.add("preamble_zc_scan", scan_duration_ns);
     const char* failure_reason = window.saw_coarse
                                      ? "FRAME_BOUNDARY"
                                      : (window.saw_preamble ? "ZC_SYNC" : "NO_PREAMBLE");
@@ -353,18 +342,8 @@ void prs_frame_detector_impl::publish_failed_attempt(const correlation_window& w
     meta = pmt::dict_add(
         meta, pmt::mp("prs_start_rel"), pmt::from_long(prs_start_offset(d_cfg)));
     meta = pmt::dict_add(meta, pmt::mp("prs_len"), pmt::from_long(prs_len(d_cfg)));
-    auto stage_start = report.mark();
     const auto event = pmt::cons(meta, pmt::PMT_NIL);
-    auto stage_stop = report.mark();
-    report.add("failure_output_build", stage_start, stage_stop);
-    stage_start = stage_stop;
     message_port_pub(pmt::mp("event_out"), event);
-    stage_stop = report.mark();
-    report.add("failure_output_publish", stage_start, stage_stop);
-    report.add("acquisition_total", scan_duration_ns + report.handler_elapsed_ns());
-    if (report.enabled()) {
-        message_port_pub(pmt::mp("timing_out"), report.finish(meta));
-    }
 }
 
 bool prs_frame_detector_impl::find_frame(size_t& frame_start_index,
@@ -372,7 +351,6 @@ bool prs_frame_detector_impl::find_frame(size_t& frame_start_index,
                                          float& preamble_metric_out,
                                          float& coarse_metric_out)
 {
-    profiling::accumulated_timer scan_timer(d_enable_profiling, d_scan_duration_ns);
     const int flen = frame_len(d_cfg);
     const int coarse_rel =
         phy::leading_guard_samples + d_cfg.preamble_len * d_cfg.preamble_repeats;
@@ -525,23 +503,12 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
                                             float preamble_metric,
                                             float coarse_metric)
 {
-    profiling::timing_report report(d_enable_profiling, "frame_detector");
-    const uint64_t scan_duration_ns = d_scan_duration_ns;
-    d_scan_duration_ns = 0;
-    report.add("preamble_zc_scan", scan_duration_ns);
     const int flen = frame_len(d_cfg);
     const uint64_t abs_start = d_buffer_abs_start + frame_start_index;
     const uint64_t coarse_abs = d_buffer_abs_start + coarse_index;
     const auto frame_begin = d_buffer.begin() + d_buffer_head + frame_start_index;
-    auto stage_start = report.mark();
     std::vector<gr_complex> frame(frame_begin, frame_begin + flen);
-    auto stage_stop = report.mark();
-    report.add("frame_extract", stage_start, stage_stop);
-    stage_start = stage_stop;
     const auto prs_cp_cfo = estimate_prs_cp_cfo(frame.data(), frame.size(), d_cfg, 0.0);
-    stage_stop = report.mark();
-    report.add("prs_cp_cfo", stage_start, stage_stop);
-    stage_start = stage_stop;
     const uint64_t recv_id = d_next_frame_id++;
     pmt::pmt_t meta = pmt::make_dict();
     meta = pmt::dict_add(meta, pmt::mp("recv_id"), pmt::from_uint64(recv_id));
@@ -590,23 +557,11 @@ void prs_frame_detector_impl::publish_frame(size_t frame_start_index,
         meta = pmt::dict_add(
             meta, pmt::mp("rx_time_tag_offset"), pmt::from_uint64(d_rx_time_tag_offset));
     }
-    stage_stop = report.mark();
-    report.add("metadata_build", stage_start, stage_stop);
 
-    stage_start = stage_stop;
     const auto data = pmt::init_c32vector(frame.size(), frame);
     const auto pdu = pmt::cons(meta, data);
-    stage_stop = report.mark();
-    report.add("frame_pdu_build", stage_start, stage_stop);
-    stage_start = stage_stop;
     message_port_pub(pmt::mp("frame_out"), pdu);
-    stage_stop = report.mark();
-    report.add("frame_pdu_publish", stage_start, stage_stop);
     d_last_frame_start = static_cast<int64_t>(abs_start);
-    report.add("acquisition_total", scan_duration_ns + report.handler_elapsed_ns());
-    if (report.enabled()) {
-        message_port_pub(pmt::mp("timing_out"), report.finish(meta));
-    }
 }
 
 int prs_frame_detector_impl::general_work(int noutput_items,
