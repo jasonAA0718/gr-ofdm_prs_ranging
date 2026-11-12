@@ -689,58 +689,26 @@ bool prs_fft_zc_frame_detector_impl::complete_attempt(double frame_time,
 void prs_fft_zc_frame_detector_impl::publish_failed_attempt(
     const correlation_window& window)
 {
-    profiling::timing_report report(d_enable_profiling, "fft_zc_frame_detector");
-    const uint64_t scan_duration_ns = d_gate_scan_duration_ns + d_zc_input_duration_ns +
-                                      d_zc_fft_duration_ns + d_zc_multiply_duration_ns +
-                                      d_zc_ifft_duration_ns + d_zc_peak_duration_ns;
-    report.add("preamble_gate_scan", d_gate_scan_duration_ns);
-    report.add("zc_input_prepare", d_zc_input_duration_ns);
-    report.add("zc_fft_forward", d_zc_fft_duration_ns);
-    report.add("zc_spectrum_multiply", d_zc_multiply_duration_ns);
-    report.add("zc_ifft", d_zc_ifft_duration_ns);
-    report.add("zc_normalize_peak", d_zc_peak_duration_ns);
-    report.add("preamble_zc_scan", scan_duration_ns);
-    d_gate_scan_duration_ns = 0;
-    d_zc_input_duration_ns = 0;
-    d_zc_fft_duration_ns = 0;
-    d_zc_multiply_duration_ns = 0;
-    d_zc_ifft_duration_ns = 0;
-    d_zc_peak_duration_ns = 0;
-    const char* failure_reason = window.saw_coarse
-                                     ? "FRAME_BOUNDARY"
+    const char* failure_reason = window.saw_coarse ? "FRAME_BOUNDARY"
                                      : (window.saw_preamble ? "ZC_SYNC" : "NO_PREAMBLE");
     pmt::pmt_t meta = pmt::make_dict();
-    meta =
-        pmt::dict_add(meta, pmt::mp("attempt_id"), pmt::from_uint64(window.attempt_id));
+    meta = pmt::dict_add(meta, pmt::mp("attempt_id"), pmt::from_uint64(window.attempt_id));
     meta = pmt::dict_add(meta, pmt::mp("failure_reason"), pmt::mp(failure_reason));
     meta = pmt::dict_add(meta, pmt::mp("frame_id_valid"), pmt::PMT_F);
-    meta = pmt::dict_add(
-        meta, pmt::mp("preamble_metric"), pmt::from_double(window.preamble_metric));
-    meta = pmt::dict_add(
-        meta, pmt::mp("coarse_metric"), pmt::from_double(window.coarse_metric));
-    meta = pmt::dict_add(
-        meta, pmt::mp("coarse_zc_root"), pmt::from_long(d_cfg.coarse_zc_root));
+    meta = pmt::dict_add(meta, pmt::mp("preamble_metric"), pmt::from_double(window.preamble_metric));
+    meta = pmt::dict_add(meta, pmt::mp("coarse_metric"), pmt::from_double(window.coarse_metric));
+    meta = pmt::dict_add(meta, pmt::mp("coarse_zc_root"), pmt::from_long(d_cfg.coarse_zc_root));
     meta = pmt::dict_add(meta, pmt::mp("channel_id"), pmt::from_long(d_cfg.channel_id));
     meta = pmt::dict_add(meta, pmt::mp("samp_rate"), pmt::from_double(d_cfg.samp_rate));
     meta = pmt::dict_add(meta, pmt::mp("fft_len"), pmt::from_long(d_cfg.fft_len));
     meta = pmt::dict_add(meta, pmt::mp("cp_len"), pmt::from_long(d_cfg.cp_len));
     meta = pmt::dict_add(meta, pmt::mp("active_bins"), pmt::from_long(d_cfg.active_bins));
     meta = pmt::dict_add(meta, pmt::mp("prs_symbols"), pmt::from_long(d_cfg.prs_symbols));
-    meta = pmt::dict_add(
-        meta, pmt::mp("prs_start_rel"), pmt::from_long(prs_start_offset(d_cfg)));
+    meta = pmt::dict_add(meta, pmt::mp("prs_start_rel"), pmt::from_long(prs_start_offset(d_cfg)));
     meta = pmt::dict_add(meta, pmt::mp("prs_len"), pmt::from_long(prs_len(d_cfg)));
-    auto stage_start = report.mark();
     const auto event = pmt::cons(meta, pmt::PMT_NIL);
-    auto stage_stop = report.mark();
-    report.add("failure_output_build", stage_start, stage_stop);
-    stage_start = stage_stop;
     message_port_pub(pmt::mp("event_out"), event);
-    stage_stop = report.mark();
-    report.add("failure_output_publish", stage_start, stage_stop);
-    report.add("acquisition_total", scan_duration_ns + report.handler_elapsed_ns());
-    if (report.enabled()) {
-        message_port_pub(pmt::mp("timing_out"), report.finish(meta));
-    }
+
 }
 
 

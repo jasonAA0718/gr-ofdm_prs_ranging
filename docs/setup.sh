@@ -41,5 +41,5 @@ net.core.wmem_default=50000000
 EOF
 
 sudo sysctl --system
-
+export PYTHONPATH="/home/cnsl/Desktop/gr-ofdm_prs_ranging/tools${PYTHONPATH:+:$PYTHONPATH}"
 echo "=== Setup complete ==="

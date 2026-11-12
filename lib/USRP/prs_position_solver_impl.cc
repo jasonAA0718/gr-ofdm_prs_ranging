@@ -173,8 +173,8 @@ void prs_position_solver_impl::handle_epoch(pmt::pmt_t msg)
 
     // WLS
     const bool has_previous_position = std::isfinite(d_position[0]) && std::isfinite(d_position[1]);
-    constexpr int max_iterations = 20;
-    constexpr double convergence_tolerance = 1e-4;
+    constexpr int max_iterations = 40;
+    constexpr double convergence_tolerance = 1e-2;
     bool converged = 0;
     double x = (has_previous_position) ? d_position[0] : initial_guess[0];
     double y = (has_previous_position) ? d_position[1] : initial_guess[1];
@@ -299,6 +299,11 @@ void prs_position_solver_impl::handle_epoch(pmt::pmt_t msg)
 
     if (!converged){
             auto result = pmt::make_dict();
+                d_position = { x, y, d_vehicle_height_m };
+            std::vector<double> position = { d_position[0], d_position[1], d_position[2] };
+            result = pmt::dict_add(result,
+                            pmt::mp("position_m"),
+                            pmt::init_f64vector(position.size(), position));
             result = pmt::dict_add(result,
                                     pmt::mp("residual"),
                                     pmt::init_f64vector(residuals.size(), residuals));

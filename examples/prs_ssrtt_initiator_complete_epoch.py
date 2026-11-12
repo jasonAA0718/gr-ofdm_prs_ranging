@@ -23,6 +23,7 @@ from gnuradio import eng_notation
 from gnuradio import ofdm_prs_ranging
 from gnuradio import uhd
 import time
+import sys; sys.path.insert(0, "/home/cnsl/Desktop/gr-ofdm_prs_ranging/tools"); from anchor_csv_loader import load_anchor_config
 import threading
 
 
@@ -37,19 +38,20 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         ##################################################
         # Variables
         ##################################################
+        self.anchor_config = anchor_config = load_anchor_config("/home/cnsl/Desktop/gr-ofdm_prs_ranging/tools/anchors_enu.csv")
         self.zc_length = zc_length = 819
-        self.tx_gain = tx_gain = 62
-        self.time_delays = time_delays = [0.051, 0.041, 0.067]
+        self.tx_gain = tx_gain = 75
+        self.time_delays = time_delays = [0.041, 0.051, 0.067]
         self.samp_rate = samp_rate = 30000000
         self.rx_gain = rx_gain = 56
-        self.receive_late_s = receive_late_s = 0.003
-        self.receive_early_s = receive_early_s = 0.001
-        self.processing_grace_s = processing_grace_s = 0.01
+        self.receive_late_s = receive_late_s = 0.004
+        self.receive_early_s = receive_early_s = 0.003
+        self.processing_grace_s = processing_grace_s = 0.1
         self.premble_rep = premble_rep = 17
         self.premble_length = premble_length = 128
-        self.obs_log = obs_log = "CSV/complete_epoch_measurements.csv"
+        self.obs_log = obs_log = "/home/cnsl/Desktop/gr-ofdm_prs_ranging/examples/CSV/complete_epoch_measurements.csv"
         self.center_freq = center_freq = 1060e6
-        self.anchor_ids = anchor_ids = [0, 1, 2]
+        self.anchor_ids = anchor_ids = anchor_config[0]
 
         ##################################################
         # Blocks
@@ -104,10 +106,10 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 512, 64, 512, 127, False)
         self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger(obs_log, 1, False)
         self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 512, 512, 127, 13990001, False, 2)
-        self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/complete_epoch_acquisition.csv", "initiator", 1)
+        self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("/home/cnsl/Desktop/gr-ofdm_prs_ranging/examples/CSV/complete_epoch_acquisition.csv", "initiator", 1)
         self.ofdm_prs_ranging_prs_position_solver_0 = ofdm_prs_ranging.prs_position_solver(
-            [0, 1, 2],
-            [[0,0,0], [6,0,0], [0,8,0]],
+            anchor_config[0],
+            anchor_config[1],
             0.0
         )
         self.cycle_summary_debug_0_0 = blocks.message_debug(False, gr.log_levels.info)
@@ -129,8 +131,8 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'epoch_out'), (self.ofdm_prs_ranging_prs_position_solver_0, 'epoch_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'measurement_out'), (self.prs_csv_logger_0, 'measurement_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'window_out'), (self.prs_frame_detector_0_0, 'tx_time_in'))
-        self.msg_connect((self.prs_multi_anchor_cycle_0, 'solver_tx_out'), (self.prs_ssrtt_solver_0, 'tx_time_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'solver_measurement_out'), (self.prs_ssrtt_solver_0, 'measurement_in'))
+        self.msg_connect((self.prs_multi_anchor_cycle_0, 'solver_tx_out'), (self.prs_ssrtt_solver_0, 'tx_time_in'))
         self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_multi_anchor_cycle_0, 'measurement_in'))
         self.msg_connect((self.prs_rx_timekeeper_0, 'clock_out'), (self.prs_multi_anchor_cycle_0, 'clock_in'))
         self.msg_connect((self.prs_rx_timekeeper_0, 'timed_trigger_out'), (self.prs_source, 'trigger'))
@@ -140,6 +142,13 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         self.connect((self.uhd_usrp_source_0_0, 0), (self.prs_frame_detector_0_0, 0))
         self.connect((self.uhd_usrp_source_0_0, 0), (self.prs_rx_timekeeper_0, 0))
 
+
+    def get_anchor_config(self):
+        return self.anchor_config
+
+    def set_anchor_config(self, anchor_config):
+        self.anchor_config = anchor_config
+        self.set_anchor_ids(self.anchor_config[0])
 
     def get_zc_length(self):
         return self.zc_length

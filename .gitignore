@@ -25,6 +25,7 @@ __pycache__/
 # Large experiment folders
 logs/*
 captures/*
+examples/CSV/*
 
 # Keep folder structure
 !logs/.gitkeep
@@ -37,4 +38,6 @@ captures/*
 build/
 
 # Local development roadmap
-Agenda.md
+Agenda.mdtools/node_modules/
+tools/package-lock.json
+tools/package.json

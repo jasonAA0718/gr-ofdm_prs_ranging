@@ -4,15 +4,14 @@ options:
     catch_exceptions: 'True'
     category: '[GRC Hier Blocks]'
     cmake_opt: ''
-    comment: Minimal SS-RTT responder topology. Add/configure UHD Source and Sink
-      for hardware.
+    comment: ''
     copyright: ''
     description: OFDM PRS SS-RTT responder
     gen_cmake: 'On'
     gen_linking: dynamic
     generate_options: no_gui
     hier_block_src_path: '.:'
-    id: prs_ssrtt_responder_anchor1
+    id: prs_ssrtt_responder_anchor_2
     max_nouts: '0'
     output_language: python
     placement: (0,0)
@@ -23,29 +22,17 @@ options:
     run_options: prompt
     sizing_mode: fixed
     thread_safe_setters: ''
-    title: PRS Anchor 1 (Static Two-Anchor Experiment)
+    title: PRS Anchor 2
     window_size: (1200,800)
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [40, 32.0]
+    coordinate: [48, 40.0]
     rotation: 0
     state: enabled
 
 blocks:
-- name: T_burst
-  id: variable
-  parameters:
-    comment: ''
-    value: '0.5'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [1112, 48.0]
-    rotation: 0
-    state: enabled
 - name: anchor_id
   id: variable
   parameters:
@@ -55,7 +42,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [400, 120]
+    coordinate: [336, 128.0]
     rotation: 0
     state: enabled
 - name: center_freq
@@ -67,7 +54,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [224, 104.0]
+    coordinate: [232, 128.0]
     rotation: 0
     state: enabled
 - name: premble_length
@@ -109,14 +96,13 @@ blocks:
 - name: response_delay_seconds
   id: variable
   parameters:
-    comment: Match initiator time_delays entry; seconds, converted once to integer
-      samples.
+    comment: ''
     value: '0.067'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [650, 120]
+    coordinate: [448, 128.0]
     rotation: 0
     state: enabled
 - name: rx_gain
@@ -140,14 +126,14 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [224, 32.0]
+    coordinate: [232, 40.0]
     rotation: 0
     state: enabled
 - name: tx_gain
   id: variable
   parameters:
     comment: ''
-    value: '60'
+    value: '65'
   states:
     bus_sink: false
     bus_source: false
@@ -226,7 +212,7 @@ blocks:
     preamble_len: '128'
     preamble_repeats: '17'
     prs_symbols: '127'
-    queue_depth: '1'
+    queue_depth: '2'
     samp_rate: 30e6
     threshold: '0.12'
   states:

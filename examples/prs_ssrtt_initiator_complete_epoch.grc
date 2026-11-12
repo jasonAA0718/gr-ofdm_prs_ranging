@@ -24,27 +24,39 @@ options:
     run_options: prompt
     sizing_mode: fixed
     thread_safe_setters: ''
-    title: PRS Four-Anchor Complete Observation Initiator
+    title: PRS Four-Anchor Initiator
     window_size: (1200,800)
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [64, 20.0]
+    coordinate: [64, 32.0]
     rotation: 0
     state: enabled
 
 blocks:
-- name: anchor_ids
+- name: anchor_config
   id: variable
   parameters:
-    comment: Delay corresponding anchor ID
-    value: '[0, 1, 2]'
+    comment: ranging_cycle_time
+    value: load_anchor_config("/home/cnsl/Desktop/gr-ofdm_prs_ranging/tools/anchors_enu.csv")
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [288, 120.0]
+    coordinate: [1152, 120.0]
+    rotation: 0
+    state: enabled
+- name: anchor_ids
+  id: variable
+  parameters:
+    comment: Delay corresponding anchor ID
+    value: anchor_config[0]
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [248, 120.0]
     rotation: 0
     state: enabled
 - name: anchor_ids
@@ -56,7 +68,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [296, 176.0]
+    coordinate: [1424, 32.0]
     rotation: 0
     state: disabled
 - name: center_freq
@@ -75,7 +87,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '"CSV/complete_epoch_measurements.csv"'
+    value: '"/home/cnsl/Desktop/gr-ofdm_prs_ranging/examples/CSV/complete_epoch_measurements.csv"'
   states:
     bus_sink: false
     bus_source: false
@@ -111,36 +123,36 @@ blocks:
   id: variable
   parameters:
     comment: ranging_cycle_time
-    value: '0.01'
+    value: '0.1'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1136, 128.0]
+    coordinate: [1016, 120.0]
     rotation: 0
     state: enabled
 - name: receive_early_s
   id: variable
   parameters:
     comment: "Anchor received window \nbefore time"
-    value: '0.001'
+    value: '0.002'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [856, 128.0]
+    coordinate: [760, 120.0]
     rotation: 0
     state: enabled
 - name: receive_late_s
   id: variable
   parameters:
     comment: "Anchor received window \nbefore time"
-    value: '0.003'
+    value: '0.002'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1000, 128.0]
+    coordinate: [888, 120.0]
     rotation: 0
     state: enabled
 - name: rx_gain
@@ -175,12 +187,12 @@ blocks:
       The minimal slot space:
 
       delay_1 - delay_0 = before + after + frame_length'
-    value: '[0.051, 0.041, 0.067]'
+    value: '[0.041, 0.051, 0.067]'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [480, 120.0]
+    coordinate: [376, 120.0]
     rotation: 0
     state: enabled
 - name: time_delays
@@ -196,14 +208,14 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [440, 184.0]
+    coordinate: [1424, 120.0]
     rotation: 0
     state: disabled
 - name: tx_gain
   id: variable
   parameters:
     comment: ''
-    value: '62'
+    value: '75'
   states:
     bus_sink: false
     bus_source: false
@@ -229,7 +241,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1288, 72.0]
+    coordinate: [1312, 56.0]
     rotation: 0
     state: disabled
 - name: zc_length
@@ -303,7 +315,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1688, 1424.0]
+    coordinate: [2280, 1360.0]
     rotation: 0
     state: enabled
 - name: cycle_summary_debug_0_0
@@ -318,7 +330,21 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1720, 1560.0]
+    coordinate: [2272, 1528.0]
+    rotation: 0
+    state: enabled
+- name: import_0
+  id: import
+  parameters:
+    alias: ''
+    comment: ''
+    imports: import sys; sys.path.insert(0, "/home/cnsl/Desktop/gr-ofdm_prs_ranging/tools");
+      from anchor_csv_loader import load_anchor_config
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1136, 40.0]
     rotation: 0
     state: enabled
 - name: ofdm_prs_ranging_prs_position_solver_0
@@ -326,8 +352,8 @@ blocks:
   parameters:
     affinity: ''
     alias: ''
-    anchor_ids: '[0, 1, 2]'
-    anchor_positions_m: '[[0,0,0], [6,0,0], [0,8,0]]'
+    anchor_ids: anchor_config[0]
+    anchor_positions_m: anchor_config[1]
     comment: ''
     maxoutbuf: '0'
     minoutbuf: '0'
@@ -336,7 +362,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1224, 1520.0]
+    coordinate: [1152, 1504.0]
     rotation: 0
     state: enabled
 - name: prs_acquisition_logger_0
@@ -347,7 +373,7 @@ blocks:
     append: '1'
     comment: Logs every detector output before SS-RTT filtering
     node: '"initiator"'
-    path: '"CSV/complete_epoch_acquisition.csv"'
+    path: '"/home/cnsl/Desktop/gr-ofdm_prs_ranging/examples/CSV/complete_epoch_acquisition.csv"'
   states:
     bus_sink: false
     bus_source: false
@@ -1285,7 +1311,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [400, 256.0]
+    coordinate: [400, 288.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_0_0
