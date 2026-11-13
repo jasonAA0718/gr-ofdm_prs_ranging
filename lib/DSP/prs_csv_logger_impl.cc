@@ -31,7 +31,7 @@ prs_csv_logger_impl::prs_csv_logger_impl(const std::string& path,
       d_file(path, append ? std::ios::app : std::ios::trunc)
 {
     if (!append || d_file.tellp() == 0) {
-        d_file << "direction,poll_id,anchor_id,"
+        d_file << "direction,poll_id,anchor_id,cycle_sequence,"
                   "t1_tx_time,t4_rx_time,calibration_time,integer_range_m,"
                   "corrected_range_m,poll_fine_delay_samples,response_fine_delay_samples,"
                   "fine_range_correction_m,fine_correction_valid,"
@@ -68,6 +68,7 @@ void prs_csv_logger_impl::handle_measurement(pmt::pmt_t msg)
     d_file << std::setprecision(15);
     d_file << direction << ',' << dict_ref_uint64(meta, "poll_id", 0) << ','
            << dict_ref_uint64(meta, "anchor_id", 0) << ','
+           << dict_ref_uint64(meta, "cycle_sequence", 0) << ','
            << dict_ref_double(meta, "t1_tx_time", 0.0) << ','
            << dict_ref_double(meta, "t4_rx_time", 0.0) << ','
            << dict_ref_double(meta, "calibration_time", NAN) << ','

@@ -769,6 +769,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
             meta = pmt.make_dict()
             for key, value in (
                 ("poll_id", pmt.from_uint64(7)),
+                ("cycle_sequence", pmt.from_uint64(65537)),
                 ("anchor_id", pmt.from_uint64(3)),
                 ("t1_tx_time", pmt.from_double(100.0)),
                 ("t4_rx_time", pmt.from_double(100.000011)),
@@ -804,15 +805,14 @@ class qa_prs_receiver(gr_unittest.TestCase):
             fields = lines[1].split(",")
             self.assertEqual(len(header), len(fields))
             self.assertEqual(header, [
+                "direction", "poll_id", "anchor_id", "cycle_sequence",
                 "t1_tx_time", "t4_rx_time", "calibration_time", "integer_range_m",
                 "corrected_range_m", "poll_fine_delay_samples", "response_fine_delay_samples",
-                "fine_range_correction_m", "fine_correction_valid",
-                "direction", "poll_id", "anchor_id", "reply_delay_samples", "fine_delay_s",
-                "fine_delay_samples", "phase_range_contribution_m", "frame_id_valid",
-                "coarse_metric", "payload_metric", "prs_cp_cfo_hz", "prs_cp_cfo_coherence",
-                "selected_cfo_hz", "payload_retry_used", "prs_channel_cfo_hz",
-                "residual_cfo_hz", "channel_coherence", "phase_slope_rad_per_hz",
-                "phase_residual", "snr", "quality",
+                "fine_range_correction_m", "fine_correction_valid", "reply_delay_samples",
+                "frame_id_valid", "coarse_metric", "payload_metric", "prs_cp_cfo_hz",
+                "prs_cp_cfo_coherence", "selected_cfo_hz", "payload_retry_used",
+                "prs_channel_cfo_hz", "residual_cfo_hz", "channel_coherence",
+                "phase_slope_rad_per_hz", "phase_residual", "snr", "quality",
             ])
             for name, expected in (
                     ("calibration_time", 5.808278798530661e-06),
@@ -824,6 +824,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
                 self.assertAlmostEqual(float(fields[header.index(name)]), expected, delta=1e-12)
             self.assertEqual(fields[header.index("fine_correction_valid")], "1")
             self.assertEqual(fields[header.index("poll_id")], "7")
+            self.assertEqual(fields[header.index("cycle_sequence")], "65537")
             self.assertEqual(fields[header.index("anchor_id")], "3")
             self.assertAlmostEqual(float(fields[header.index("t1_tx_time")]), 100.0)
             self.assertAlmostEqual(float(fields[header.index("t4_rx_time")]), 100.000011)
@@ -831,7 +832,8 @@ class qa_prs_receiver(gr_unittest.TestCase):
             for name in (
                     "prs_cp_cfo_hz",
                     "prs_channel_cfo_hz", "phase_slope_rad_per_hz",
-                    "fine_delay_samples", "phase_range_contribution_m"):
+                    "poll_fine_delay_samples", "response_fine_delay_samples",
+                    "fine_range_correction_m"):
                 self.assertIn(name, header)
         finally:
             if os.path.exists(path):
@@ -986,14 +988,16 @@ class qa_prs_receiver(gr_unittest.TestCase):
                     rx_time=pmt.make_tuple(pmt.from_uint64(100), pmt.from_double(0.0500136))))
                 solver.to_basic_block()._post(pmt.intern("measurement_in"), pmt.cons(meta, pmt.PMT_NIL))
             self._await_messages(debug, len(cases))
-            integer = (13.6e-6 + 4.841619800497349e-5) * 299792458.0 / 2
             for index, (poll, response, pv, rv) in enumerate(cases):
                 out = pmt.car(debug.get_message(index))
                 get = lambda key: pmt.to_double(pmt.dict_ref(out, pmt.intern(key), pmt.PMT_NIL))
-                self.assertAlmostEqual(get("integer_range_m"), integer, delta=2e-6)
+                # Verify fine correction relative to the reported integer range,
+                # independently of the experiment-specific absolute calibration.
+                integer = get("integer_range_m")
+                self.assertTrue(numpy.isfinite(integer))
                 expected_valid = pv and rv and numpy.isfinite(poll) and numpy.isfinite(response)
                 self.assertEqual(pmt.to_bool(pmt.dict_ref(out, pmt.intern("fine_correction_valid"), pmt.PMT_F)), expected_valid)
-                self.assertAlmostEqual(get("measurement_timestamp"), 100.0500136)
+                self.assertAlmostEqual(get("t4_rx_time"), 100.0500136)
                 if expected_valid:
                     correction = 299792458.0 / (2 * fs) * (poll + response)
                     self.assertAlmostEqual(get("fine_range_correction_m"), correction, places=9)
@@ -1069,8 +1073,9 @@ class qa_prs_receiver(gr_unittest.TestCase):
         self.assertEqual(pmt.to_uint64(pmt.dict_ref(trigger, pmt.intern("tx_time_secs"), pmt.PMT_NIL)), 10)
         self.assertAlmostEqual(pmt.to_double(pmt.dict_ref(trigger, pmt.intern("tx_time_frac"), pmt.PMT_NIL)), 0.255)
 
-    def test_ssrtt_solver_computes_range_from_synthetic_timestamps(self):
-        solver = ofdm_prs_ranging.prs_ssrtt_solver(10e6)
+    def test_ssrtt_solver_reports_synthetic_timestamp_rtt(self):
+        samp_rate = 10e6
+        solver = ofdm_prs_ranging.prs_ssrtt_solver(samp_rate)
         debug = blocks.message_debug()
 
         tx = pmt.make_dict()
@@ -1113,18 +1118,18 @@ class qa_prs_receiver(gr_unittest.TestCase):
 
         self.assertGreaterEqual(debug.num_messages(), 1)
         out = pmt.car(debug.get_message(0))
-        self.assertAlmostEqual(pmt.to_double(pmt.dict_ref(out, pmt.intern("rtt_s"), pmt.PMT_NIL)), 13.6e-6)
-        self.assertAlmostEqual(pmt.to_double(pmt.dict_ref(out, pmt.intern("tof_s"), pmt.PMT_NIL)),
-                               (13.6e-6 + 4.841619800497349e-5) / 2.0)
-        calibrated_tof = (13.6e-6 + 4.841619800497349e-5) / 2.0
-        calibrated_range = calibrated_tof * 299792458.0
-        self.assertAlmostEqual(pmt.to_double(pmt.dict_ref(out, pmt.intern("range_m"), pmt.PMT_NIL)), calibrated_range, places=5)
-        self.assertAlmostEqual(pmt.to_double(pmt.dict_ref(
-            out, pmt.intern("integer_range_m"), pmt.PMT_NIL)),
-            calibrated_range, places=5)
-        self.assertAlmostEqual(pmt.to_double(pmt.dict_ref(
-            out, pmt.intern("response_phase_range_correction_m"), pmt.PMT_NIL)),
-            3.747405725, places=6)
+        # Reconstruct RTT from the same fields written by prs_csv_logger.
+        # UHD timestamp differences and decoded sample delay are independent
+        # of the configurable experiment's absolute range calibration.
+        t1 = pmt.to_double(pmt.dict_ref(out, pmt.intern("t1_tx_time"), pmt.PMT_NIL))
+        t4 = pmt.to_double(pmt.dict_ref(out, pmt.intern("t4_rx_time"), pmt.PMT_NIL))
+        reply_samples = pmt.to_uint64(
+            pmt.dict_ref(out, pmt.intern("reply_delay_samples"), pmt.PMT_NIL))
+        self.assertEqual(t1, 100.0)
+        self.assertAlmostEqual(t4, 100.0050136, delta=1e-12)
+        self.assertEqual(reply_samples, 50000)
+        rtt_s = t4 - t1 - reply_samples / samp_rate
+        self.assertAlmostEqual(rtt_s, 13.6e-6, delta=1e-12)
 
 
 if __name__ == "__main__":

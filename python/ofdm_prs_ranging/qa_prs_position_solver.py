@@ -70,6 +70,8 @@ class qa_prs_position_solver(gr_unittest.TestCase):
         poll_id = 100
         epoch_pdu = self.epoch_create(observed_anchor_ids, integer_ranges_m, corrected_ranges_m, fine_correction_valid_flags, poll_id)
 
+        # Range selection metadata is present on either solver result port.
+        self.tb.msg_connect(self.solver, "position_out", self.debug, "store")
         self.tb.start()
 
 
@@ -82,7 +84,7 @@ class qa_prs_position_solver(gr_unittest.TestCase):
 
         while self.debug.num_messages() == 0:
             if time.monotonic() >= deadline:
-                self.fail("No diagnostic message received")
+                self.fail("No solver result received")
             time.sleep(0.01)
 
         msg = self.debug.get_message(0)
@@ -108,7 +110,7 @@ class qa_prs_position_solver(gr_unittest.TestCase):
         )
 
         count = pmt.to_uint64(
-            get_field("positioning_anchor_count")
+            get_field("used_anchor_count")
         )
 
         self.assertEqual(selected_ids, [0, 1, 2])

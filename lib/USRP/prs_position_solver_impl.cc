@@ -1,25 +1,19 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include "prs_position_solver_impl.h"
 #include <gnuradio/io_signature.h>
-#include <pmt/pmt.h>
-#include <array>
+#include <algorithm>
 #include <cmath>
-#include <cstdint>
+#include <set>
 #include <stdexcept>
+
 namespace gr {
 namespace ofdm_prs_ranging {
-
-
+namespace {
 struct range_observation {
-    uint32_t anchor_id;
     std::array<double, 3> anchor_pos;
     double range;
-    double weight;
-    bool used_fine_correction;
 };
-
-
-
-
+} // namespace
 
 prs_position_solver::sptr
 prs_position_solver::make(const std::vector<int>& anchor_ids,
@@ -37,30 +31,27 @@ prs_position_solver_impl::prs_position_solver_impl(
     : gr::block("prs_position_solver",
                 gr::io_signature::make(0, 0, 0),
                 gr::io_signature::make(0, 0, 0)),
-    d_anchor_ids(anchor_ids),
-    d_anchor_positions_m(anchor_positions_m),
-    d_vehicle_height_m(vehicle_height_m)
+      d_anchor_ids(anchor_ids),
+      d_anchor_positions_m(anchor_positions_m),
+      d_vehicle_height_m(vehicle_height_m),
+      d_position{ NAN, NAN, NAN }
 {
-    if (anchor_ids.empty() || anchor_ids.size() > 8)
-        throw std::invalid_argument("Invalid anchor count");
-
-    if (!std::isfinite(vehicle_height_m))
-        throw std::invalid_argument("Invalid vehicle height");
-
-    for (auto id : anchor_ids) {
-
-        if (static_cast<size_t>(id) >= anchor_positions_m.size())
-            throw std::invalid_argument("Anchor position not found");
-
-        if (anchor_positions_m[id].size() != 3)
-            throw std::invalid_argument("XYZ must have 3 elements");
-
-        for (double xyz : anchor_positions_m[id]) {
-            if (!std::isfinite(xyz))
+    if (anchor_ids.empty() || anchor_ids.size() > 8 || !std::isfinite(vehicle_height_m)) {
+        throw std::invalid_argument("Invalid anchor count or vehicle height");
+    }
+    std::set<int> unique_ids;
+    for (int id : anchor_ids) {
+        if (id < 0 || id > 7 || !unique_ids.insert(id).second ||
+            static_cast<size_t>(id) >= anchor_positions_m.size() ||
+            anchor_positions_m[id].size() != 3) {
+            throw std::invalid_argument("Invalid anchor ID or XYZ coordinate layout");
+        }
+        for (double coordinate : anchor_positions_m[id]) {
+            if (!std::isfinite(coordinate)) {
                 throw std::invalid_argument("Invalid XYZ coordinate");
+            }
         }
     }
-    d_position = { NAN, NAN, NAN };
     message_port_register_in(pmt::mp("epoch_in"));
     message_port_register_out(pmt::mp("position_out"));
     message_port_register_out(pmt::mp("diagnostic_out"));
@@ -69,282 +60,162 @@ prs_position_solver_impl::prs_position_solver_impl(
 
 void prs_position_solver_impl::handle_epoch(pmt::pmt_t msg)
 {
-    // Existing Cycle Manager publishes (dictionary, NIL).
-    if (!pmt::is_pair(msg)) {
+    const auto meta = pmt::is_pair(msg) && pmt::is_dict(pmt::car(msg)) ? pmt::car(msg)
+                                                                       : pmt::make_dict();
+    auto result = pmt::make_dict();
+    for (const char* name : { "poll_id",
+                              "cycle_sequence",
+                              "reference_timestamp",
+                              "cycle_completion_timestamp",
+                              "summary_emission_timestamp" }) {
+        const auto key = pmt::mp(name);
+        if (pmt::dict_has_key(meta, key)) {
+            result = pmt::dict_add(result, key, pmt::dict_ref(meta, key, pmt::PMT_NIL));
+        }
+    }
+    const auto ids = pmt::dict_ref(meta, pmt::mp("observed_anchor_ids"), pmt::PMT_NIL);
+    const size_t observed_count = pmt::is_u32vector(ids) ? pmt::length(ids) : 0;
+    std::vector<range_observation> observations;
+    std::vector<uint32_t> selected_ids;
+    std::vector<double> selected_ranges, residuals;
+    std::vector<uint8_t> fine_flags;
+
+    // Exactly one result for each input, including malformed or aborted cycles.
+    const auto publish = [&](bool success, const char* reason) {
+        result = pmt::dict_add(result, pmt::mp("residual"), pmt::init_f64vector(residuals.size(), residuals));
+        result = pmt::dict_add(result, pmt::mp("observed_anchor_count"), pmt::from_uint64(observed_count));
+        result = pmt::dict_add(result, pmt::mp("used_anchor_count"), pmt::from_uint64(selected_ids.size()));
+        result = pmt::dict_add(result, pmt::mp("used_fine_correction_flags"), pmt::init_u8vector(fine_flags.size(), fine_flags));
+        result = pmt::dict_add(result, pmt::mp("selected_ranges_m"), pmt::init_f64vector(selected_ranges.size(), selected_ranges));
+        result = pmt::dict_add(result, pmt::mp("selected_anchor_ids"), pmt::init_u32vector(selected_ids.size(), selected_ids));
+        result = pmt::dict_add(result, pmt::mp("reason"), pmt::mp(reason));
+        result = pmt::dict_add(result, pmt::mp("success"), pmt::from_bool(success));
+        message_port_pub(pmt::mp(success ? "position_out" : "diagnostic_out"),
+                         pmt::cons(result, pmt::PMT_NIL));
+    };
+
+
+    if (!pmt::is_pair(msg) || !pmt::is_dict(pmt::car(msg))) {
+        publish(false, "INVALID_INPUT");
         return;
     }
-
-    const auto meta = pmt::car(msg);
-
-    if (!pmt::is_dict(meta)) {
+    const auto completion =
+        pmt::dict_ref(meta, pmt::mp("completion_reason"), pmt::PMT_NIL);
+    if (pmt::is_symbol(completion) &&
+        pmt::symbol_to_string(completion) == "STOPPED_INCOMPLETE") {
+        publish(false, "CYCLE_ABORTED");
         return;
     }
-
-    const auto pmt_ids =
-        pmt::dict_ref(meta, pmt::mp("observed_anchor_ids"), pmt::PMT_NIL);
-
-    const auto pmt_integer_ranges =
-        pmt::dict_ref(meta, pmt::mp("integer_ranges_m"), pmt::PMT_NIL);
-
-    const auto pmt_corrected_ranges =
+    const auto integers = pmt::dict_ref(meta, pmt::mp("integer_ranges_m"), pmt::PMT_NIL);
+    const auto corrected =
         pmt::dict_ref(meta, pmt::mp("corrected_ranges_m"), pmt::PMT_NIL);
-
-    const auto pmt_fine_flags =
+    const auto flags =
         pmt::dict_ref(meta, pmt::mp("fine_correction_valid_flags"), pmt::PMT_NIL);
-
-    if (!pmt::is_u32vector(pmt_ids) || !pmt::is_f64vector(pmt_integer_ranges) ||
-        !pmt::is_f64vector(pmt_corrected_ranges) || !pmt::is_u8vector(pmt_fine_flags)) {
+    if (!pmt::is_u32vector(ids) || !pmt::is_f64vector(integers) ||
+        !pmt::is_f64vector(corrected) || !pmt::is_u8vector(flags) || observed_count > 8 ||
+        pmt::length(integers) != observed_count ||
+        pmt::length(corrected) != observed_count ||
+        pmt::length(flags) != observed_count) {
+        publish(false, "INVALID_OBSERVATION_LAYOUT");
         return;
     }
-
-    // Not necessary but for first positioning version
-    const size_t N = pmt::length(pmt_ids);
-    // Check the length of measurement is reasonable.
-    if (pmt::length(pmt_integer_ranges) != N || pmt::length(pmt_corrected_ranges) != N ||
-        pmt::length(pmt_fine_flags) != N) {
-        return;
-    }
-
-    std::vector<range_observation> obs;
-    for (size_t i = 0; i < N; i++) {
-        double range;
-        // Covert PMT data to C++ data type
-        uint32_t anchor_id = pmt::u32vector_ref(pmt_ids, i);
-        double integer_range = pmt::f64vector_ref(pmt_integer_ranges, i);
-        double corrected_range = pmt::f64vector_ref(pmt_corrected_ranges, i);
-        uint8_t fine_flag = pmt::u8vector_ref(pmt_fine_flags, i);
-        range_observation valid_obs;
-        // Check the valid range
-        const bool use_fine = fine_flag == 1 && std::isfinite(corrected_range);
-        range = use_fine ? corrected_range : integer_range;
+    std::set<uint32_t> seen;
+    for (size_t i = 0; i < observed_count; ++i) {
+        const uint32_t id = pmt::u32vector_ref(ids, i);
+        if (!seen.insert(id).second ||
+            std::find(d_anchor_ids.begin(), d_anchor_ids.end(), id) ==
+                d_anchor_ids.end()) {
+            publish(false, "INVALID_ANCHOR_ID");
+            return;
+        }
+        const double fine_range = pmt::f64vector_ref(corrected, i);
+        const bool use_fine =
+            pmt::u8vector_ref(flags, i) == 1 && std::isfinite(fine_range);
+        const double range = use_fine ? fine_range : pmt::f64vector_ref(integers, i);
         if (!std::isfinite(range) || range <= 0.0) {
             continue;
         }
-        // Call the anchor pos based on anchor id
-        if (anchor_id >= d_anchor_positions_m.size()) {
-            return;
-        }
-        const auto& position = d_anchor_positions_m[anchor_id];
-
-        // Store the target range measurement
-        valid_obs.anchor_id = anchor_id;
-        valid_obs.anchor_pos = { position[0], position[1], position[2] };
-        valid_obs.used_fine_correction = use_fine;
-        valid_obs.range = range;
-        valid_obs.weight = 1.0;
-        obs.push_back(valid_obs);
-    }
-
-    std::vector<double> selected_ranges;
-    std::vector<double> residuals;
-    std::vector<uint32_t> selected_anchor_ids;
-    std::vector<uint8_t> selected_fine_flags;
-
-    std::array<double, 3> initial_guess = { 0, 0, 0 };
-    for (const auto& measurement : obs) {
-        // Get the measurement info
-        const uint32_t anchor_id = measurement.anchor_id;
-        const double range = measurement.range;
-        const double weight = measurement.weight;
-        // Initial guess
-        initial_guess[0] += measurement.anchor_pos[0];
-        initial_guess[1] += measurement.anchor_pos[1];
-        initial_guess[2] += measurement.anchor_pos[2];
-        // Log measurement info
+        const auto& pos = d_anchor_positions_m[id];
+        observations.push_back({ { pos[0], pos[1], pos[2] }, range });
+        selected_ids.push_back(id);
         selected_ranges.push_back(range);
-        selected_anchor_ids.push_back(anchor_id);
-        selected_fine_flags.push_back(measurement.used_fine_correction ? 1 : 0);
+        fine_flags.push_back(use_fine ? 1 : 0);
     }
-
-    if (obs.size() < 3) {
-        // Insufficient Observations may add fail diagnostic_out but later.
-        auto result = pmt::make_dict();
-        result = pmt::dict_add(result,pmt::mp("selected_ranges_m"),pmt::init_f64vector(selected_ranges.size(), selected_ranges));
-        result = pmt::dict_add(result,pmt::mp("selected_anchor_ids"),pmt::init_u32vector(selected_anchor_ids.size(), selected_anchor_ids));
-        result = pmt::dict_add(result,pmt::mp("poll_id"),pmt::dict_ref(meta, pmt::mp("poll_id"), pmt::PMT_NIL));
-        result = pmt::dict_add(result, pmt::mp("completion_reason"), pmt::mp("The anchor less than 3"));
-        message_port_pub(pmt::mp("diagnostic_out"), pmt::cons(result, pmt::PMT_NIL));
+    if (observations.size() < 3) {
+        publish(false, "INSUFFICIENT_OBSERVATIONS");
         return;
     }
-    for (size_t i = 0; i < 3; i++)
-        initial_guess[i] = initial_guess[i] / selected_anchor_ids.size();
-    // The 2D position constrain remove in 3D implementation.
-    initial_guess[2] = d_vehicle_height_m;
 
-    // WLS
-    const bool has_previous_position = std::isfinite(d_position[0]) && std::isfinite(d_position[1]);
-    constexpr int max_iterations = 40;
-    constexpr double convergence_tolerance = 1e-2;
-    bool converged = 0;
-    double x = (has_previous_position) ? d_position[0] : initial_guess[0];
-    double y = (has_previous_position) ? d_position[1] : initial_guess[1];
-    for (int iteration = 0; iteration < max_iterations; ++iteration) {
-        // residuals clean
+    // Fixed-height 2D least squares. Preserve the existing uniform weights,
+    // 40-iteration limit and 1 cm step convergence threshold.
+    double x = 0.0, y = 0.0;
+    for (const auto& observation : observations) {
+        x += observation.anchor_pos[0] / observations.size();
+        y += observation.anchor_pos[1] / observations.size();
+    }
+    if (std::isfinite(d_position[0]) && std::isfinite(d_position[1])) {
+        x = d_position[0];
+        y = d_position[1];
+    }
+    bool converged = false;
+    for (int iteration = 0; iteration < 40; ++iteration) {
+        double axx = 0.0, axy = 0.0, ayy = 0.0, bx = 0.0, by = 0.0;
         residuals.clear();
-        // A = H' * W * H, B = H'* W * residual
-        double Axx = 0.0;
-        double Axy = 0.0;
-        double Ayy = 0.0;
-        double bx = 0.0;
-        double by = 0.0;
-        for (const auto& measurement : obs) {
-            // Calculate the residual
-            const double dx = x - measurement.anchor_pos[0];
-            const double dy = y - measurement.anchor_pos[1];
-            const double dz = d_vehicle_height_m - measurement.anchor_pos[2];
-            const double predicted_range = std::sqrt(dx * dx + dy * dy + dz * dz);
-            const double residual = measurement.range - predicted_range;
-            // Jacobian
-            if (!std::isfinite(predicted_range) ||
-                predicted_range <= 1e-12) {
-                auto result = pmt::make_dict();
-                result = pmt::dict_add(result,
-                    pmt::mp("selected_ranges_m"),
-                    pmt::init_f64vector(selected_ranges.size(), selected_ranges));
-                result = pmt::dict_add(result,
-                    pmt::mp("poll_id"),
-                    pmt::dict_ref(meta, pmt::mp("poll_id"), pmt::PMT_NIL));
-                result = pmt::dict_add(result, pmt::mp("completion_reason"), pmt::mp("predicted_range is not isfinite or <=1e-12 "));
-                message_port_pub(pmt::mp("diagnostic_out"), pmt::cons(result, pmt::PMT_NIL));
+        for (const auto& observation : observations) {
+            const double dx = x - observation.anchor_pos[0];
+            const double dy = y - observation.anchor_pos[1];
+            const double dz = d_vehicle_height_m - observation.anchor_pos[2];
+            const double predicted = std::hypot(dx, dy, dz);
+            if (!std::isfinite(predicted) || predicted <= 1e-12) {
+                publish(false, "INVALID_PREDICTED_RANGE");
                 return;
             }
-            double hx = dx / predicted_range;
-            double hy = dy / predicted_range;
-            double w = measurement.weight;
-            Axx += hx * hx * w;
-            Axy += hx * hy * w;
-            Ayy += hy * hy * w;
-
-            bx += w * hx * residual;
-            by += w * hy * residual;
-            // Log residual
+            const double residual = observation.range - predicted;
+            const double hx = dx / predicted, hy = dy / predicted;
+            axx += hx * hx;
+            axy += hx * hy;
+            ayy += hy * hy;
+            bx += hx * residual;
+            by += hy * residual;
             residuals.push_back(residual);
         }
-        const double det = Axx * Ayy - Axy * Axy;
-
-        // Singular or nearly singular geometry
+        const double det = axx * ayy - axy * axy;
         if (!std::isfinite(det) || det <= 1e-12) {
-                auto result = pmt::make_dict();
-                result = pmt::dict_add(result,
-                                        pmt::mp("residual"),
-                                        pmt::init_f64vector(residuals.size(), residuals));
-                result = pmt::dict_add(result,
-                                        pmt::mp("used_fine_correction_flags"),
-                                        pmt::init_u8vector(selected_fine_flags.size(), selected_fine_flags));
-                result = pmt::dict_add(result,
-                                        pmt::mp("selected_ranges_m"),
-                                        pmt::init_f64vector(selected_ranges.size(), selected_ranges));
-                result = pmt::dict_add(result, 
-                                        pmt::mp("positioning_anchor_count"), 
-                                        pmt::from_uint64(obs.size()));
-                result = pmt::dict_add(result,
-                                        pmt::mp("selected_anchor_ids"),
-                                        pmt::init_u32vector(selected_anchor_ids.size(), selected_anchor_ids));
-                result = pmt::dict_add(result,
-                                        pmt::mp("poll_id"),
-                                        pmt::dict_ref(meta, pmt::mp("poll_id"), pmt::PMT_NIL));
-                result = pmt::dict_add(result, pmt::mp("completion_reason"), pmt::mp("singular geometry"));
-                message_port_pub(pmt::mp("diagnostic_out"), pmt::cons(result, pmt::PMT_NIL));
+            publish(false, "SINGULAR_GEOMETRY");
             return;
         }
-        const double delta_x = (Ayy * bx - Axy * by) / det;
-        const double delta_y = (Axx * by - Axy * bx) / det;
-        if (!std::isfinite(delta_x) || !std::isfinite(delta_y)) {
-            auto result = pmt::make_dict();
-            result = pmt::dict_add(result,
-                                    pmt::mp("det"),
-                                    pmt::from_double(det));
-            result = pmt::dict_add(result,
-                                    pmt::mp("residual"),
-                                    pmt::init_f64vector(residuals.size(), residuals));
-            result = pmt::dict_add(result,
-                                    pmt::mp("selected_ranges_m"),
-                                    pmt::init_f64vector(selected_ranges.size(), selected_ranges));
-            result = pmt::dict_add(result,
-                                    pmt::mp("selected_anchor_ids"),
-                                    pmt::init_u32vector(selected_anchor_ids.size(), selected_anchor_ids));
-            result = pmt::dict_add(result,
-                                    pmt::mp("poll_id"),
-                                    pmt::dict_ref(meta, pmt::mp("poll_id"), pmt::PMT_NIL));
-            result = pmt::dict_add(result, pmt::mp("completion_reason"), pmt::mp("delta x delta y is not finite"));
-            message_port_pub(pmt::mp("diagnostic_out"), pmt::cons(result, pmt::PMT_NIL));
+        const double delta_x = (ayy * bx - axy * by) / det;
+        const double delta_y = (axx * by - axy * bx) / det;
+        if (!std::isfinite(delta_x) || !std::isfinite(delta_y) ||
+            !std::isfinite(x + delta_x) || !std::isfinite(y + delta_y)) {
+            publish(false, "NONFINITE_UPDATE");
             return;
         }
         x += delta_x;
         y += delta_y;
-        const double step_norm = std::hypot(delta_x, delta_y);
-
-        if (step_norm < convergence_tolerance) {
-            converged = 1;
+        if (std::hypot(delta_x, delta_y) < 1e-2) {
+            converged = true;
             break;
         }
     }
     residuals.clear();
-
-    for (const auto& measurement : obs) {
-
-        const double dx = x - measurement.anchor_pos[0];
-        const double dy = y - measurement.anchor_pos[1];
-        const double dz =
-            d_vehicle_height_m - measurement.anchor_pos[2];
-
-        const double predicted_range =
-            std::sqrt(dx * dx + dy * dy + dz * dz);
-
-        const double residual =
-            measurement.range - predicted_range;
-
-        residuals.push_back(residual);
+    for (const auto& observation : observations) {
+        const double predicted =
+            std::hypot(x - observation.anchor_pos[0],
+                       y - observation.anchor_pos[1],
+                       d_vehicle_height_m - observation.anchor_pos[2]);
+        residuals.push_back(observation.range - predicted);
     }
-
-    if (!converged){
-            auto result = pmt::make_dict();
-                d_position = { x, y, d_vehicle_height_m };
-            std::vector<double> position = { d_position[0], d_position[1], d_position[2] };
-            result = pmt::dict_add(result,
-                            pmt::mp("position_m"),
-                            pmt::init_f64vector(position.size(), position));
-            result = pmt::dict_add(result,
-                                    pmt::mp("residual"),
-                                    pmt::init_f64vector(residuals.size(), residuals));
-            result = pmt::dict_add(result,
-                                    pmt::mp("selected_ranges_m"),
-                                    pmt::init_f64vector(selected_ranges.size(), selected_ranges));
-            result = pmt::dict_add(result,
-                                    pmt::mp("selected_anchor_ids"),
-                                    pmt::init_u32vector(selected_anchor_ids.size(), selected_anchor_ids));
-            result = pmt::dict_add(result,
-                                    pmt::mp("poll_id"),
-                                    pmt::dict_ref(meta, pmt::mp("poll_id"), pmt::PMT_NIL));
-            result = pmt::dict_add(result, pmt::mp("completion_reason"), pmt::mp("WLS is not convergent"));
-            message_port_pub(pmt::mp("diagnostic_out"), pmt::cons(result, pmt::PMT_NIL));
-            return;
+    if (!converged) {
+        publish(false, "NOT_CONVERGED");
+        return;
     }
-
+    // Failed attempts never replace the last successful initial guess.
     d_position = { x, y, d_vehicle_height_m };
-    std::vector<double> position = { d_position[0], d_position[1], d_position[2] };
-    auto result = pmt::make_dict();
-    result = pmt::dict_add(result,
-                            pmt::mp("position_m"),
-                            pmt::init_f64vector(position.size(), position));
-    result = pmt::dict_add(result,
-                        pmt::mp("residual"),
-                        pmt::init_f64vector(residuals.size(), residuals));
-    result = pmt::dict_add(result,
-                            pmt::mp("selected_ranges_m"),
-                            pmt::init_f64vector(selected_ranges.size(), selected_ranges));
-    result = pmt::dict_add(result,
-                            pmt::mp("selected_anchor_ids"),
-                            pmt::init_u32vector(selected_anchor_ids.size(), selected_anchor_ids));
-    result = pmt::dict_add(result,
-                            pmt::mp("poll_id"),
-                            pmt::dict_ref(meta, pmt::mp("poll_id"), pmt::PMT_NIL));
-    result = pmt::dict_add(result, pmt::mp("completion_reason"), pmt::mp("Positioning Estimation"));
-    
-    message_port_pub(pmt::mp("position_out"), pmt::cons(result, pmt::PMT_NIL));
-    return;
+    result = pmt::dict_add(
+        result, pmt::mp("position_m"), pmt::init_f64vector(3, d_position.data()));
+    publish(true, "OK");
 }
-
 
 } // namespace ofdm_prs_ranging
 } // namespace gr

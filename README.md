@@ -3,8 +3,8 @@
 GNU Radio OOT blocks for USRP/UHD burst ranging using a custom OFDM PRS-like
 waveform. The current system supports statically scheduled 1..8-anchor ranging
 cycles and complete positioning epochs from finalized cycles with at least three
-configured anchors. Online position calculation remains future work. It is not a
-standards-complete LTE/NR PRS implementation.
+configured anchors. Fixed-height 2D position calculation and CSV result logging
+are available. It is not a standards-complete LTE/NR PRS implementation.
 
 Packet, geometry and one-anchor ranging sections were updated for Phase B.
 The historical sections retain their original provenance. [signal.md](docs/signal.md) is the detailed waveform and DSP reference.
@@ -32,7 +32,8 @@ no standalone time-domain BPSK payload in the current receiver chain.
 | Multi-anchor ranging cycles | Implemented for 1..8 configured anchors with static windows, packet identity, duplicate suppression and bounded cycle completion |
 | RF validation | One-anchor Phase B and two-anchor Phase C reported successful by the user; three/four/eight-anchor RF operation is not claimed |
 | Complete positioning epochs | Implemented on `epoch_out`; requires every configured anchor, at least three anchors, and normal cycle finalization; synthetic QA verified |
-| Online position calculation | Not implemented; no anchor coordinate database or Position Solver |
+| Online position calculation | Fixed-height 2D least squares in `prs_position_solver`; accepts partial observations with at least three usable anchors |
+| Position CSV | `prs_position_csv_logger` records successful fixes and solver failures, with cycle association and residual summaries |
 | DS-TWR, clock-skew correction, pre-FFT PRS CFO correction | Not implemented |
 
 The FFT-ZC algorithm remains experimental in accuracy terms even though the
@@ -389,9 +390,9 @@ for timing semantics and epoch eligibility.
 Focused QA includes 1/2-anchor ranging-only compatibility, complete 3/4/8-anchor
 epochs, no early/partial/shutdown publication, invalid fine correction, ordered
 metadata preservation, duplicates, missing anchors, sequential reuse and cleanup.
-The Position Solver, surveyed coordinates, geometry checks and online position
-calculation remain future work. A positioning epoch is an observation set,
-not a position fix.
+The complete epoch remains an observation set. The positioning and logging
+path described below additionally accepts partial observations; supplied anchor
+coordinates must be surveyed for meaningful RF position accuracy.
 
 Milestone verification (fresh build, October 28): all 14 focused cycle-manager
 tests pass, including the existing complete-packet/two-window acquisition cases.
@@ -403,6 +404,75 @@ current SS-TWR equation/calibration were not changed. The Phase-C acquisition
 regression checks the same synthetic RTT from canonical T1/T4/decoded delay
 instead of requiring that removed alias. Existing mismatch flags and complete
 summary fields are published again so diagnostics remain machine-readable.
+
+## Position Results and CSV Logging
+
+The cycle manager's `observation_out` publishes every finalized cycle, including
+partial/empty observations and aborted cycles. Connect it to
+`prs_position_solver.epoch_in`. The legacy `epoch_out` continues to publish
+complete, normally finalized observations with at least three configured
+anchors. Do not connect both outputs to the same solver: a complete cycle
+would otherwise be processed twice.
+
+The position solver uses a fixed vehicle height and estimates local X/Y in
+metres. It attempts a fix with at least three usable, distinct configured
+anchors, even when other anchors did not respond. Finite positive selected
+ranges are usable; a valid finite corrected range takes priority, otherwise
+the integer range is selected. There is no new outlier filter or RF accuracy
+claim. Unknown/duplicate anchor IDs and malformed layouts produce diagnostics.
+
+Each input produces either `position_out` on success or `diagnostic_out` on
+failure. Both carry `success`, `reason`, `poll_id`, `cycle_sequence`, available
+UHD reference/finalization timestamps, `observed_anchor_count`,
+`used_anchor_count`, selected IDs/ranges, fine-selection flags and residuals.
+Failures omit `position_m`; the last successful fix remains the next initial
+guess. Reference time is POLL TX T1, not solver execution or CSV write time.
+
+Connect the two solver outputs to `prs_position_csv_logger.position_in` and
+its optional `diagnostic_in`. The complete-epoch example now demonstrates
+this path and writes `examples/CSV/complete_epoch_positions.csv`.
+The CSV columns are:
+
+```text
+cycle_sequence,poll_id,reference_timestamp,success,reason,x_m,y_m,z_m,
+observed_anchor_count,used_anchor_count,anchor_ids,residual_rms_m,residual_max_abs_m
+```
+
+Each result is one row. XYZ is empty on failure; `z_m` on success is the fixed
+vehicle height. `anchor_ids` lists usable selected IDs separated by semicolons.
+Counts distinguish received observations from usable selected ranges, even
+when too few remain to solve. No expected count, missing IDs or per-anchor
+ranges are written. Residual summaries measure consistency with the selected
+ranges, not position error; unavailable summaries are empty.
+
+Individual ranges remain in the measurement CSV, which now also includes
+`cycle_sequence`. Join within a run by `(cycle_sequence, poll_id)` and then
+`anchor_id`; the 16-bit POLL ID alone can repeat. Use separate files per run
+and retain the anchor-coordinate configuration alongside them. Start a new
+measurement CSV after this schema change. Position CSV append checks its
+header and rejects incompatible files. The logger flushes each row and
+reports file-open/write failures.
+
+Shutdown observation publication does not guarantee downstream processing
+after the whole flowgraph has already stopped. To record `CYCLE_ABORTED`,
+finalize the cycle manager while solver/logger handlers are still running,
+then allow their messages to drain before stopping the flowgraph. Normal
+expired cycles require no special shutdown handling.
+
+Software verification for the positioning logger change (2026-11-12): build
+and generation of all seven GRC examples pass. All ten new positioning/logging
+cases and all fourteen cycle-manager cases pass. Full CTest passes 11/12 targets;
+`qa_prs_receiver` still has the pre-existing removed-`rtt_s` and calibration
+expectation failures. Its measurement CSV test now checks the current schema
+including `cycle_sequence`. No RF positioning validation or system installation
+was performed as part of this change.
+
+Receiver QA update (2026-11-13): synthetic RTT is reconstructed as
+`t4_rx_time - t1_tx_time - reply_delay_samples / samp_rate` using current
+measurement CSV fields. Hard-coded absolute calibration expectations and
+obsolete output-alias assertions were removed; fine-correction sign/validity
+and invalid-value fallback checks remain. The solver calibration/formula is
+unchanged. Fresh full CTest passes all 12/12 targets (24 receiver cases).
 
 ## Historical Phase C Implementation and Software Verification
 

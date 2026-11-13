@@ -1,0 +1,21 @@
+id: ofdm_prs_ranging_prs_position_csv_logger
+label: PRS Position CSV Logger
+category: '[ofdm_prs_ranging]'
+templates:
+  imports: from gnuradio import ofdm_prs_ranging
+  make: ofdm_prs_ranging.prs_position_csv_logger(${path}, ${append})
+parameters:
+- {id: path, label: CSV Path, dtype: string, default: '"prs_positions.csv"'}
+- {id: append, label: Append, dtype: bool, default: 'True'}
+inputs:
+- {label: position_in, domain: message}
+- {label: diagnostic_in, domain: message, optional: true}
+outputs: []
+documentation: |-
+  Connect position solver position_out and optional diagnostic_out to the corresponding inputs.
+  One row per result. Failed rows have empty XYZ fields, even if diagnostics include trial coordinates.
+  Counts distinguish received observations from valid ranges selected for positioning.
+  anchor_ids lists selected IDs separated by semicolons; no per-anchor ranges are duplicated.
+  reference_timestamp is POLL TX time in UHD seconds, not wall-clock or CSV write time.
+  Use separate files per run. Append validates the CSV header; an incompatible file is rejected.
+file_format: 1

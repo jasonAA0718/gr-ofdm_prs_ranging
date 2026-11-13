@@ -45,7 +45,7 @@ private:
     void handle_measurement(pmt::pmt_t msg);
     void handle_range(pmt::pmt_t msg);
     void finish(const cycle& c, const char* reason);
-    void publish_epoch(const cycle& c);
+    void publish_observations(const cycle& c, const char* reason);
     void diagnostic(pmt::pmt_t meta, const char* reason);
     cycle* locate(pmt::pmt_t meta);
 };

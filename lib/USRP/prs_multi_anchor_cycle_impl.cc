@@ -78,7 +78,7 @@ prs_multi_anchor_cycle_impl::prs_multi_anchor_cycle_impl(double fs,
     for (const auto* port : {"tx_time_in", "clock_in", "measurement_in", "range_in"})
         message_port_register_in(pmt::mp(port));
     for (const auto* port : {"window_out", "solver_tx_out", "solver_measurement_out",
-                             "measurement_out", "cycle_out", "epoch_out", "diagnostic_out"})
+                             "measurement_out", "cycle_out", "epoch_out", "observation_out", "diagnostic_out"})
         message_port_register_out(pmt::mp(port));
     set_msg_handler(pmt::mp("tx_time_in"), [this](pmt::pmt_t m) { handle_tx(m); });
     set_msg_handler(pmt::mp("clock_in"), [this](pmt::pmt_t m) { handle_clock(m); });
@@ -262,26 +262,30 @@ void prs_multi_anchor_cycle_impl::finish(const cycle& c, const char* reason)
     const auto summary = pmt::dict_add(meta, pmt::mp("anchor_snrs_db"),
         pmt::init_f64vector(anchor_snrs_db.size(), anchor_snrs_db));
     message_port_pub(pmt::mp("cycle_out"), pmt::cons(summary, pmt::PMT_NIL));
-    // Finalized normal cycles only. Shutdown never publishes an epoch, even
-    // when every range happened to arrive before the scheduled end.
-    if (std::string(reason) == "WINDOWS_EXPIRED" && d_anchors.size() >= 1 &&
-        c.measurements.size() == d_anchors.size()) publish_epoch(c);
+    // Every finalized cycle reaches positioning, including zero observations
+    // and shutdown. The separate complete-epoch interface keeps its contract.
+    publish_observations(c, reason);
     auto expire = pmt::dict_add(meta, pmt::mp("expire_cycle"), pmt::PMT_T);
     message_port_pub(pmt::mp("solver_tx_out"), expire);
 }
-void prs_multi_anchor_cycle_impl::publish_epoch(const cycle& c)
+void prs_multi_anchor_cycle_impl::publish_observations(const cycle& c, const char* reason)
 {
     std::vector<double> integer_ranges, corrected_ranges, timestamps;
     std::vector<uint8_t> fine_flags;
-    auto observations = pmt::make_vector(d_anchors.size(), pmt::PMT_NIL);
-    auto diagnostics = pmt::make_vector(d_anchors.size(), pmt::PMT_NIL);
+    std::vector<uint32_t> observed_ids;
+    auto observations = pmt::make_vector(c.measurements.size(), pmt::PMT_NIL);
+    auto diagnostics = pmt::make_vector(c.measurements.size(), pmt::PMT_NIL);
     for (size_t i = 0; i < d_anchors.size(); ++i) {
-        const auto& measurement = c.measurements.at(d_anchors[i]);
+        const auto found = c.measurements.find(d_anchors[i]);
+        if (found == c.measurements.end()) continue;
+        const size_t index = observed_ids.size();
+        observed_ids.push_back(d_anchors[i]);
+        const auto& measurement = found->second;
         integer_ranges.push_back(dict_ref_double(measurement, "integer_range_m", NAN));
         corrected_ranges.push_back(dict_ref_double(measurement, "corrected_range_m", NAN));
         timestamps.push_back(dict_ref_double(measurement, "measurement_timestamp", NAN));
         fine_flags.push_back(metadata_true(measurement, "fine_correction_valid") ? 1 : 0);
-        pmt::vector_set(observations, i, measurement);
+        pmt::vector_set(observations, index, measurement);
         auto quality = pmt::make_dict();
         for (const auto* key : {"frame_id_valid", "valid", "snr", "quality",
                 "coarse_metric", "payload_metric", "phase_slope", "phase_residual",
@@ -290,7 +294,7 @@ void prs_multi_anchor_cycle_impl::publish_epoch(const cycle& c)
             if (pmt::dict_has_key(measurement, pmt::mp(key)))
                 quality = pmt::dict_add(quality, pmt::mp(key), pmt::dict_ref(measurement, pmt::mp(key), pmt::PMT_NIL));
         }
-        pmt::vector_set(diagnostics, i, quality);
+        pmt::vector_set(diagnostics, index, quality);
     }
     auto epoch = pmt::make_dict();
     epoch = pmt::dict_add(epoch, pmt::mp("cycle_completion_timestamp"), pmt::from_double(c.end));
@@ -302,11 +306,17 @@ void prs_multi_anchor_cycle_impl::publish_epoch(const cycle& c)
     epoch = pmt::dict_add(epoch, pmt::mp("integer_ranges_m"), pmt::init_f64vector(integer_ranges.size(), integer_ranges));
     epoch = pmt::dict_add(epoch, pmt::mp("measurements"), observations);
     epoch = pmt::dict_add(epoch, pmt::mp("measurement_timestamps"), pmt::init_f64vector(timestamps.size(), timestamps));
-    epoch = pmt::dict_add(epoch, pmt::mp("observed_anchor_ids"), pmt::init_u32vector(d_anchors.size(), d_anchors));
+    epoch = pmt::dict_add(epoch, pmt::mp("observed_anchor_ids"), pmt::init_u32vector(observed_ids.size(), observed_ids));
     epoch = pmt::dict_add(epoch, pmt::mp("reference_timestamp"), pmt::from_double(c.t1));
     epoch = pmt::dict_add(epoch, pmt::mp("cycle_sequence"), pmt::from_uint64(c.sequence));
     epoch = pmt::dict_add(epoch, pmt::mp("poll_id"), pmt::from_uint64(c.poll));
-    message_port_pub(pmt::mp("epoch_out"), pmt::cons(epoch, pmt::PMT_NIL));
+    epoch = pmt::dict_add(epoch, pmt::mp("completion_reason"), pmt::mp(reason));
+    const auto pdu = pmt::cons(epoch, pmt::PMT_NIL);
+    message_port_pub(pmt::mp("observation_out"), pdu);
+    if (std::string(reason) == "WINDOWS_EXPIRED" && d_anchors.size() >= 3 &&
+        c.measurements.size() == d_anchors.size()) {
+        message_port_pub(pmt::mp("epoch_out"), pdu);
+    }
 }
 void prs_multi_anchor_cycle_impl::handle_clock(pmt::pmt_t msg)
 {

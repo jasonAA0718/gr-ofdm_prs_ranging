@@ -25,6 +25,7 @@ install(FILES api.h
     prs_ssrtt_solver.h
     prs_position_solver.h
     prs_csv_logger.h
+    prs_position_csv_logger.h
     zc_manual_ping_source.h
     zc_peak_detector.h
     zc_rtt_calculator.h

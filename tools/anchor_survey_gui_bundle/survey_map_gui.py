@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GNU Radio anchor survey GUI: LLH/DMS, ENU export, online tiles, offline MBTiles.
+"""GNU Radio survey GUI: LLH/ENU, map tiles and live position CSV debug tracks.
 
 Requires Python 3 + tkinter. Place beside survey_llh_to_enu.py and
 anchor_csv_loader.py. No third-party pip packages required.
@@ -7,6 +7,7 @@ anchor_csv_loader.py. No third-party pip packages required.
 from __future__ import annotations
 
 import csv
+from collections import deque
 import io
 import math
 import os
@@ -21,6 +22,7 @@ import urllib.error
 import urllib.request
 
 from survey_llh_to_enu import llh_to_ecef, ecef_to_enu
+from position_csv_reader import PositionCsvReader, MAX_TRAIL_POINTS, enu_to_latlon
 
 APP_TITLE = "GNSS / SDR 站點 Survey · LLH → ENU"
 INPUT_HEADERS = ["anchor_id", "latitude_deg", "longitude_deg", "ground_elevation_m", "antenna_agl_m"]
@@ -194,7 +196,23 @@ class SurveyApp(tk.Tk):
         self.current_tiles = []
         self.drag_at = None
         self.render_after = None
+        self.position_path = tk.StringVar()
+        self.position_hz = tk.StringVar(value="0.2")
+        self.position_follow = tk.BooleanVar(value=True)
+        self.position_status = tk.StringVar(value="尚未載入 Position CSV")
+        self.position_queue = queue.Queue()
+        self.position_track = deque(maxlen=MAX_TRAIL_POINTS)
+        self.position_latest = None
+        self.position_fix = None
+        self.position_origin = None
+        self.position_running = False
+        self.position_generation = 0
+        self.position_cancel = threading.Event()
+        self.position_after = None
+        self.position_last_record_at = None
+        self.position_error = ""
         self._build_ui()
+        self.protocol("WM_DELETE_WINDOW", self._close)
         self._previous_mode = self.coord_mode.get()
         self.coord_mode.trace_add("write", lambda *_: self._switch_mode())
         self.after(100, self._poll_tiles)
@@ -217,10 +235,39 @@ class SurveyApp(tk.Tk):
 
         header = ttk.Frame(map_frame)
         header.pack(fill="x", pady=(0, 7))
-        ttk.Label(header, text="站點配置地圖", style="Title.TLabel").pack(side="left")
+        ttk.Label(header, text="站點與即時定位", style="Title.TLabel").pack(side="left")
         ttk.Button(header, text="所有站點", command=self.fit_sites).pack(side="right", padx=3)
         ttk.Button(header, text="−", width=3, command=lambda: self.change_zoom(-1)).pack(side="right", padx=3)
         ttk.Button(header, text="+", width=3, command=lambda: self.change_zoom(1)).pack(side="right", padx=3)
+        navigation = ttk.LabelFrame(map_frame, text="Position CSV 即時 Debug", padding=6)
+        navigation.pack(fill="x", pady=(0, 7))
+        path_row = ttk.Frame(navigation)
+        path_row.pack(fill="x")
+        ttk.Entry(path_row, textvariable=self.position_path).pack(side="left", fill="x", expand=True)
+        ttk.Button(path_row, text="選取 CSV", command=self.open_position_csv).pack(side="left", padx=3)
+        controls = ttk.Frame(navigation)
+        controls.pack(fill="x", pady=(4, 0))
+        ttk.Label(controls, text="更新 Hz").pack(side="left")
+        ttk.Combobox(controls, textvariable=self.position_hz, values=("0.1", "0.2", "0.5", "1"),
+                     width=5, state="readonly").pack(side="left", padx=3)
+        self.position_button = ttk.Button(controls, text="開始 / 重新載入", command=self.start_positions)
+        self.position_button.pack(side="left", padx=2)
+        ttk.Button(controls, text="暫停", command=self.stop_positions).pack(side="left", padx=2)
+        track_controls = ttk.Frame(navigation)
+        track_controls.pack(fill="x", pady=(3, 0))
+        ttk.Button(track_controls, text="定位置中", command=self.center_position).pack(side="left", padx=2)
+        ttk.Button(track_controls, text="清除軌跡", command=self.clear_position_track).pack(side="left", padx=2)
+        ttk.Checkbutton(track_controls, text="跟隨定位", variable=self.position_follow).pack(side="left")
+        origin_hint = ttk.Label(navigation,
+                                text="ENU 原點使用目前 Survey 的 A0 天線位置；須與 solver 設定一致。",
+                                foreground="#657789", wraplength=480)
+        origin_hint.pack(anchor="w", pady=(3, 0))
+        position_label = ttk.Label(navigation, textvariable=self.position_status,
+                                   wraplength=480, foreground="#2e5070")
+        position_label.pack(anchor="w")
+        navigation.bind("<Configure>", lambda event: (
+            origin_hint.configure(wraplength=max(180, event.width - 20)),
+            position_label.configure(wraplength=max(180, event.width - 20))))
         self.canvas = tk.Canvas(map_frame, bg="#e6ecf2", highlightthickness=0, cursor="fleur")
         self.canvas.pack(fill="both", expand=True)
         self.canvas.bind("<Configure>", lambda e: self.queue_redraw())
@@ -516,6 +563,7 @@ class SurveyApp(tk.Tk):
             label = "Initiator" if initiator else f"A{s['id']}"
             cv.create_text(sx + 13, sy - 14, text=label, anchor="w", font=("Arial", 11, "bold"), fill="#142e43")
             cv.create_text(sx + 14, sy + 4, text=f"H {s['ground']+s['agl']:.2f} m", anchor="w", font=("Arial", 9), fill="#304455")
+        self._draw_positions()
         cv.create_rectangle(9, 9, 272, 52, fill="white", outline="#cbd7e2")
         cv.create_text(17, 18, text=f"Lat {self.map_lat:.7f}   Lon {self.map_lon:.7f}", anchor="nw", fill="#23415e")
         cv.create_text(17, 36, text=f"Zoom {z}  |  {'離線 MBTiles' if self.offline.get() else '線上 OSM'}", anchor="nw", fill="#60758a")
@@ -579,7 +627,214 @@ class SurveyApp(tk.Tk):
             pass
         if updated and not self.offline.get():
             self.queue_redraw()
+        self._poll_position_results()
         self.after(150, self._poll_tiles)
+
+    def _get_position_origin(self):
+        anchor = next((site for site in self.sites if site["id"] == 0), None)
+        if anchor is None:
+            raise ValueError("請先載入 Survey CSV 或設定 A0，才能將 ENU 定位轉為地圖座標")
+        geoid = parse_finite(self.geoid.get(), "Geoid N")
+        return (anchor["lat"], anchor["lon"], anchor["ground"] + anchor["agl"] + geoid)
+
+    def open_position_csv(self):
+        filename = filedialog.askopenfilename(title="開啟持續寫入的 Position CSV",
+                                             filetypes=[("CSV", "*.csv"), ("All files", "*")])
+        if filename:
+            self.stop_positions()
+            self.position_path.set(filename)
+            self.position_status.set("已選取檔案，按「開始 / 重新載入」讀取")
+
+    def start_positions(self):
+        try:
+            origin = self._get_position_origin()
+            filename = self.position_path.get().strip()
+            if not filename:
+                raise ValueError("請先選取 Position CSV")
+            hz = parse_finite(self.position_hz.get(), "更新 Hz")
+            if not 0.01 <= hz <= 2:
+                raise ValueError("Debug 更新率請使用 0.01–2 Hz")
+        except ValueError as exc:
+            messagebox.showerror("無法開始定位顯示", str(exc))
+            return
+        self.stop_positions()
+        self.position_origin = origin
+        self.position_track.clear()
+        self.position_fix = self.position_latest = None
+        self.position_last_record_at = None
+        self.position_error = ""
+        self.position_reader = PositionCsvReader(filename)
+        self.position_cancel = threading.Event()
+        self.position_running = True
+        self.position_status.set("正在讀取 Position CSV…")
+        self._launch_position_read()
+        self.queue_redraw()
+
+    def stop_positions(self):
+        self.position_running = False
+        self.position_generation += 1
+        self.position_cancel.set()
+        if self.position_after is not None:
+            self.after_cancel(self.position_after)
+            self.position_after = None
+        if self.position_fix is not None:
+            self.position_status.set("已暫停；地圖保留上次有效定位")
+        self._draw_positions()
+
+    def _launch_position_read(self):
+        self.position_after = None
+        if not self.position_running:
+            return
+        try:
+            if self._get_position_origin() != self.position_origin:
+                raise ValueError("Survey A0 或 Geoid 已變更，請重新載入 Position CSV")
+        except ValueError as exc:
+            self.stop_positions()
+            self.position_track.clear()
+            self.position_fix = None
+            self.position_status.set(str(exc))
+            self._draw_positions()
+            return
+        generation = self.position_generation
+        reader, cancelled = self.position_reader, self.position_cancel
+
+        def read():
+            try:
+                result = reader.poll(cancelled)
+                error = ""
+            except (OSError, ValueError, UnicodeError, csv.Error) as exc:
+                result, error = None, str(exc)
+            if not cancelled.is_set():
+                self.position_queue.put((generation, result, error))
+        threading.Thread(target=read, daemon=True).start()
+
+    def _poll_position_results(self):
+        changed = False
+        try:
+            while True:
+                generation, result, error = self.position_queue.get_nowait()
+                if generation != self.position_generation or not self.position_running:
+                    continue
+                # Editing the survey while a read was in flight must not plot
+                # an old frame against the newly edited anchor markers.
+                try:
+                    same_origin = self._get_position_origin() == self.position_origin
+                except ValueError:
+                    same_origin = False
+                if not same_origin:
+                    self.stop_positions()
+                    self.position_track.clear()
+                    self.position_fix = None
+                    self.position_status.set("Survey 原點已變更，請重新載入 Position CSV")
+                    self._draw_positions()
+                    continue
+                self.position_error = error
+                if result is not None:
+                    if result["reset"]:
+                        self.position_track.clear()
+                        self.position_fix = self.position_latest = None
+                        self.position_last_record_at = None
+                    for row in result["fixes"]:
+                        latitude, longitude = enu_to_latlon(*row["xyz"], self.position_origin)
+                        point = (latitude, longitude, row["break_before"])
+                        self.position_track.append(point)
+                        self.position_fix = (latitude, longitude, row)
+                    self.position_latest = result["latest"]
+                    self.position_invalid = result["invalid"]
+                    if result["new_records"]:
+                        # Use file mtime only to seed local freshness; never
+                        # compare UHD reference_timestamp with Unix time.
+                        file_age = max(0., time.time() - result.get("mtime", time.time()))
+                        self.position_last_record_at = time.monotonic() - file_age
+                    if result["fixes"] and self.position_follow.get():
+                        self.center_position()
+                self.position_after = self.after(int(1000 / float(self.position_hz.get())),
+                                                 self._launch_position_read)
+                changed = True
+        except queue.Empty:
+            pass
+        if self.position_running:
+            self._update_position_status()
+        if changed:
+            self._draw_positions()
+
+    def _position_state(self):
+        if not self.position_running:
+            return "已暫停", "#8793a0"
+        if self.position_error:
+            return "CSV 讀取失敗", "#e68b25"
+        if self.position_last_record_at is None:
+            return "等待完整紀錄", "#8793a0"
+        age = time.monotonic() - self.position_last_record_at
+        if age >= max(15., 3 / float(self.position_hz.get())):
+            return "資料未更新", "#8793a0"
+        if self.position_latest and self.position_latest["success"].strip() == "0":
+            return "定位失敗", "#e68b25"
+        return "定位成功", "#159a71"
+
+    def _update_position_status(self):
+        state, _ = self._position_state()
+        if self.position_error:
+            self.position_status.set(f"{state}：{self.position_error[:180]}")
+            return
+        row = self.position_latest
+        if row is None:
+            self.position_status.set(f"{state}（只接受 success=1 的有限 XYZ）")
+            return
+        reason = " ".join(row["reason"].split())[:100]
+        age = max(0., time.monotonic() - self.position_last_record_at)
+        text = (f"{state} | cycle {row.get('cycle_sequence', '')} / poll {row.get('poll_id', '')}"
+                f" | {reason} | CSV 最近新增紀錄 {age:.0f} s 前")
+        if self.position_fix:
+            x, y, z = self.position_fix[2]["xyz"]
+            text += f"\n上次有效 ENU：E {x:.2f} / N {y:.2f} / U {z:.2f} m"
+        if getattr(self, "position_invalid", 0):
+            text += f" | 略過無效列 {self.position_invalid}"
+        self.position_status.set(text)
+
+    def center_position(self):
+        if self.position_fix:
+            self.center_at(self.position_fix[0], self.position_fix[1])
+
+    def clear_position_track(self):
+        self.position_track.clear()
+        self._draw_positions()
+
+    def _draw_positions(self):
+        if not hasattr(self, "canvas"):
+            return
+        cv = self.canvas
+        cv.delete("position_overlay")
+        w, h = cv.winfo_width(), cv.winfo_height()
+        cx, cy = latlon_to_world(self.map_lat, self.map_lon, self.zoom)
+        world_width = 2 ** self.zoom * TILE_PX
+
+        def screen(lat, lon):
+            px, py = latlon_to_world(lat, lon, self.zoom)
+            px += round((cx - px) / world_width) * world_width
+            return px - cx + w / 2, py - cy + h / 2
+
+        segment = []
+        for lat, lon, break_before in self.position_track:
+            if break_before and len(segment) >= 4:
+                cv.create_line(*segment, fill="#17a2b8", width=3, tags="position_overlay")
+            if break_before:
+                segment = []
+            segment.extend(screen(lat, lon))
+        if len(segment) >= 4:
+            cv.create_line(*segment, fill="#17a2b8", width=3, tags="position_overlay")
+        if self.position_fix:
+            sx, sy = screen(self.position_fix[0], self.position_fix[1])
+            state, color = self._position_state()
+            cv.create_oval(sx-10, sy-10, sx+10, sy+10, fill=color, outline="white",
+                           width=3, tags="position_overlay")
+            cv.create_text(sx+14, sy-12, text=f"SDR {state}", anchor="w",
+                           fill=color, font=("Arial", 11, "bold"), tags="position_overlay")
+
+    def _close(self):
+        self.stop_positions()
+        self.tiles.clear_mbtiles()
+        self.destroy()
 
     def offline_help(self):
         messagebox.showinfo(

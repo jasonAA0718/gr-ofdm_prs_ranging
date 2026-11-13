@@ -879,8 +879,9 @@ The legacy single-anchor timestamp store is bounded by the 16-bit ID domain.
 In managed Phase-C operation, open/expire messages include a local
 `cycle_sequence`; solver timestamps are removed when that cycle closes.
 The ranging equation above is the current source expression and is unchanged
-by Phase C. Two older QA expectations still use the former additive expression;
-that pre-existing conflict is reported separately rather than recalibrated.
+by Phase C. Receiver QA reconstructs RTT from logged T1, T4 and decoded sample
+delay. Experiment-specific absolute calibration expectations are not asserted;
+bidirectional fine-correction signs and invalid-value fallback remain covered.
 
 At 30 MS/s, one sample is 33.333 ns and one integer RTT range increment is
 approximately 4.997 m. A phase fit can resolve a residual below one sample,
@@ -1017,10 +1018,76 @@ unchanged. Quality dictionaries copy present keys from `frame_id_valid`, `valid`
 `residual_cfo_hz`, and `channel_coherence`. Absent diagnostics are omitted;
 all original keys remain available in `measurements`.
 
-This epoch is only an integrated observation set. Surveyed anchor coordinates,
-geometry evaluation and position calculation belong to a future separate
-Position Solver; no position fix or minimum-range early publication is implemented.
+This complete epoch is an integrated observation set. The separate position
+solver below accepts this set or finalized partial observations. No early
+publication is introduced.
 Three/four/eight-anchor software tests do not establish corresponding RF validation.
+
+## Partial Observations and Fixed-Height Positioning
+
+`prs_multi_anchor_cycle.observation_out` emits one `(dictionary, PMT_NIL)` PDU
+for every finalized cycle, including zero accepted measurements and shutdown.
+It uses the epoch schema above plus `completion_reason`. `observed_anchor_ids`
+and every per-anchor vector contain only accepted observations, in configured
+anchor order; they can be shorter than `expected_anchor_ids` or empty.
+Only the existing normal complete-epoch path also emits `epoch_out`.
+
+Connect `observation_out` to `prs_position_solver.epoch_in`. The solver does
+not manage response windows or wait for packets. `STOPPED_INCOMPLETE` produces
+`CYCLE_ABORTED`; normal observations use available ranges without requiring
+all configured anchors. A usable observation has a unique configured ID and
+a finite positive selected range. Select the corrected range when its fine
+flag is 1 and the corrected value is finite; otherwise select the integer
+range. A nonpositive selected range is excluded. Layout/type errors and
+unknown/duplicate IDs produce diagnostics rather than silent drops.
+
+The estimator is fixed-height 2D least squares with uniform weights. For
+anchor coordinates `(a_ix,a_iy,a_iz)` and configured vehicle height `h`:
+
+```math
+\hat r_i(x,y)=\sqrt{(x-a_{ix})^2+(y-a_{iy})^2+(h-a_{iz})^2},
+\qquad e_i=r_i-\hat r_i.
+```
+
+At least three usable anchors are required. Gauss-Newton solves
+`(H^T H) delta = H^T e`, with Jacobian row
+`[(x-a_ix)/predicted_range, (y-a_iy)/predicted_range]`. Initialization uses the
+last successful X/Y, or the selected-anchor centroid if no successful fix
+exists. The existing 40-iteration limit and step norm threshold of 0.01 m
+are retained. A predicted range at most `1e-12` or nonfinite value is rejected;
+a nonfinite determinant or determinant at most `1e-12` reports singular
+geometry. No residual-based rejection, uncertainty estimate or geometry
+quality score is added. A converged solution does not establish RF accuracy.
+
+Exactly one result is published per input: `position_out` for success and
+`diagnostic_out` for failure. Both include `success`, machine-readable `reason`,
+available cycle IDs/UHD timestamps,
+`observed_anchor_count`, `used_anchor_count`, `selected_anchor_ids`,
+`selected_ranges_m`, `used_fine_correction_flags`, and `residual`.
+Only successful output contains `position_m=[x,y,h]`. Failed estimates do not
+replace the last successful position.
+
+| Reason | Meaning |
+|---|---|
+| `OK` | Step convergence reached with at least three usable observations |
+| `INSUFFICIENT_OBSERVATIONS` | Fewer than three usable selected ranges, including zero observations |
+| `CYCLE_ABORTED` | Cycle finalized by shutdown rather than normal receive-window expiry |
+| `INVALID_INPUT` | Input is not a dictionary/NIL PDU |
+| `INVALID_OBSERVATION_LAYOUT` | Missing/wrong vector types, unequal lengths, or more than eight observations |
+| `INVALID_ANCHOR_ID` | Duplicate ID or ID absent from the solver configuration |
+| `INVALID_PREDICTED_RANGE` | Predicted distance is nonfinite or too small for the Jacobian |
+| `SINGULAR_GEOMETRY` | Normal matrix fails the determinant check |
+| `NONFINITE_UPDATE` | Update or updated position is nonfinite |
+| `NOT_CONVERGED` | Iteration limit reached |
+
+The CSV logger records both result ports using the schema in README.
+`residual_rms_m = sqrt(sum(e_i^2)/n)` and
+`residual_max_abs_m = max(abs(e_i))`; these are range-fit residuals in metres,
+not position errors. Missing/nonfinite/incomplete residual vectors produce
+empty summaries. Failure XYZ is always empty, even for external diagnostics
+containing trial coordinates. IDs are written as integers without conversion
+to floating point. Measurement CSV includes `cycle_sequence` for association;
+position CSV does not duplicate per-anchor ranges or expected/missing IDs.
 
 ## Implementation References
 

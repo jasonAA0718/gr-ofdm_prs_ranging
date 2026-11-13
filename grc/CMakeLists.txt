@@ -23,6 +23,7 @@ install(FILES
     ofdm_prs_ranging_prs_ssrtt_solver.block.yml
     ofdm_prs_ranging_prs_position_solver.block.yml
     ofdm_prs_ranging_prs_csv_logger.block.yml
+    ofdm_prs_ranging_prs_position_csv_logger.block.yml
     ofdm_prs_ranging_zc_manual_ping_source.block.yml
     ofdm_prs_ranging_zc_peak_detector.block.yml
     ofdm_prs_ranging_zc_rtt_calculator.block.yml

@@ -15,6 +15,7 @@ set(ofdm_prs_ranging_dsp_sources
     DSP/prs_acquisition_logger_impl.cc
     DSP/prs_channel_estimator_impl.cc
     DSP/prs_csv_logger_impl.cc
+    DSP/prs_position_csv_logger_impl.cc
     DSP/prs_fft_receiver_impl.cc
     DSP/prs_fft_zc_frame_detector_impl.cc
     DSP/prs_frame_detector_impl.cc

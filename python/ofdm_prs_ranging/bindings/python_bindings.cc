@@ -36,6 +36,7 @@ void bind_prs_ssrtt_responder(py::module& m);
 void bind_prs_ssrtt_solver(py::module& m);
 void bind_prs_position_solver(py::module& m);
 void bind_prs_csv_logger(py::module& m);
+void bind_prs_position_csv_logger(py::module& m);
 void bind_prs_timed_burst_source(py::module& m);
 void bind_zc_manual_ping_source(py::module& m);
 void bind_zc_peak_detector(py::module& m);
@@ -85,6 +86,7 @@ PYBIND11_MODULE(ofdm_prs_ranging_python, m)
     bind_prs_ssrtt_solver(m);
     bind_prs_position_solver(m);
     bind_prs_csv_logger(m);
+    bind_prs_position_csv_logger(m);
     bind_prs_timed_burst_source(m);
     bind_zc_manual_ping_source(m);
     bind_zc_peak_detector(m);

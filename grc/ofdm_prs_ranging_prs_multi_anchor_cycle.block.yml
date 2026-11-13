@@ -26,6 +26,7 @@ outputs:
 - {label: measurement_out, domain: message}
 - {label: cycle_out, domain: message, optional: true}
 - {label: epoch_out, domain: message, optional: true}
+- {label: observation_out, domain: message, optional: true}
 - {label: diagnostic_out, domain: message, optional: true}
 documentation: |-
   Configure 1..8 unique anchor IDs (0..7) and corresponding static delays in seconds.
@@ -35,5 +36,8 @@ documentation: |-
   when ALL configured anchors have accepted ranges and at least three anchors are configured.
   Epoch arrays and full measurement dictionaries follow configured anchor_ids order.
   Invalid fine correction preserves the integer range, NaN corrected value and validity flag.
-  Missing anchors, one/two-anchor cycles and shutdown do not produce epochs. No position is computed.
+  Missing anchors, one/two-anchor cycles and shutdown do not produce complete epochs.
+  observation_out publishes every finalized cycle, including partial/empty observations and shutdown.
+  Its aligned vectors contain only accepted anchors in configured order; completion_reason marks shutdown.
+  Connect observation_out to position solver epoch_in to log all positioning outcomes.
 file_format: 1

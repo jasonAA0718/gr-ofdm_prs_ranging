@@ -100,6 +100,7 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
             0.1, 0.7, 13990001, 1,
             True, 25, 2)
         self.prs_rx_timekeeper_0 = ofdm_prs_ranging.prs_rx_timekeeper(samp_rate, 0.1)
+        self.prs_position_csv_logger_0 = ofdm_prs_ranging.prs_position_csv_logger("/home/cnsl/Desktop/gr-ofdm_prs_ranging/examples/CSV/complete_epoch_positions.csv", True)
         self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 512, 512, 1.0)
         self.prs_multi_anchor_cycle_0 = ofdm_prs_ranging.prs_multi_anchor_cycle(samp_rate, anchor_ids, time_delays, premble_length, premble_rep, zc_length, receive_early_s, receive_late_s, processing_grace_s)
         self.prs_frame_detector_0_0 = ofdm_prs_ranging.prs_fft_zc_frame_detector(samp_rate, 512, 64, 512, 127, premble_length, premble_rep, zc_length, 0.6, 10000, 29, 1, 1, 0.0, 0.00166, 0.0077, 0.5, 4096, 512, (4096-512), True)
@@ -112,7 +113,8 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
             anchor_config[1],
             0.0
         )
-        self.cycle_summary_debug = blocks.message_debug(False, gr.log_levels.info)
+        self.cycle_summary_debug_0_0 = blocks.message_debug(False, gr.log_levels.info)
+        self.cycle_summary_debug_0 = blocks.message_debug(False, gr.log_levels.info)
         self.blocks_message_strobe_0 = blocks.message_strobe(pmt.PMT_T, 500)
 
 
@@ -120,17 +122,20 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         # Connections
         ##################################################
         self.msg_connect((self.blocks_message_strobe_0, 'strobe'), (self.prs_rx_timekeeper_0, 'trigger_in'))
+        self.msg_connect((self.ofdm_prs_ranging_prs_position_solver_0, 'position_out'), (self.cycle_summary_debug_0, 'print'))
+        self.msg_connect((self.ofdm_prs_ranging_prs_position_solver_0, 'diagnostic_out'), (self.cycle_summary_debug_0_0, 'print'))
+        self.msg_connect((self.ofdm_prs_ranging_prs_position_solver_0, 'position_out'), (self.prs_position_csv_logger_0, 'position_in'))
+        self.msg_connect((self.ofdm_prs_ranging_prs_position_solver_0, 'diagnostic_out'), (self.prs_position_csv_logger_0, 'diagnostic_in'))
         self.msg_connect((self.prs_channel_estimator_0, 'event_out'), (self.prs_acquisition_logger_0, 'frame_in'))
         self.msg_connect((self.prs_channel_estimator_0, 'channel_out'), (self.prs_phase_slope_estimator_0, 'channel_in'))
         self.msg_connect((self.prs_fft_receiver_0, 'symbols_out'), (self.prs_channel_estimator_0, 'symbols_in'))
         self.msg_connect((self.prs_frame_detector_0_0, 'event_out'), (self.prs_acquisition_logger_0, 'frame_in'))
         self.msg_connect((self.prs_frame_detector_0_0, 'frame_out'), (self.prs_fft_receiver_0, 'frame_in'))
-        self.msg_connect((self.prs_multi_anchor_cycle_0, 'cycle_out'), (self.cycle_summary_debug, 'print'))
-        self.msg_connect((self.prs_multi_anchor_cycle_0, 'epoch_out'), (self.ofdm_prs_ranging_prs_position_solver_0, 'epoch_in'))
+        self.msg_connect((self.prs_multi_anchor_cycle_0, 'observation_out'), (self.ofdm_prs_ranging_prs_position_solver_0, 'epoch_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'measurement_out'), (self.prs_csv_logger_0, 'measurement_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'window_out'), (self.prs_frame_detector_0_0, 'tx_time_in'))
-        self.msg_connect((self.prs_multi_anchor_cycle_0, 'solver_measurement_out'), (self.prs_ssrtt_solver_0, 'measurement_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'solver_tx_out'), (self.prs_ssrtt_solver_0, 'tx_time_in'))
+        self.msg_connect((self.prs_multi_anchor_cycle_0, 'solver_measurement_out'), (self.prs_ssrtt_solver_0, 'measurement_in'))
         self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_multi_anchor_cycle_0, 'measurement_in'))
         self.msg_connect((self.prs_rx_timekeeper_0, 'clock_out'), (self.prs_multi_anchor_cycle_0, 'clock_in'))
         self.msg_connect((self.prs_rx_timekeeper_0, 'timed_trigger_out'), (self.prs_source, 'trigger'))

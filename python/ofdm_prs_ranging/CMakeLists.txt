@@ -54,3 +54,6 @@ set_tests_properties(qa_prs_window_capture
                      PROPERTIES ENVIRONMENT "HOME=/tmp;XDG_CACHE_HOME=/tmp")
 set_tests_properties(qa_prs_zc_frame_sync
                      PROPERTIES ENVIRONMENT "HOME=/tmp;XDG_CACHE_HOME=/tmp")
+
+GR_ADD_TEST(qa_prs_position_logging ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qa_prs_position_logging.py)
+set_tests_properties(qa_prs_position_logging PROPERTIES ENVIRONMENT "XDG_CACHE_HOME=/tmp")

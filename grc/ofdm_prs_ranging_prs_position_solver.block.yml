@@ -42,10 +42,10 @@ outputs:
   optional: true
 
 documentation: |-
-  Position solver for complete multi-anchor positioning epochs.
+  Fixed-height 2D position solver for finalized complete, partial or empty observations.
 
   Input:
-    epoch_in
+    epoch_in: cycle manager observation_out (or legacy complete epoch_out)
 
   Outputs:
     position_out
@@ -54,6 +54,10 @@ documentation: |-
   Anchor coordinates use local XYZ coordinates in meters.
   Vehicle height is fixed for 2D positioning.
 
-  WLS weights initially use the identity matrix.
+  Uses at least three distinct configured anchors with finite positive selected ranges.
+  Valid finite fine-corrected ranges take priority; otherwise integer ranges are used.
+  position_out contains successful fixes; every failed input produces diagnostic_out.
+  Both outputs include success/reason, cycle identity, timestamps, observed_anchor_count and used_anchor_count.
+  STOPPED_INCOMPLETE produces CYCLE_ABORTED. WLS weights use the identity matrix.
 
 file_format: 1
