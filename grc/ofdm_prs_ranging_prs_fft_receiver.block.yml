@@ -14,4 +14,10 @@ inputs:
 - {label: frame_in, domain: message}
 outputs:
 - {label: symbols_out, domain: message}
+documentation: |-
+  Removes CP, optionally derotates samples using the frame's pre_fft_cfo_hz request,
+  and computes the OFDM FFT. Phase is continuous across symbols and CPs, referenced
+  to the original frame start. PMT samples, sample indices and UHD times are unchanged.
+  Absent/nonfinite pre_fft_cfo_hz selects the original zero-compensation path.
+  symbols_out records the actual applied pre_fft_cfo_hz for residual/total CFO bookkeeping.
 file_format: 1

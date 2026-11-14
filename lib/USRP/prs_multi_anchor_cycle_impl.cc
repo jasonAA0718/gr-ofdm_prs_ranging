@@ -32,22 +32,23 @@ pmt::pmt_t metadata(pmt::pmt_t msg)
 }
 prs_multi_anchor_cycle::sptr prs_multi_anchor_cycle::make(double fs,
     const std::vector<int>& ids, const std::vector<double>& delays, int l, int r, int nz,
-    double before, double after, double grace)
+    double before, double after, double grace, double cfo_max_age_s)
 {
     return gnuradio::make_block_sptr<prs_multi_anchor_cycle_impl>(
-        fs, ids, delays, l, r, nz, before, after, grace);
+        fs, ids, delays, l, r, nz, before, after, grace, cfo_max_age_s);
 }
 prs_multi_anchor_cycle_impl::prs_multi_anchor_cycle_impl(double fs,
     const std::vector<int>& ids, const std::vector<double>& delays, int l, int r, int nz,
-    double before, double after, double grace)
+    double before, double after, double grace, double cfo_max_age_s)
     : gr::block("prs_multi_anchor_cycle", gr::io_signature::make(0, 0, 0),
                 gr::io_signature::make(0, 0, 0)), d_samp_rate(fs),
-      d_frame_s(0), d_before(before), d_after(after), d_grace(grace)
+      d_frame_s(0), d_before(before), d_after(after), d_grace(grace), d_cfo_max_age(cfo_max_age_s)
 {
     if (!std::isfinite(fs) || fs <= 0 || ids.empty() || ids.size() > 8 ||
         ids.size() != delays.size() ||
         l <= 0 || r < 2 || nz <= 0 || !std::isfinite(before) || before < 0 ||
-        !std::isfinite(after) || after < 0 || !std::isfinite(grace) || grace < 0) {
+        !std::isfinite(after) || after < 0 || !std::isfinite(grace) || grace < 0 ||
+        !std::isfinite(cfo_max_age_s) || cfo_max_age_s <= 0) {
         throw std::invalid_argument("1..8 anchors, matching delays and finite positive geometry required");
     }
     // Frame duration in sec
@@ -96,6 +97,7 @@ bool prs_multi_anchor_cycle_impl::start()
     d_clock = -1.0;
     d_last_tx = -1.0;
     d_cycles.clear();
+    d_anchor_cfo.clear();
     // Sequence stays monotonic across stop/start of this block instance.
     return true;
 }
@@ -155,6 +157,20 @@ void prs_multi_anchor_cycle_impl::handle_tx(pmt::pmt_t msg)
         window = pmt::dict_add(window, pmt::mp("expected_anchor_id"), pmt::from_uint64(slot.anchor));
         window = pmt::dict_add(window, pmt::mp("response_slot_index"), pmt::from_uint64(i));
         window = pmt::dict_add(window, pmt::mp("expected_reply_delay_samples"), pmt::from_uint64(slot.delay));
+        // Snapshot a reference for THIS anchor and THIS scheduled window.
+        // A missing/stale reference must never inherit CFO from a POLL message.
+        window = pmt::dict_delete(window, pmt::mp("prs_channel_cfo_hz"));
+        window = pmt::dict_delete(window, pmt::mp("channel_coherence"));
+        const auto reference = d_anchor_cfo.find(slot.anchor);
+        if (reference != d_anchor_cfo.end()) {
+            const double age = slot.start - reference->second.rx_time;
+            if (age >= 0.0 && age <= d_cfo_max_age) {
+                window = pmt::dict_add(window, pmt::mp("prs_channel_cfo_hz"),
+                                       pmt::from_double(reference->second.hz));
+                window = pmt::dict_add(window, pmt::mp("channel_coherence"),
+                                       pmt::from_double(reference->second.coherence));
+            }
+        }
         message_port_pub(pmt::mp("window_out"), window);
     }
     ++d_sequence;
@@ -204,6 +220,15 @@ void prs_multi_anchor_cycle_impl::handle_measurement(pmt::pmt_t msg)
     }
     if (c->pending.count(anchor) || c->received.count(anchor)) {
         ++c->duplicates; diagnostic(meta, "DUPLICATE_RESPONSE"); return;
+    }
+    // Only CRC/identity/slot/delay/duplicate-validated observations can train
+    // the per-anchor acquisition reference. Phase-fit validity is independent.
+    const double cfo = dict_ref_double(meta, "prs_channel_cfo_hz", NAN);
+    const double coherence = dict_ref_double(meta, "channel_coherence", NAN);
+    const auto old = d_anchor_cfo.find(static_cast<uint32_t>(anchor));
+    if (std::isfinite(cfo) && std::isfinite(coherence) && coherence >= 0.2 &&
+        (old == d_anchor_cfo.end() || t4 > old->second.rx_time)) {
+        d_anchor_cfo[static_cast<uint32_t>(anchor)] = {cfo, coherence, t4};
     }
     c->pending.insert(anchor);
     meta = pmt::dict_add(meta, pmt::mp("reply_delay_mismatch"), pmt::PMT_F);
@@ -290,7 +315,7 @@ void prs_multi_anchor_cycle_impl::publish_observations(const cycle& c, const cha
         for (const auto* key : {"frame_id_valid", "valid", "snr", "quality",
                 "coarse_metric", "payload_metric", "phase_slope", "phase_residual",
                 "prs_cp_cfo_hz", "prs_cp_cfo_coherence", "selected_cfo_hz",
-                "prs_channel_cfo_hz", "residual_cfo_hz", "channel_coherence"}) {
+                "prs_channel_cfo_hz", "residual_cfo_hz", "pre_fft_cfo_hz", "channel_coherence"}) {
             if (pmt::dict_has_key(measurement, pmt::mp(key)))
                 quality = pmt::dict_add(quality, pmt::mp(key), pmt::dict_ref(measurement, pmt::mp(key), pmt::PMT_NIL));
         }

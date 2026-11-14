@@ -13,6 +13,8 @@ namespace ofdm_prs_ranging {
 // epoch_out publishes a (dictionary, NIL) PDU only after normal completion of
 // a cycle with all configured ranges and at least three anchors. Epoch arrays
 // and full measurement metadata follow configured anchor_ids order.
+// window_out snapshots per-anchor total CFO from trusted prior responses when
+// its UHD-time age at window start is within cfo_max_age_s (finite and >0).
 class OFDM_PRS_RANGING_API prs_multi_anchor_cycle : virtual public gr::block
 {
 public:
@@ -22,7 +24,8 @@ public:
                      const std::vector<double>& time_delays = {0.031, 0.081},
                      int preamble_len = 128, int preamble_repeats = 17,
                      int coarse_sync_len = 819, double window_before_s = 0.002,
-                     double window_after_s = 0.005, double processing_grace_s = 0.1);
+                     double window_after_s = 0.005, double processing_grace_s = 0.1,
+                     double cfo_max_age_s = 5.0);
     virtual size_t active_cycle_count() const = 0;
 };
 } // namespace ofdm_prs_ranging

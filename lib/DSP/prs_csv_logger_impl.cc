@@ -39,7 +39,7 @@ prs_csv_logger_impl::prs_csv_logger_impl(const std::string& path,
                   "frame_id_valid,coarse_metric,payload_metric,"
                   "prs_cp_cfo_hz,prs_cp_cfo_coherence,selected_cfo_hz,"
                   "payload_retry_used,prs_channel_cfo_hz,residual_cfo_hz,"
-                  "channel_coherence,phase_slope_rad_per_hz,phase_residual,snr,quality\n";
+                  "channel_coherence,phase_slope_rad_per_hz,phase_residual,snr,quality,pre_fft_cfo_hz\n";
     }
     message_port_register_in(pmt::mp("measurement_in"));
     set_msg_handler(pmt::mp("measurement_in"),
@@ -96,7 +96,8 @@ void prs_csv_logger_impl::handle_measurement(pmt::pmt_t msg)
            << dict_ref_double(meta, "phase_slope", 0.0) << ','
            << dict_ref_double(meta, "phase_residual", 0.0) << ','
            << dict_ref_double(meta, "snr", 0.0) << ','
-           << dict_ref_double(meta, "quality", 0.0) << '\n';
+           << dict_ref_double(meta, "quality", 0.0) << ','
+           << dict_ref_double(meta, "pre_fft_cfo_hz", 0.0) << '\n';
     d_file.flush();
 }
 

@@ -374,6 +374,7 @@ blocks:
     alias: ''
     anchor_ids: anchor_ids
     coarse_sync_len: zc_length
+    cfo_max_age_s: '5.0'
     comment: ''
     maxoutbuf: '0'
     minoutbuf: '0'

@@ -6,6 +6,7 @@
  */
 
 #include "prs_fft_zc_frame_detector_impl.h"
+#include "prs_protocol_metadata.h"
 #include <gnuradio/fft/fft.h>
 #include <gnuradio/io_signature.h>
 #include <algorithm>
@@ -195,6 +196,15 @@ void prs_fft_zc_frame_detector_impl::handle_tx_time(const pmt::pmt_t& message)
             explicit_end - explicit_start < frame_len(d_cfg) / d_cfg.samp_rate) return;
         correlation_window window{explicit_start, explicit_end,
             dict_ref_uint64(msg, "poll_id", 0), false, false, false, 0, 0, msg};
+        uint64_t anchor = 8, sequence = 0;
+        window.managed = !pmt::is_null(pmt::dict_ref(msg, pmt::mp("cycle_sequence"), pmt::PMT_NIL)) &&
+                         bounded_uint(msg, "expected_anchor_id", 8, 7, anchor) &&
+                         bounded_uint(msg, "cycle_sequence", 0, UINT64_MAX, sequence);
+        const double cfo = dict_ref_double(msg, "prs_channel_cfo_hz", NAN);
+        const double coherence = dict_ref_double(msg, "channel_coherence", NAN);
+        window.have_cfo = window.managed && std::isfinite(cfo) &&
+                          std::isfinite(coherence) && coherence >= 0.2;
+        window.cfo_hz = window.have_cfo ? cfo : 0.0;
         std::lock_guard<std::mutex> lock(d_window_mutex);
         // The coordinator is bounded; also bound the detector for arbitrary message callers.
         if (d_windows.size() >= 32) return;
@@ -548,9 +558,16 @@ bool prs_fft_zc_frame_detector_impl::fft_zc_cfo_search(size_t first_coarse,
     double tracked_cfo_hz = 0.0;
     bool have_tracked_cfo = false;
     if (d_cfo_compensation) {
-        std::lock_guard<std::mutex> lock(d_cfo_mutex);
-        have_tracked_cfo = d_have_tracked_cfo;
-        tracked_cfo_hz = d_tracked_cfo_hz;
+        if (d_have_active_window && d_active_window.managed) {
+            // Managed initiator windows never fall back to another anchor's
+            // global prs_cfo_in feedback, including during bootstrap.
+            have_tracked_cfo = d_active_window.have_cfo;
+            tracked_cfo_hz = d_active_window.cfo_hz;
+        } else {
+            std::lock_guard<std::mutex> lock(d_cfo_mutex);
+            have_tracked_cfo = d_have_tracked_cfo;
+            tracked_cfo_hz = d_tracked_cfo_hz;
+        }
     }
 
     if (have_tracked_cfo || !d_cfo_compensation) {
@@ -806,7 +823,7 @@ void prs_fft_zc_frame_detector_impl::publish_frame(size_t frame_start_index,
         pmt::dict_add(meta,
                       pmt::mp("cfo_source"),
                       pmt::mp(d_last_cfo_was_tracked
-                                  ? "PRS_FLL"
+                                  ? ((d_have_active_window && d_active_window.managed) ? "ANCHOR_FLL" : "PRS_FLL")
                                   : (d_cfo_compensation ? "INITIAL_BIN" : "DISABLED")));
     meta = pmt::dict_add(meta,
                          pmt::mp("prs_cp_cfo_hz"),
@@ -816,6 +833,11 @@ void prs_fft_zc_frame_detector_impl::publish_frame(size_t frame_start_index,
     meta = pmt::dict_add(
         meta, pmt::mp("selected_cfo_hz"), pmt::from_double(d_last_detection_cfo_hz));
     meta = pmt::dict_add(meta, pmt::mp("cfo"), pmt::from_double(d_last_detection_cfo_hz));
+    if (d_cfo_compensation && d_have_active_window && d_active_window.managed) {
+        // Raw samples remain unchanged here; FFT receiver applies this request.
+        meta = pmt::dict_add(meta, pmt::mp("pre_fft_cfo_hz"),
+                             pmt::from_double(d_last_detection_cfo_hz));
+    }
     meta = pmt::dict_add(meta, pmt::mp("samp_rate"), pmt::from_double(d_cfg.samp_rate));
     meta = pmt::dict_add(meta, pmt::mp("fft_len"), pmt::from_long(d_cfg.fft_len));
     meta = pmt::dict_add(meta, pmt::mp("cp_len"), pmt::from_long(d_cfg.cp_len));
@@ -880,7 +902,11 @@ int prs_fft_zc_frame_detector_impl::general_work(int noutput_items,
     } else {
         const double chunk_start_time = sample_time(abs_start);
         const double chunk_stop_time = sample_time(abs_stop);
-        std::vector<std::pair<uint64_t, uint64_t>> segments;
+        struct window_segment {
+            uint64_t start, stop;
+            correlation_window window;
+        };
+        std::vector<window_segment> segments;
         std::vector<correlation_window> expired_windows;
         {
             std::lock_guard<std::mutex> lock(d_window_mutex);
@@ -920,7 +946,7 @@ int prs_fft_zc_frame_detector_impl::general_work(int noutput_items,
                     abs_stop,
                     static_cast<uint64_t>(std::max(0.0, std::ceil(stop_offset))));
                 if (segment_start < segment_stop) {
-                    segments.emplace_back(segment_start, segment_stop);
+                    segments.push_back({segment_start, segment_stop, window});
                 }
             }
         }
@@ -930,13 +956,17 @@ int prs_fft_zc_frame_detector_impl::general_work(int noutput_items,
 
         uint64_t processed_until = abs_start;
         for (const auto& segment : segments) {
-            if (segment.first != processed_until) {
-                reset_buffer(segment.first);
+            if (segment.start != processed_until || !d_have_active_window ||
+                segment.window.start != d_active_window.start ||
+                segment.window.end != d_active_window.end) {
+                reset_buffer(segment.start);
             }
-            process_samples(in + (segment.first - abs_start),
-                            static_cast<size_t>(segment.second - segment.first),
-                            segment.first);
-            processed_until = segment.second;
+            d_active_window = segment.window;
+            d_have_active_window = true;
+            process_samples(in + (segment.start - abs_start),
+                            static_cast<size_t>(segment.stop - segment.start),
+                            segment.start);
+            processed_until = segment.stop;
         }
         if (processed_until != abs_stop) {
             reset_buffer(abs_stop);

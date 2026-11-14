@@ -99,7 +99,7 @@ class prs_ssrtt_initiator_multi_anchor(gr.top_block):
             True, 25, 2)
         self.prs_rx_timekeeper_0 = ofdm_prs_ranging.prs_rx_timekeeper(samp_rate, 0.1)
         self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 512, 512, 1.0)
-        self.prs_multi_anchor_cycle_0 = ofdm_prs_ranging.prs_multi_anchor_cycle(samp_rate, anchor_ids, time_delays, premble_length, premble_rep, zc_length, receive_early_s, receive_late_s, processing_grace_s)
+        self.prs_multi_anchor_cycle_0 = ofdm_prs_ranging.prs_multi_anchor_cycle(samp_rate, anchor_ids, time_delays, premble_length, premble_rep, zc_length, receive_early_s, receive_late_s, processing_grace_s, 5.0)
         self.prs_frame_detector_0_0 = ofdm_prs_ranging.prs_fft_zc_frame_detector(samp_rate, 512, 64, 512, 127, premble_length, premble_rep, zc_length, 0.5, 10000, 29, 1, 1, 0.0, 0.00166, 0.0077, 0.5, 4096, 512, (4096-512), True)
         self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 512, 64, 512, 127)
         self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger(obs_log, 1)

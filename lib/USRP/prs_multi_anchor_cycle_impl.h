@@ -15,7 +15,7 @@ public:
     prs_multi_anchor_cycle_impl(double samp_rate, const std::vector<int>& anchor_ids,
         const std::vector<double>& time_delays, int preamble_len, int preamble_repeats,
         int coarse_sync_len, double window_before_s, double window_after_s,
-        double processing_grace_s);
+        double processing_grace_s, double cfo_max_age_s);
     size_t active_cycle_count() const override;
     bool start() override;
     bool stop() override;
@@ -33,7 +33,9 @@ private:
         std::map<uint32_t, pmt::pmt_t> measurements;
         uint64_t duplicates = 0, identity_mismatches = 0, delay_mismatches = 0, crc_failures = 0;
     };
-    double d_samp_rate, d_frame_s, d_before, d_after, d_grace;
+    struct cfo_reference { double hz; double coherence; double rx_time; };
+    std::map<uint32_t, cfo_reference> d_anchor_cfo;
+    double d_samp_rate, d_frame_s, d_before, d_after, d_grace, d_cfo_max_age;
     double d_clock = -1.0;
     double d_last_tx = -1.0;
     uint64_t d_sequence = 0;

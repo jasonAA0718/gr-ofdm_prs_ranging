@@ -178,12 +178,15 @@ maximum over all paths. There is no peak-ratio threshold. A lobe reaching the
 end of the available search can be accepted without observing its falling edge.
 Example ZC thresholds are 0.4 at the initiator and 0.5 at the responder.
 
-Optional CFO compensation applies only to matched-filter input copies.
+Detector-side CFO compensation applies to matched-filter input copies.
 With no tracked CFO it searches -300 through +300 Hz in 100 Hz steps.
-A finite channel-CFO feedback value with `channel_coherence >= 0.2` becomes
-the next acquisition reference. Metadata uses `INITIAL_BIN`, `PRS_FLL`,
-or `DISABLED`. This feedback does not derotate the raw PRS frame sent to
-the FFT receiver. Within the bootstrap bank, accepted threshold peaks take
+Continuous/legacy reception accepts a finite total `prs_channel_cfo_hz` on
+`prs_cfo_in` with finite `channel_coherence >= 0.2`. Managed TDMA windows use
+only the reference attached by the cycle manager to that window, independently
+of global feedback. Metadata uses `ANCHOR_FLL`, `PRS_FLL`, `INITIAL_BIN`, or
+`DISABLED`. The extracted raw frame is unchanged; managed frames additionally
+request the pre-FFT correction described below through `pre_fft_cfo_hz`.
+Within the bootstrap bank, accepted threshold peaks take
 priority, then earlier candidate indices, then larger metric at the same index.
 For the historical example ZC length 419, the observation lasts only 13.967 us at
 30 MS/s; 100 Hz hypotheses are very close compared with its reciprocal span
@@ -496,12 +499,13 @@ variation also count as error. It is distinct from adjacent-symbol
 ## CFO Estimation and Correction
 
 Three CFO methods are relevant to the design, but the current production path
-only produces the CP and pilot-channel estimates:
+produces CP and pilot-channel estimates, with managed pre-FFT correction:
 
 ```text
 repeated preamble -> method documented below; currently disabled
-PRS cyclic prefix -> prs_cp_cfo_hz
-adjacent PRS channel estimates -> prs_channel_cfo_hz
+PRS cyclic prefix (raw samples) -> prs_cp_cfo_hz
+managed FFT-input correction -> pre_fft_cfo_hz
+adjacent PRS channels -> residual estimate, reconstructed total prs_channel_cfo_hz
 ```
 
 Let
@@ -672,8 +676,10 @@ C_H =
 \hat H_m[k]^*\hat H_{m+1}[k]
 ```
 
-It unwraps `angle C_H` relative to `hat f_CP`, or relative to the detector's
-acquisition CFO when the CP field is unavailable, and calculates
+It unwraps `angle C_H` relative to `hat f_CP - f_applied`, or relative to
+`detector acquisition CFO - f_applied` when the CP field is unavailable.
+Here `f_applied` is `pre_fft_cfo_hz` (zero without a request). It calculates
+the remaining channel CFO
 
 ```math
 \hat f_H =
@@ -716,8 +722,8 @@ and the CFO-aligned channel used by the phase-slope estimator is
 | PRS CP `hat f_CP` | 8128 | 512 samples | 73152-sample PRS span | +/-29.297 kHz | Channel-CFO unwrap reference |
 | PRS channel `hat f_H` | 48384 | 576 samples | 73152-sample PRS span | +/-26.042 kHz | Pilot/data inter-symbol phase alignment |
 
-The two active estimates should be approximately equal for a stable oscillator
-and a correctly extracted frame. Differences close to `Fs/N_FFT` or
+Raw CP CFO and the reconstructed total channel CFO should be approximately
+equal for a stable oscillator and a correctly extracted frame. Differences close to `Fs/N_FFT` or
 `Fs/(N_FFT+N_CP)` indicate a likely phase-ambiguity branch error. Low CP
 coherence points toward low SNR, incorrect timing, interference, or delay spread
 beyond the CP. High CP coherence with low channel coherence instead points
@@ -729,20 +735,70 @@ The metadata used for comparison is:
 prs_cp_cfo_hz
 prs_cp_cfo_coherence
 selected_cfo_hz
+pre_fft_cfo_hz
 prs_channel_cfo_hz
 residual_cfo_hz
 channel_coherence
 ```
 
-`residual_cfo_hz` currently means `prs_channel_cfo_hz` minus the unwrap
-reference. It is not a fourth independent CFO measurement made after channel
-correction.
+`residual_cfo_hz` retains its historical meaning: reconstructed total
+`prs_channel_cfo_hz` minus the raw CP/detector unwrap reference, before
+subtracting the applied correction. It is a disagreement diagnostic, not the
+remaining FFT-input CFO. That remaining estimate equals
+`prs_channel_cfo_hz - pre_fft_cfo_hz`.
 
-### Warning: Current PRS ICI Is Not Removed
+### Managed Pre-FFT CFO Correction
 
-> **Warning:** The current FFT receiver does not derotate raw PRS time samples
-> before the FFT. CP CFO supplies the channel-CFO unwrap reference; `hat f_H`
-> aligns pilot channels and data after FFT. Preamble CFO is disabled.
+The coordinator caches the newest valid total CFO/coherence and RESPONSE T4
+per configured anchor, after its existing CRC/reserved, slot, decoded identity,
+reply delay and duplicate checks. CFO is finite and coherence is finite and at
+least 0.2; phase-fit validity is independent. Later-arriving observations with
+older/equal T4 cannot overwrite a newer CFO. Invalid/weak feedback does not
+refresh the stored T4. Cache entries survive cycle cleanup and clear on start.
+
+At creation of each scheduled window, the coordinator attaches that anchor's
+`prs_channel_cfo_hz` and `channel_coherence` only if
+`0 <= window_start - reference_T4 <= cfo_max_age_s`. This new final constructor
+argument defaults to 5.0 s and must be finite and positive. The detector
+recognizes a managed window by valid `expected_anchor_id` and `cycle_sequence`,
+parses its CFO into the window and activates that immutable context when
+processing its corresponding sample interval. Changing windows resets the raw
+buffer even when intervals touch; a window spanning scheduler calls retains
+its own context. A missing/nonfinite/weak reference invokes bootstrap without
+using another anchor's/global CFO. Normal reception uses `prs_cfo_in` as before.
+
+With `cfo_compensation=true`, managed `frame_out` metadata requests
+`pre_fft_cfo_hz = detection_cfo_hz`. This also applies to a bootstrap-selected
+bin. Other paths do not emit a pre-FFT request; disabling compensation emits
+none. The FFT receiver defaults absent/nonfinite requests to zero and publishes
+the actual applied `pre_fft_cfo_hz`.
+
+Let `n` be the sample index relative to the original extracted frame start and
+`f_a` the applied correction. Each useful-symbol FFT input copy is
+
+```math
+y_c[n]=y[n]\exp(-j2\pi f_a n/F_s).
+```
+
+Phase is continuous across skipped CPs and across symbols, not restarted at
+each symbol. Raw PMT vectors, frame boundaries, FFT-window indices, amplitudes,
+packet format and UHD receive/transmit timestamps are preserved. The CP CFO
+estimate still comes from raw samples. Therefore unwrap the pilot-channel
+estimate around `f_CP - f_a`, rotate pilot/data symbols with its residual
+`f_H`, and publish
+
+```math
+f_{\mathrm{channel,total}} = f_a + f_H.
+```
+
+This reconstructed total trains the next window. Feeding `f_H` alone back as
+a total would lose the correction already applied; repeatedly adding the old
+reference to an already-total estimate would accumulate an error. No PLL gain,
+smoothing, frequency-sign reversal or RF calibration change is introduced.
+
+Pre-FFT correction reduces the ICI from the estimated CFO. Remaining CFO still
+causes ICI, and post-FFT symbol rotations cannot undo that leakage. Continuous
+Responder and legacy paths retain their original zero pre-FFT correction.
 
 Post-FFT channel rotation removes common phase evolution between OFDM symbols,
 but it cannot reverse leakage that CFO has already produced between subcarriers.
@@ -756,12 +812,13 @@ For normalized CFO
 
 the received bin contains both its desired term and CFO-dependent contributions
 from other bins. This ICI can bias channel phase and therefore bias the final
-phase-slope delay. The present correction also does not remove SFO, phase noise,
+phase-slope delay. CFO correction also does not remove SFO, phase noise,
 multipath distortion, or an incorrect integer FFT-window position.
 
-`selected_cfo_hz` records the detector-side CFO selection; MC-DS payload
-decoding uses the downstream pilot-channel CFO estimate. The channel estimator always calculates
-and applies its inter-symbol estimate without a coherence threshold. A
+`selected_cfo_hz` records detector-side CFO selection. MC-DS payload decoding
+uses the downstream residual pilot-channel CFO for inter-symbol alignment.
+The channel estimator always calculates and applies that residual estimate
+without a coherence threshold. A
 low-coherence channel CFO can therefore rotate channel symbols using an
 unreliable estimate. In addition, an invalid CP estimate is currently exported
 as finite value zero, so downstream code cannot distinguish invalid CP from a
@@ -1015,7 +1072,7 @@ as an alias of `t4_rx_time`; the solver and individual range-output PDUs are
 unchanged. Quality dictionaries copy present keys from `frame_id_valid`, `valid`,
 `snr`, `quality`, `coarse_metric`, `payload_metric`, `phase_slope`, `phase_residual`,
 `prs_cp_cfo_hz`, `prs_cp_cfo_coherence`, `selected_cfo_hz`, `prs_channel_cfo_hz`,
-`residual_cfo_hz`, and `channel_coherence`. Absent diagnostics are omitted;
+`residual_cfo_hz`, `pre_fft_cfo_hz`, and `channel_coherence`. Absent diagnostics are omitted;
 all original keys remain available in `measurements`.
 
 This complete epoch is an integrated observation set. The separate position

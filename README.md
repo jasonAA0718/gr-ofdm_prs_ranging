@@ -25,7 +25,7 @@ no standalone time-domain BPSK payload in the current receiver chain.
 | Integrated OFDM payload | Implemented; 512 bins, 127 Gold chips, fixed data scrambler |
 | Local-ZC detector | Available as `prs_frame_detector` |
 | FFT-ZC detector | Available as `prs_fft_zc_frame_detector`; selected by the main GRCs |
-| CFO handling | CP estimate plus post-FFT pilot/data phase alignment; optional FFT-ZC CFO feedback |
+| CFO handling | Per-anchor TDMA CFO feedback with a 5 s default lifetime; managed pre-FFT compensation plus residual pilot/data phase alignment; legacy `prs_cfo_in` retained |
 | Fine delay | Weighted phase-slope estimate from the averaged 384 pilot bins |
 | Live range | Integer timestamp SS-TWR plus separate bidirectional corrected range when both fine estimates are valid |
 | Anchor identity | Packet-level anchor ID 0–7; responder POLL fine delay transported in RESPONSE |
@@ -34,7 +34,7 @@ no standalone time-domain BPSK payload in the current receiver chain.
 | Complete positioning epochs | Implemented on `epoch_out`; requires every configured anchor, at least three anchors, and normal cycle finalization; synthetic QA verified |
 | Online position calculation | Fixed-height 2D least squares in `prs_position_solver`; accepts partial observations with at least three usable anchors |
 | Position CSV | `prs_position_csv_logger` records successful fixes and solver failures, with cycle association and residual summaries |
-| DS-TWR, clock-skew correction, pre-FFT PRS CFO correction | Not implemented |
+| DS-TWR, clock-skew correction | Not implemented |
 
 The FFT-ZC algorithm remains experimental in accuracy terms even though the
 examples select it. Availability, example selection, and experimental validation
@@ -56,13 +56,15 @@ UHD Source -> frame detector -> FFT receiver -> channel estimator
 detector.event_out -----------+
 channel_estimator.event_out -+-> acquisition CSV logger
 
-channel_estimator.channel_out -> FFT-ZC detector.prs_cfo_in (optional feedback)
+initiator: phase_estimator.measurement_out -> cycle.measurement_in
+           cycle.window_out (per-anchor CFO) -> FFT-ZC detector.tx_time_in
+legacy continuous path: channel_estimator.channel_out -> detector.prs_cfo_in (optional)
 ```
 
 The detector extracts a complete raw complex frame with timing and acquisition
 metadata. It measures CP CFO but does not decode the OFDM payload. The FFT
-receiver removes CPs, performs 127 FFTs, and reorders bins into signed-frequency
-order. The channel estimator removes known pilots/Gold chips, estimates
+receiver removes CPs, applies a managed frame's requested time-domain CFO
+correction, performs 127 FFTs, and reorders bins into signed-frequency order. The channel estimator removes known pilots/Gold chips, estimates
 inter-symbol CFO, aligns and averages pilot channels, and despreads/equalizes
 the data before CRC checking. The phase estimator receives the compact
 384-bin channel vector.
@@ -189,6 +191,67 @@ and the waveform are unchanged by this removal.
 CMake installation does not prune files from previous installations. If an old
 installation exists, also remove its obsolete `prs_timing_collector.h` and
 `ofdm_prs_ranging_prs_timing_collector.block.yml` from that installation prefix.
+
+## Per-Anchor CFO Feedback and Pre-FFT Correction
+
+Managed initiators use the existing ranging-cycle feedback connection.
+`measurement_in` already carries `prs_channel_cfo_hz` and `channel_coherence`
+from channel estimation. After CRC, cycle, slot, identity, reply-delay and
+first-valid observation checks, the coordinator stores the newest finite CFO
+with coherence at least 0.2 under the decoded anchor ID. Phase-fit `valid` and
+fine-delay validity do not gate this CFO update. Weak/nonfinite, duplicate,
+stale-generation and inconsistent observations do not replace or refresh a
+trusted reference. Older receive timestamps cannot overwrite newer feedback.
+
+Each `window_out` snapshots its own anchor's reference. Age is calculated in
+UHD seconds from the reference RESPONSE T4 to the upcoming window start;
+`cfo_max_age_s` is a new final constructor/GRC argument, finite and positive,
+with default 5.0 s. Missing, future-dated or expired references produce no
+window CFO. Cache entries survive cycle finalization and are cleared on block
+start; memory is bounded by the configured anchors. No smoothing is added.
+
+The detector retains the snapshot with its window across scheduler calls.
+Managed windows never use the global `prs_cfo_in` fallback: missing/invalid
+references use the existing -300..+300 Hz bootstrap bank. Continuous and
+legacy un-managed windows preserve their prior global-feedback behavior.
+The `cfo_source` values are `ANCHOR_FLL`, `PRS_FLL`, `INITIAL_BIN`, or `DISABLED`.
+With compensation enabled, managed frames carry `pre_fft_cfo_hz` equal to the
+selected acquisition CFO, including bootstrap selection. Disabling detector
+CFO compensation also disables its managed pre-FFT request. Responder/split
+acquisition examples keep their previous wiring and processing path.
+
+`frame_out` samples remain raw. The FFT receiver derotates only its FFT input
+copy, with phase referenced to the original first frame sample and continuous
+across CPs and OFDM symbols. `pre_fft_cfo_hz` on FFT output reports the actual
+applied correction; absent/nonfinite requests apply zero. Original PMT samples,
+frame/FFT boundaries and UHD timestamps are unchanged.
+
+The raw CP CFO minus the applied correction supplies the residual channel-CFO
+unwrap reference. Pilot/data symbol rotations use the estimated residual;
+`prs_channel_cfo_hz` reports applied correction plus residual, so feedback
+remains a total CFO rather than accumulating or feeding back residual alone.
+The historical `residual_cfo_hz` definition stays total channel CFO minus the
+raw CP/detector unwrap reference. Actual remaining FFT-input CFO is
+`prs_channel_cfo_hz - pre_fft_cfo_hz`.
+
+Measurement CSV appends `pre_fft_cfo_hz` to distinguish actual pre-FFT
+correction from the reconstructed total. Start a new measurement CSV for
+this schema; existing log files are not converted. Position CSV is unchanged.
+Both initiator examples expose the new lifetime default and retain their
+experimental RF/gain/threshold/timing settings. Rebuild/reinstall the OOT
+module before running updated GRCs; the appended default preserves source-level
+calls, but the compiled constructor signature has changed. Detailed equations and the
+remaining ICI limitation are in [signal.md](docs/signal.md#managed-pre-fft-cfo-correction).
+
+Software verification (2026-11-13): Release build and all 13 CTest targets pass,
+including 11 new per-anchor CFO cases. All seven example GRCs were regenerated
+in a temporary directory using workspace block definitions for validation;
+committed initiator Python snapshots were updated only for the lifetime argument
+to preserve their existing experimental settings. Synthetic checks cover cache
+quality/identity/lifetime, window isolation, large positive/negative CFO unwrap,
+raw-frame preservation, packet CRC, fine delay, disabled compensation and the
+legacy continuous path. No installation or RF validation was performed.
+
 
 ## Experimental History
 

@@ -812,7 +812,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
                 "frame_id_valid", "coarse_metric", "payload_metric", "prs_cp_cfo_hz",
                 "prs_cp_cfo_coherence", "selected_cfo_hz", "payload_retry_used",
                 "prs_channel_cfo_hz", "residual_cfo_hz", "channel_coherence",
-                "phase_slope_rad_per_hz", "phase_residual", "snr", "quality",
+                "phase_slope_rad_per_hz", "phase_residual", "snr", "quality", "pre_fft_cfo_hz",
             ])
             for name, expected in (
                     ("calibration_time", 5.808278798530661e-06),

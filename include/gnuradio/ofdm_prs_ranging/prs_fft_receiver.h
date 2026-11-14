@@ -14,6 +14,8 @@
 namespace gr {
 namespace ofdm_prs_ranging {
 
+// frame_in may request time-domain derotation with pre_fft_cfo_hz (Hz).
+// symbols_out records the actual applied value; raw PDU samples are never modified.
 class OFDM_PRS_RANGING_API prs_fft_receiver : virtual public gr::block
 {
 public:

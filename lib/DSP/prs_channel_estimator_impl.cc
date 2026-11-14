@@ -133,9 +133,13 @@ void prs_channel_estimator_impl::handle_symbols(pmt::pmt_t msg)
     if (!std::isfinite(unwrap_reference_hz)) {
         unwrap_reference_hz = dict_ref_double(meta, "detection_cfo_hz", 0.0);
     }
-    const double reference_phase = 2.0 * pi * unwrap_reference_hz * symbol_period;
+    const double applied_value = dict_ref_double(meta, "pre_fft_cfo_hz", 0.0);
+    const double applied_cfo = std::isfinite(applied_value) ? applied_value : 0.0;
+    const double residual_reference_hz = unwrap_reference_hz - applied_cfo;
+    const double reference_phase = 2.0 * pi * residual_reference_hz * symbol_period;
     phase += 2.0 * pi * std::round((reference_phase - phase) / (2.0 * pi));
-    const double prs_channel_cfo_hz = phase / (2.0 * pi * symbol_period);
+    const double channel_residual_hz = phase / (2.0 * pi * symbol_period);
+    const double prs_channel_cfo_hz = applied_cfo + channel_residual_hz;
     const double coherence_denom = std::sqrt(previous_power * next_power);
     const double channel_coherence =
         coherence_denom > 0.0 ? std::min(1.0, std::abs(symbol_corr) / coherence_denom)
@@ -143,7 +147,7 @@ void prs_channel_estimator_impl::handle_symbols(pmt::pmt_t msg)
 
     std::array<gr_complex, mc_ds_symbol_count> symbol_rotations{};
     for (int sym = 0; sym < d_cfg.prs_symbols; ++sym) {
-        const double angle = -2.0 * pi * prs_channel_cfo_hz * symbol_period * sym;
+        const double angle = -2.0 * pi * channel_residual_hz * symbol_period * sym;
         symbol_rotations[static_cast<size_t>(sym)] = gr_complex(
             static_cast<float>(std::cos(angle)), static_cast<float>(std::sin(angle)));
     }

@@ -33,4 +33,12 @@ inputs:
 outputs:
 - {label: frame_out, domain: message}
 - {label: event_out, domain: message, optional: true}
+documentation: |-
+  Continuous and legacy windows use prs_cfo_in (total prs_channel_cfo_hz and coherence >=0.2).
+  Managed TDMA windows carry expected_anchor_id/cycle_sequence and snapshot their own CFO
+  on tx_time_in; a missing/invalid window CFO bootstraps instead of using global feedback.
+  CFO Source is ANCHOR_FLL, PRS_FLL, INITIAL_BIN or DISABLED.
+  With CFO compensation enabled, managed frames request pre-FFT correction using the
+  selected detection CFO via pre_fft_cfo_hz. frame_out samples remain raw.
+  Disabling CFO compensation disables both acquisition and managed pre-FFT correction.
 file_format: 1

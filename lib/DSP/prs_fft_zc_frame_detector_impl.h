@@ -98,7 +98,12 @@ private:
         float preamble_metric;
         float coarse_metric;
         pmt::pmt_t schedule_meta = pmt::PMT_NIL;
+        bool managed = false;
+        bool have_cfo = false;
+        double cfo_hz = 0.0;
     };
+    correlation_window d_active_window{};
+    bool d_have_active_window = false;
     std::mutex d_window_mutex;
     std::vector<correlation_window> d_windows;
 

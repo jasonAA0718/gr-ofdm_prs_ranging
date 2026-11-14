@@ -8,6 +8,8 @@
 #include "prs_fft_receiver_impl.h"
 #include <gnuradio/io_signature.h>
 #include <algorithm>
+#include <cmath>
+#include <complex>
 
 namespace gr {
 namespace ofdm_prs_ranging {
@@ -54,19 +56,36 @@ void prs_fft_receiver_impl::handle_frame(pmt::pmt_t msg)
     const int start =
         static_cast<int>(dict_ref_double(meta, "prs_start_rel", prs_start_offset(d_cfg)));
     const int needed = start + prs_len(d_cfg);
-    if (frame_size < static_cast<size_t>(needed)) {
+    if (start < 0 || frame_size < static_cast<size_t>(needed)) {
         meta = pmt::dict_add(meta, pmt::mp("fft_error"), pmt::mp("short_frame"));
+        meta = pmt::dict_add(meta, pmt::mp("pre_fft_cfo_hz"), pmt::from_double(0.0));
         message_port_pub(
             pmt::mp("symbols_out"),
             pmt::cons(meta, pmt::init_c32vector(0, std::vector<gr_complex>())));
         return;
     }
 
+    const double requested_cfo = dict_ref_double(meta, "pre_fft_cfo_hz", 0.0);
+    const double applied_cfo = std::isfinite(requested_cfo) ? requested_cfo : 0.0;
+    // Phase is referenced to the first raw frame sample, continuous across
+    // CPs and symbols. Input PMT data, frame boundaries and UHD time stay intact.
+    const double phase_step = -2.0 * std::acos(-1.0) * applied_cfo / d_cfg.samp_rate;
+    const auto rotation_step = std::polar(1.0, phase_step);
+    meta = pmt::dict_add(meta, pmt::mp("pre_fft_cfo_hz"), pmt::from_double(applied_cfo));
     size_t active_index = 0;
     for (int sym = 0; sym < d_cfg.prs_symbols; ++sym) {
         const int sym_start = start + sym * (d_cfg.fft_len + d_cfg.cp_len) + d_cfg.cp_len;
-        std::copy(
-            frame + sym_start, frame + sym_start + d_cfg.fft_len, d_fft->get_inbuf());
+        if (applied_cfo == 0.0) {
+            std::copy(frame + sym_start, frame + sym_start + d_cfg.fft_len,
+                       d_fft->get_inbuf());
+        } else {
+            auto rotation = std::polar(1.0, phase_step * sym_start);
+            for (int i = 0; i < d_cfg.fft_len; ++i) {
+                d_fft->get_inbuf()[i] = frame[sym_start + i] * gr_complex(
+                    static_cast<float>(rotation.real()), static_cast<float>(rotation.imag()));
+                rotation *= rotation_step;
+            }
+        }
         d_fft->execute();
         const gr_complex* freq = d_fft->get_outbuf();
         if (d_cfg.active_bins == d_cfg.fft_len) {
