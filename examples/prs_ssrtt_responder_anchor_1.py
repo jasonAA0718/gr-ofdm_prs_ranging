@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0
 #
 # GNU Radio Python Flow Graph
-# Title: PRS Anchor 1 (Static Two-Anchor Experiment)
+# Title: PRS Anchor 1
 # Description: OFDM PRS SS-RTT responder
 # GNU Radio version: 3.10.11.0
 
@@ -25,33 +25,32 @@ import threading
 
 
 
-class prs_ssrtt_responder_anchor1(gr.top_block):
+class prs_ssrtt_responder_anchor_1(gr.top_block):
 
     def __init__(self):
-        gr.top_block.__init__(self, "PRS Anchor 1 (Static Two-Anchor Experiment)", catch_exceptions=True)
+        gr.top_block.__init__(self, "PRS Anchor 1", catch_exceptions=True)
         self.flowgraph_started = threading.Event()
 
         ##################################################
         # Variables
         ##################################################
         self.samp_rate = samp_rate = 30000000
-        self.response_delay_seconds = response_delay_seconds = 0.067
+        self.response_delay_seconds = response_delay_seconds = 0.051
         self.zc_length = zc_length = 819
-        self.tx_gain = tx_gain = 60
-        self.rx_gain = rx_gain = 56
+        self.tx_gain = tx_gain = 70
+        self.rx_gain = rx_gain = 50
         self.reply_delay_samples = reply_delay_samples = int(response_delay_seconds*samp_rate + 0.5)
         self.premble_rep = premble_rep = 17
         self.premble_length = premble_length = 128
-        self.center_freq = center_freq = 1060e6
-        self.anchor_id = anchor_id = 2
-        self.T_burst = T_burst = 0.5
+        self.center_freq = center_freq = 1330e6
+        self.anchor_id = anchor_id = 1
 
         ##################################################
         # Blocks
         ##################################################
 
         self.uhd_usrp_source_0_0_0 = uhd.usrp_source(
-            ",".join(("serial=34D04BB", "recv_buff_size=20000000,num_recv_frames=700")),
+            ",".join(("serial=34D0563", "recv_buff_size=20000000,num_recv_frames=700")),
             uhd.stream_args(
                 cpu_format="fc32",
                 args='',
@@ -67,7 +66,7 @@ class prs_ssrtt_responder_anchor1(gr.top_block):
         self.uhd_usrp_source_0_0_0.set_bandwidth(samp_rate, 0)
         self.uhd_usrp_source_0_0_0.set_gain(rx_gain, 0)
         self.uhd_usrp_sink_0_0 = uhd.usrp_sink(
-            ",".join(("serial=34D04BB", '')),
+            ",".join(("serial=34D0563", '')),
             uhd.stream_args(
                 cpu_format="fc32",
                 args='',
@@ -99,7 +98,7 @@ class prs_ssrtt_responder_anchor1(gr.top_block):
         self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/anchor1_acquisition.csv", "responder", 1)
         self.ofdm_prs_ranging_prs_zc_frame_sync_0 = ofdm_prs_ranging.prs_zc_frame_sync(30e6, 512, 64, 512, 127, 128, 17, 819, 0.15, 0.35, 25, 0)
         self.ofdm_prs_ranging_prs_zc_frame_sync_0.set_processor_affinity([2])
-        self.ofdm_prs_ranging_prs_window_capture_0 = ofdm_prs_ranging.prs_window_capture(30e6, 512, 64, 512, 127, 128, 17, 819, 0.12, 10000, 4096, 4096, 1, True)
+        self.ofdm_prs_ranging_prs_window_capture_0 = ofdm_prs_ranging.prs_window_capture(30e6, 512, 64, 512, 127, 128, 17, 819, 0.12, 10000, 4096, 4096, 2, True)
 
 
         ##################################################
@@ -192,16 +191,10 @@ class prs_ssrtt_responder_anchor1(gr.top_block):
     def set_anchor_id(self, anchor_id):
         self.anchor_id = anchor_id
 
-    def get_T_burst(self):
-        return self.T_burst
-
-    def set_T_burst(self, T_burst):
-        self.T_burst = T_burst
 
 
 
-
-def main(top_block_cls=prs_ssrtt_responder_anchor1, options=None):
+def main(top_block_cls=prs_ssrtt_responder_anchor_1, options=None):
     tb = top_block_cls()
 
     def sig_handler(sig=None, frame=None):

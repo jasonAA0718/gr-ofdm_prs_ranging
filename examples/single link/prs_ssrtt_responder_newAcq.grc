@@ -50,7 +50,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: 1060e6
+    value: 1330e6
   states:
     bus_sink: false
     bus_source: false
@@ -86,7 +86,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: int(0.031*samp_rate)
+    value: int(0.052*samp_rate)
   states:
     bus_sink: false
     bus_source: false
@@ -281,8 +281,6 @@ blocks:
     alias: ''
     append: '1'
     comment: Records POLL PRS CFO and phase-slope measurements
-    maxoutbuf: '0'
-    minoutbuf: '0'
     path: '"CSV/responder_measurements.csv"'
   states:
     bus_sink: false
@@ -508,7 +506,7 @@ blocks:
     clock_source6: ''
     clock_source7: ''
     comment: ''
-    dev_addr: '"serial=34D0564"'
+    dev_addr: '"serial=34D04BB"'
     dev_args: ''
     gain0: tx_gain
     gain1: '0'
@@ -849,7 +847,7 @@ blocks:
     dc_offs_enb7: default
     dc_offs_enb8: default
     dc_offs_enb9: default
-    dev_addr: '"serial=34D0564"'
+    dev_addr: '"serial=34D04BB"'
     dev_args: '"recv_buff_size=20000000,num_recv_frames=700"'
     gain0: rx_gain
     gain1: '0'

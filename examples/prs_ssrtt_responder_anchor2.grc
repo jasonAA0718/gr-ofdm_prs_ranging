@@ -49,7 +49,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: 1060e6
+    value: 1330e6
   states:
     bus_sink: false
     bus_source: false
@@ -109,7 +109,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '56'
+    value: '50'
   states:
     bus_sink: false
     bus_source: false
@@ -133,7 +133,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '65'
+    value: '70'
   states:
     bus_sink: false
     bus_source: false
@@ -256,7 +256,7 @@ blocks:
     append: '1'
     comment: Logs every detected POLL before responder filtering
     node: '"responder"'
-    path: '"CSV/anchor1_acquisition.csv"'
+    path: '"CSV/anchor2_acquisition.csv"'
   states:
     bus_sink: false
     bus_source: false
@@ -292,9 +292,7 @@ blocks:
     alias: ''
     append: '1'
     comment: Records POLL PRS CFO and phase-slope measurements
-    maxoutbuf: '0'
-    minoutbuf: '0'
-    path: '"CSV/anchor1_measurements.csv"'
+    path: '"CSV/anchor2_measurements.csv"'
   states:
     bus_sink: false
     bus_source: false

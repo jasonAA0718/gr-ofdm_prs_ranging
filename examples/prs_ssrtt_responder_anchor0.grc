@@ -49,12 +49,12 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: 1060e6
+    value: 1330e6
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [232, 120.0]
+    coordinate: [248, 128.0]
     rotation: 0
     state: enabled
 - name: premble_length
@@ -109,35 +109,14 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '56'
+    value: '50'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [816, 40.0]
+    coordinate: [784, 48.0]
     rotation: 0
     state: enabled
-- name: rx_gain
-  id: variable_qtgui_range
-  parameters:
-    comment: ''
-    gui_hint: ''
-    label: ''
-    min_len: '200'
-    orient: QtCore.Qt.Horizontal
-    rangeType: float
-    start: '0'
-    step: '1'
-    stop: '76'
-    value: '0'
-    widget: counter_slider
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [1120, 24.0]
-    rotation: 0
-    state: disabled
 - name: samp_rate
   id: variable
   parameters:
@@ -154,35 +133,14 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '65'
+    value: '70'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [912, 40.0]
+    coordinate: [880, 48.0]
     rotation: 0
     state: enabled
-- name: tx_gain
-  id: variable_qtgui_range
-  parameters:
-    comment: ''
-    gui_hint: ''
-    label: ''
-    min_len: '200'
-    orient: QtCore.Qt.Horizontal
-    rangeType: float
-    start: '0'
-    step: '1'
-    stop: '60'
-    value: '0'
-    widget: counter_slider
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [1008, 28.0]
-    rotation: 0
-    state: disabled
 - name: zc_length
   id: variable
   parameters:
@@ -313,8 +271,6 @@ blocks:
     alias: ''
     append: '1'
     comment: Records POLL PRS CFO and phase-slope measurements
-    maxoutbuf: '0'
-    minoutbuf: '0'
     path: '"CSV/anchor0_measurements.csv"'
   states:
     bus_sink: false
@@ -677,7 +633,7 @@ blocks:
     num_mboards: '1'
     otw: ''
     samp_rate: samp_rate
-    sd_spec0: A:B
+    sd_spec0: A:A
     sd_spec1: ''
     sd_spec2: ''
     sd_spec3: ''
@@ -1113,7 +1069,7 @@ blocks:
     rx_agc8: Default
     rx_agc9: Default
     samp_rate: samp_rate
-    sd_spec0: A:B
+    sd_spec0: A:A
     sd_spec1: ''
     sd_spec2: ''
     sd_spec3: ''
