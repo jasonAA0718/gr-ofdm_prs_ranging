@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0
 #
 # GNU Radio Python Flow Graph
-# Title: PRS Anchor 1 (Static Two-Anchor Experiment)
+# Title: PRS Anchor 2
 # Description: OFDM PRS SS-RTT responder
 # GNU Radio version: 3.10.11.0
 
@@ -25,10 +25,10 @@ import threading
 
 
 
-class prs_ssrtt_responder_anchor2(gr.top_block):
+class prs_ssrtt_responder_anchor_2(gr.top_block):
 
     def __init__(self):
-        gr.top_block.__init__(self, "PRS Anchor 1 (Static Two-Anchor Experiment)", catch_exceptions=True)
+        gr.top_block.__init__(self, "PRS Anchor 2", catch_exceptions=True)
         self.flowgraph_started = threading.Event()
 
         ##################################################
@@ -37,14 +37,13 @@ class prs_ssrtt_responder_anchor2(gr.top_block):
         self.samp_rate = samp_rate = 30000000
         self.response_delay_seconds = response_delay_seconds = 0.067
         self.zc_length = zc_length = 819
-        self.tx_gain = tx_gain = 60
-        self.rx_gain = rx_gain = 56
+        self.tx_gain = tx_gain = 70
+        self.rx_gain = rx_gain = 50
         self.reply_delay_samples = reply_delay_samples = int(response_delay_seconds*samp_rate + 0.5)
         self.premble_rep = premble_rep = 17
         self.premble_length = premble_length = 128
-        self.center_freq = center_freq = 1060e6
+        self.center_freq = center_freq = 1330e6
         self.anchor_id = anchor_id = 2
-        self.T_burst = T_burst = 0.5
 
         ##################################################
         # Blocks
@@ -94,12 +93,12 @@ class prs_ssrtt_responder_anchor2(gr.top_block):
             True, 29, 2)
         self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 512, 512, 1.0)
         self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 512, 64, 512, 127)
-        self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger("CSV/anchor1_measurements.csv", 1)
+        self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger("CSV/anchor2_measurements.csv", 1)
         self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 512, 512, 127, 13990001, 2)
-        self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/anchor1_acquisition.csv", "responder", 1)
+        self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/anchor2_acquisition.csv", "responder", 1)
         self.ofdm_prs_ranging_prs_zc_frame_sync_0 = ofdm_prs_ranging.prs_zc_frame_sync(30e6, 512, 64, 512, 127, 128, 17, 819, 0.15, 0.35, 25, 0)
         self.ofdm_prs_ranging_prs_zc_frame_sync_0.set_processor_affinity([2])
-        self.ofdm_prs_ranging_prs_window_capture_0 = ofdm_prs_ranging.prs_window_capture(30e6, 512, 64, 512, 127, 128, 17, 819, 0.12, 10000, 4096, 4096, 1, True)
+        self.ofdm_prs_ranging_prs_window_capture_0 = ofdm_prs_ranging.prs_window_capture(30e6, 512, 64, 512, 127, 128, 17, 819, 0.12, 10000, 4096, 4096, 2, True)
 
 
         ##################################################
@@ -192,16 +191,10 @@ class prs_ssrtt_responder_anchor2(gr.top_block):
     def set_anchor_id(self, anchor_id):
         self.anchor_id = anchor_id
 
-    def get_T_burst(self):
-        return self.T_burst
-
-    def set_T_burst(self, T_burst):
-        self.T_burst = T_burst
 
 
 
-
-def main(top_block_cls=prs_ssrtt_responder_anchor2, options=None):
+def main(top_block_cls=prs_ssrtt_responder_anchor_2, options=None):
     tb = top_block_cls()
 
     def sig_handler(sig=None, frame=None):

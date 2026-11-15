@@ -5,19 +5,15 @@
 # SPDX-License-Identifier: GPL-3.0
 #
 # GNU Radio Python Flow Graph
-# Title: PRS Anchor 0 (Static Two-Anchor Experiment)
+# Title: PRS Anchor 0
 # Description: OFDM PRS SS-RTT responder
 # GNU Radio version: 3.10.11.0
 
-from PyQt5 import Qt
-from gnuradio import qtgui
-from PyQt5 import QtCore
 from gnuradio import gr
 from gnuradio.filter import firdes
 from gnuradio.fft import window
 import sys
 import signal
-from PyQt5 import Qt
 from argparse import ArgumentParser
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio import eng_notation
@@ -28,37 +24,11 @@ import threading
 
 
 
-class prs_ssrtt_responder_anchor0(gr.top_block, Qt.QWidget):
+
+class prs_ssrtt_responder_anchor_0(gr.top_block):
 
     def __init__(self):
-        gr.top_block.__init__(self, "PRS Anchor 0 (Static Two-Anchor Experiment)", catch_exceptions=True)
-        Qt.QWidget.__init__(self)
-        self.setWindowTitle("PRS Anchor 0 (Static Two-Anchor Experiment)")
-        qtgui.util.check_set_qss()
-        try:
-            self.setWindowIcon(Qt.QIcon.fromTheme('gnuradio-grc'))
-        except BaseException as exc:
-            print(f"Qt GUI: Could not set Icon: {str(exc)}", file=sys.stderr)
-        self.top_scroll_layout = Qt.QVBoxLayout()
-        self.setLayout(self.top_scroll_layout)
-        self.top_scroll = Qt.QScrollArea()
-        self.top_scroll.setFrameStyle(Qt.QFrame.NoFrame)
-        self.top_scroll_layout.addWidget(self.top_scroll)
-        self.top_scroll.setWidgetResizable(True)
-        self.top_widget = Qt.QWidget()
-        self.top_scroll.setWidget(self.top_widget)
-        self.top_layout = Qt.QVBoxLayout(self.top_widget)
-        self.top_grid_layout = Qt.QGridLayout()
-        self.top_layout.addLayout(self.top_grid_layout)
-
-        self.settings = Qt.QSettings("gnuradio/flowgraphs", "prs_ssrtt_responder_anchor0")
-
-        try:
-            geometry = self.settings.value("geometry")
-            if geometry:
-                self.restoreGeometry(geometry)
-        except BaseException as exc:
-            print(f"Qt GUI: Could not restore geometry: {str(exc)}", file=sys.stderr)
+        gr.top_block.__init__(self, "PRS Anchor 0", catch_exceptions=True)
         self.flowgraph_started = threading.Event()
 
         ##################################################
@@ -67,25 +37,18 @@ class prs_ssrtt_responder_anchor0(gr.top_block, Qt.QWidget):
         self.samp_rate = samp_rate = 30000000
         self.response_delay_seconds = response_delay_seconds = 0.041
         self.zc_length = zc_length = 819
-        self.tx_gain = tx_gain = 0
-        self.rx_gain = rx_gain = 0
+        self.tx_gain = tx_gain = 70
+        self.rx_gain = rx_gain = 50
         self.reply_delay_samples = reply_delay_samples = int(response_delay_seconds*samp_rate + 0.5)
         self.premble_rep = premble_rep = 17
         self.premble_length = premble_length = 128
-        self.center_freq = center_freq = 1060e6
+        self.center_freq = center_freq = 1330e6
         self.anchor_id = anchor_id = 0
-        self.T_burst = T_burst = 0.75
 
         ##################################################
         # Blocks
         ##################################################
 
-        self._tx_gain_range = qtgui.Range(0, 60, 1, 0, 200)
-        self._tx_gain_win = qtgui.RangeWidget(self._tx_gain_range, self.set_tx_gain, "'tx_gain'", "counter_slider", float, QtCore.Qt.Horizontal)
-        self.top_layout.addWidget(self._tx_gain_win)
-        self._rx_gain_range = qtgui.Range(0, 76, 1, 0, 200)
-        self._rx_gain_win = qtgui.RangeWidget(self._rx_gain_range, self.set_rx_gain, "'rx_gain'", "counter_slider", float, QtCore.Qt.Horizontal)
-        self.top_layout.addWidget(self._rx_gain_win)
         self.uhd_usrp_source_0_0_0 = uhd.usrp_source(
             ",".join(("serial=34D0564", "recv_buff_size=20000000,num_recv_frames=700")),
             uhd.stream_args(
@@ -96,10 +59,17 @@ class prs_ssrtt_responder_anchor0(gr.top_block, Qt.QWidget):
         )
         self.uhd_usrp_source_0_0_0.set_subdev_spec('A:A', 0)
         self.uhd_usrp_source_0_0_0.set_samp_rate(samp_rate)
-        self.uhd_usrp_source_0_0_0.set_time_unknown_pps(uhd.time_spec(0))
+        _last_pps_time = self.uhd_usrp_source_0_0_0.get_time_last_pps().get_real_secs()
+        # Poll get_time_last_pps() every 50 ms until a change is seen
+        while(self.uhd_usrp_source_0_0_0.get_time_last_pps().get_real_secs() == _last_pps_time):
+            time.sleep(0.05)
+        # Set the time to PC time on next PPS
+        self.uhd_usrp_source_0_0_0.set_time_next_pps(uhd.time_spec(int(time.time()) + 1.0))
+        # Sleep 1 second to ensure next PPS has come
+        time.sleep(1)
 
         self.uhd_usrp_source_0_0_0.set_center_freq(center_freq, 0)
-        self.uhd_usrp_source_0_0_0.set_antenna("RX2", 0)
+        self.uhd_usrp_source_0_0_0.set_antenna("TX/RX", 0)
         self.uhd_usrp_source_0_0_0.set_bandwidth(samp_rate, 0)
         self.uhd_usrp_source_0_0_0.set_gain(rx_gain, 0)
         self.uhd_usrp_sink_0_0 = uhd.usrp_sink(
@@ -135,7 +105,7 @@ class prs_ssrtt_responder_anchor0(gr.top_block, Qt.QWidget):
         self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/anchor0_acquisition.csv", "responder", 1)
         self.ofdm_prs_ranging_prs_zc_frame_sync_0 = ofdm_prs_ranging.prs_zc_frame_sync(30e6, 512, 64, 512, 127, 128, 17, 819, 0.15, 0.35, 25, 0)
         self.ofdm_prs_ranging_prs_zc_frame_sync_0.set_processor_affinity([2])
-        self.ofdm_prs_ranging_prs_window_capture_0 = ofdm_prs_ranging.prs_window_capture(30e6, 512, 64, 512, 127, 128, 17, 819, 0.12, 10000, 4096, 4096, 1, True)
+        self.ofdm_prs_ranging_prs_window_capture_0 = ofdm_prs_ranging.prs_window_capture(30e6, 512, 64, 512, 127, 128, 17, 819, 0.12, 10000, 4096, 4096, 2, True)
 
 
         ##################################################
@@ -157,14 +127,6 @@ class prs_ssrtt_responder_anchor0(gr.top_block, Qt.QWidget):
         self.connect((self.prs_source, 0), (self.uhd_usrp_sink_0_0, 0))
         self.connect((self.uhd_usrp_source_0_0_0, 0), (self.ofdm_prs_ranging_prs_window_capture_0, 0))
 
-
-    def closeEvent(self, event):
-        self.settings = Qt.QSettings("gnuradio/flowgraphs", "prs_ssrtt_responder_anchor0")
-        self.settings.setValue("geometry", self.saveGeometry())
-        self.stop()
-        self.wait()
-
-        event.accept()
 
     def get_samp_rate(self):
         return self.samp_rate
@@ -236,40 +198,31 @@ class prs_ssrtt_responder_anchor0(gr.top_block, Qt.QWidget):
     def set_anchor_id(self, anchor_id):
         self.anchor_id = anchor_id
 
-    def get_T_burst(self):
-        return self.T_burst
-
-    def set_T_burst(self, T_burst):
-        self.T_burst = T_burst
 
 
 
-
-def main(top_block_cls=prs_ssrtt_responder_anchor0, options=None):
-
-    qapp = Qt.QApplication(sys.argv)
-
+def main(top_block_cls=prs_ssrtt_responder_anchor_0, options=None):
     tb = top_block_cls()
-
-    tb.start()
-    tb.flowgraph_started.set()
-
-    tb.show()
 
     def sig_handler(sig=None, frame=None):
         tb.stop()
         tb.wait()
 
-        Qt.QApplication.quit()
+        sys.exit(0)
 
     signal.signal(signal.SIGINT, sig_handler)
     signal.signal(signal.SIGTERM, sig_handler)
 
-    timer = Qt.QTimer()
-    timer.start(500)
-    timer.timeout.connect(lambda: None)
+    tb.start()
+    tb.flowgraph_started.set()
 
-    qapp.exec_()
+    try:
+        input('Press Enter to quit: ')
+    except EOFError:
+        pass
+    tb.stop()
+    tb.wait()
+
 
 if __name__ == '__main__':
     main()

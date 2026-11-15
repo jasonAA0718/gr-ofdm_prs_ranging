@@ -49,12 +49,12 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: 1060e6
+    value: 1330e6
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [216, 128.0]
+    coordinate: [224, 136.0]
     rotation: 0
     state: enabled
 - name: premble_length
@@ -109,12 +109,12 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '56'
+    value: '50'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [816, 40.0]
+    coordinate: [776, 40.0]
     rotation: 0
     state: enabled
 - name: samp_rate
@@ -127,18 +127,6 @@ blocks:
     bus_source: false
     bus_structure: null
     coordinate: [216, 40.0]
-    rotation: 0
-    state: enabled
-- name: tx_gain
-  id: variable
-  parameters:
-    comment: ''
-    value: '65'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [912, 40.0]
     rotation: 0
     state: enabled
 - name: tx_gain
@@ -162,6 +150,18 @@ blocks:
     coordinate: [1008, 28.0]
     rotation: 0
     state: disabled
+- name: tx_gain
+  id: variable
+  parameters:
+    comment: ''
+    value: '70'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [872, 40.0]
+    rotation: 0
+    state: enabled
 - name: zc_length
   id: variable
   parameters:
@@ -292,8 +292,6 @@ blocks:
     alias: ''
     append: '1'
     comment: Records POLL PRS CFO and phase-slope measurements
-    maxoutbuf: '0'
-    minoutbuf: '0'
     path: '"CSV/anchor1_measurements.csv"'
   states:
     bus_sink: false

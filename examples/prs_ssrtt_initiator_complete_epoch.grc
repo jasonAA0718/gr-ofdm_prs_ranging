@@ -135,7 +135,7 @@ blocks:
   id: variable
   parameters:
     comment: "Anchor received window \nbefore time"
-    value: '0.002'
+    value: '0.0002'
   states:
     bus_sink: false
     bus_source: false
@@ -147,7 +147,7 @@ blocks:
   id: variable
   parameters:
     comment: "Anchor received window \nbefore time"
-    value: '0.002'
+    value: '0.003'
   states:
     bus_sink: false
     bus_source: false
@@ -159,7 +159,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '56'
+    value: '50'
   states:
     bus_sink: false
     bus_source: false
@@ -215,7 +215,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '45'
+    value: '70'
   states:
     bus_sink: false
     bus_source: false
@@ -317,7 +317,7 @@ blocks:
     bus_structure: null
     coordinate: [2280, 1360.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: cycle_summary_debug_0_0
   id: blocks_message_debug
   parameters:
@@ -459,7 +459,7 @@ blocks:
     prs_symbols: '127'
     reply_delay_s: '0.0'
     samp_rate: samp_rate
-    threshold: '0.6'
+    threshold: '0.4'
     time_gating: '1'
     window_after_s: '0.0077'
     window_before_s: '0.00166'
@@ -479,8 +479,8 @@ blocks:
     affinity: ''
     alias: ''
     anchor_ids: anchor_ids
-    coarse_sync_len: zc_length
     cfo_max_age_s: '5.0'
+    coarse_sync_len: zc_length
     comment: ''
     maxoutbuf: '0'
     minoutbuf: '0'
@@ -707,7 +707,7 @@ blocks:
     clock_source6: ''
     clock_source7: ''
     comment: ''
-    dev_addr: '"serial=32712EF"'
+    dev_addr: '"serial=34D056F"'
     dev_args: ''
     gain0: tx_gain
     gain1: '0'
@@ -1048,7 +1048,7 @@ blocks:
     dc_offs_enb7: default
     dc_offs_enb8: default
     dc_offs_enb9: default
-    dev_addr: '"serial=32712EF"'
+    dev_addr: '"serial=34D056F"'
     dev_args: '"recv_buff_size=25000000,num_recv_frames=1024"'
     gain0: rx_gain
     gain1: '0'
