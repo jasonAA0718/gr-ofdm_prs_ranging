@@ -164,7 +164,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [808, 48.0]
+    coordinate: [800, 40.0]
     rotation: 0
     state: enabled
 - name: samp_rate
@@ -215,7 +215,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '70'
+    value: '66'
   states:
     bus_sink: false
     bus_source: false
@@ -235,7 +235,7 @@ blocks:
     start: '40'
     step: '1'
     stop: '80'
-    value: '45'
+    value: '55'
     widget: counter_slider
   states:
     bus_sink: false
@@ -344,7 +344,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1136, 40.0]
+    coordinate: [1144, 40.0]
     rotation: 0
     state: enabled
 - name: ofdm_prs_ranging_prs_position_solver_0
@@ -878,7 +878,7 @@ blocks:
   parameters:
     affinity: ''
     alias: ''
-    ant0: '"TX/RX"'
+    ant0: '"RX2"'
     ant1: '"RX2"'
     ant10: '"RX2"'
     ant11: '"RX2"'

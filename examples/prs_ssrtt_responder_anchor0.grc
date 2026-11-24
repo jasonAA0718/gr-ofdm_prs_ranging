@@ -42,7 +42,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [344, 120.0]
+    coordinate: [328, 128.0]
     rotation: 0
     state: enabled
 - name: center_freq
@@ -54,7 +54,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [248, 128.0]
+    coordinate: [232, 128.0]
     rotation: 0
     state: enabled
 - name: premble_length
@@ -102,7 +102,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [464, 120.0]
+    coordinate: [424, 128.0]
     rotation: 0
     state: enabled
 - name: rx_gain
@@ -114,7 +114,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [784, 48.0]
+    coordinate: [784, 40.0]
     rotation: 0
     state: enabled
 - name: samp_rate
@@ -138,7 +138,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [880, 48.0]
+    coordinate: [864, 40.0]
     rotation: 0
     state: enabled
 - name: zc_length
@@ -261,7 +261,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1296, 552.0]
+    coordinate: [1280, 536.0]
     rotation: 0
     state: enabled
 - name: prs_csv_logger_0
@@ -296,7 +296,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [976, 540.0]
+    coordinate: [992, 544.0]
     rotation: 0
     state: enabled
 - name: prs_phase_slope_estimator_0
@@ -364,7 +364,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [776, 1252.0]
+    coordinate: [744, 1272.0]
     rotation: 0
     state: enabled
 - name: prs_text_ui_0
@@ -1108,7 +1108,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1040, 1272.0]
+    coordinate: [1048, 1272.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_0_0
@@ -1160,7 +1160,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1208, 848.0]
+    coordinate: [1176, 808.0]
     rotation: 0
     state: enabled
 - name: virtual_source_0

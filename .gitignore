@@ -21,6 +21,7 @@ __pycache__/
 *.iq
 *.complex
 *.fc32
+/tools/iq_handoff/handoff.cf32
 
 # Large experiment folders
 logs/*

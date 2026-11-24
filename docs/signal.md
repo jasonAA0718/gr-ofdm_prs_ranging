@@ -132,7 +132,7 @@ M_z[m] =
 ```
 
 In the local `prs_frame_detector`, the repeated preamble first gates a proposed frame location using the preamble
-threshold. The detector then evaluates `M_z` at offsets `-2...+2` around the
+threshold. The detector then evaluates $M_z$ at offsets `-2...+2` around the
 predicted ZC boundary, selects the strongest valid offset, and accepts it only
 when it passes the separate ZC threshold. The selected offset corrects both the
 frame start and coarse-sync index. A threshold-passing edge maximum recenters
@@ -159,14 +159,14 @@ h[n]=z_u[N_z-1-n]^*,\qquad
 r=\operatorname{IFFT}(\operatorname{FFT}(y)\operatorname{FFT}(h)).
 ```
 
-For correlation FFT size `F`, each block supplies at most `F-N_z+1`
-candidate positions and overlaps the next input by `N_z-1` samples.
-Only outputs at `N_z-1+i` are used, with IFFT scaling `1/F`.
+For correlation FFT size `F`, each block supplies at most $F-N_z+1$
+candidate positions and overlaps the next input by $N_z-1$ samples.
+Only outputs at $N_z-1+i$ are used, with IFFT scaling `1/F`.
 Each candidate has rolling input-energy normalization using the same
-`M_z` formula; this avoids circular wrap contamination of accepted outputs.
+$M_z$ formula; this avoids circular wrap contamination of accepted outputs.
 
 In continuous mode, a preamble gate predicts ZC start at gate index plus
-`L_p R`. `zc_search_before/after` bound the search around that prediction.
+$L_p R$. `zc_search_before/after` bound the search around that prediction.
 In time-gated mode, the ZC search spans the buffered scheduled response
 interval; the global preamble maximum is diagnostic and does not restrict
 the ZC search. `zc_gate_offset_samples` is selected ZC index minus predicted
@@ -262,15 +262,19 @@ After serialization, CRC generation, and padding, TX XORs this exact fixed
 11011101001110110111011110001111001010110000100001101000111001010011001111010100001010011100101010111100010101000110100000111000
 ```
 
-It has 64 zeros and 64 ones. If `u_q` is the logical payload or padding bit and
-`s_q` is the scrambler bit, `b_q=2(u_q\mathbin{\mathrm{XOR}}s_q)-1` under the
+It has 64 zeros and 64 ones. If $u_q$ is the logical payload or padding bit and
+$s_q$ is the scrambler bit, 
+
+$b_q=2(u_q\mathbin{\mathrm{XOR}}s_q)-1$ 
+
+under the
 project's `0 -> -1`, `1 -> +1` BPSK convention. All 128 logical positions,
 including the 48 padding positions, use this shared production scrambler.
 
-Let `c_i[m]` be chip `m` from row `i` of
-`lib/DSP/gold127_family_bipolar.csv`, where row index equals `code_id`. The
-default is `i=2`; each row has 127 real chips in `{-1,+1}`. Let `G_m[k]` be
-Golay A512 for even `m` and B512 for odd `m`. The native-IFFT input is
+Let $c_i[m]$ be chip `m` from row `i` of
+`lib/DSP/gold127_family_bipolar.csv`, where row index equals code_id. The
+default is `code_id=2`; each row has 127 real chips in `{-1,+1}`. Let $G_m[k]$ be
+Golay A512 for even `m` and Golay B512 for odd `m`. The native-IFFT input is
 
 ```math
 X_m[k]=
@@ -280,7 +284,7 @@ c_i[m]G_m[k], & k\in\mathcal{P}.
 \end{cases}
 ```
 
-The one chip `c_i[m]` multiplies the complete 512-bin symbol. It is not applied
+The one chip $c_i[m]$ multiplies the complete 512-bin symbol. It is not applied
 per subcarrier or per time sample. Every symbol repeats the same 128 scrambled
 data values. RX removes the Gold chip and Golay sign before inter-symbol CFO
 estimation. After CFO phase alignment, it averages channel estimates across
@@ -440,7 +444,10 @@ gain times a linear delay phase, but the implementation does not fit a
 multipath tap model or the paper-style OPA low/high-frequency estimator.
 
 The channel CFO calculation below gives one symbol rotation
-`r_m = exp(-j 2 pi hat f_H m T_sym)`. RX multiplies each pilot estimate by
+```math
+r_m = e^{-j 2 \pi \hat {f}_H m T_{sym}}.
+```
+RX multiplies each pilot estimate by
 that rotation, then averages all 127 symbols:
 
 ```math
@@ -460,7 +467,13 @@ D_q=\frac{1}{M}\sum_m Y_m[k]c_i[m]r_m.
 
 Its interpolated channel is `(bar H[k-1]+bar H[k+1])/2`, except native
 bin 511 uses only bin 510. With channel power above `1e-12`, equalization
-is `D_q * conj(H_interp) / |H_interp|^2`; otherwise the equalized value is
+is 
+
+```math
+D_q * conj(H_{interp}) / |H_{interp}|^2
+```
+
+otherwise the equalized value is
 zero. The hard bit is one if the equalized real part is nonnegative, zero
 otherwise. RX descrambles, removes 48 padding bits, and checks CRC over the
 64-bit control word and zero reserved bits.
@@ -1157,78 +1170,6 @@ position CSV does not duplicate per-anchor ranges or expected/missing IDs.
 | CP CFO, frequency axes, phase unwrap | [prs_receiver_utils.cc](lib/DSP/prs_receiver_utils.cc) |
 | FFT, channel/payload, phase fit | [FFT receiver](lib/DSP/prs_fft_receiver_impl.cc), [channel estimator](lib/DSP/prs_channel_estimator_impl.cc), [phase estimator](lib/DSP/prs_phase_slope_estimator_impl.cc) |
 | Timestamp range | [prs_ssrtt_solver_impl.cc](lib/USRP/prs_ssrtt_solver_impl.cc) |
-
-## Historical Standalone BPSK Payload
-
-The following section documents the waveform used for the earlier attenuation
-experiments. It is not generated or decoded by the current production path.
-
-Both POLL and RESPONSE frames contain the complete fixed-length BPSK payload:
-
-```text
-[16 reference samples]
-[8-bit packet type, repeated 280 samples/bit]
-[32-bit poll frame ID, repeated 280 samples/bit]
-[32-bit response frame ID, repeated 280 samples/bit]
-[32-bit reply delay, repeated 280 samples/bit]
-[16-bit CRC, repeated 280 samples/bit]
-```
-
-The payload geometry is:
-
-| Part | Information bits | Samples per bit | Payload samples | Sample offsets |
-|---|---:|---:|---:|---:|
-| Known BPSK reference | N/A | 1 per reference sign | 16 | 0-15 |
-| Packet type | 8 | 280 | 2240 | 16-2255 |
-| Poll frame ID | 32 | 280 | 8960 | 2256-11215 |
-| Response frame ID | 32 | 280 | 8960 | 11216-20175 |
-| Reply delay samples | 32 | 280 | 8960 | 20176-29135 |
-| CRC16 | 16 | 280 | 4480 | 29136-33615 |
-| **Total** | **104 information + 16 CRC bits** |  | **33616 samples** | **0-33615** |
-
-At `Fs = 30 MS/s`:
-
-```text
-one BPSK sample                    = 33.333 ns
-one repeated information bit      = 280 samples = 9.333 us
-16-sample reference duration      = 0.533 us
-33600 repeated data/CRC samples   = 1120.000 us
-complete 33616-sample payload     = 1120.533 us
-uncoded information-bit rate      = 30 MS/s / 280 = 107.143 kbit/s
-```
-
-There is no separate pulse-shaping stage inside the payload encoder. One real
-BPSK value is written into each complex baseband sample:
-
-```text
-bit 0 -> -amplitude + j0
-bit 1 -> +amplitude + j0
-```
-
-Every information bit is encoded as 280 identical consecutive samples. After
-CFO and common-phase correction, the decoder sums the real values of all 280
-samples and decides the bit from the sign of that coherent sum. Sample
-magnitude is retained instead of being discarded by hard voting.
-
-The 16 known reference signs are:
-
-```text
-+ + + - - + - + - - - + - + + -
-```
-
-They estimate one common payload phase. All integer fields, including the
-transmitted CRC value, are serialized least-significant bit first. CRC16 uses
-initial value `0xffff` and polynomial `0x1021`. It covers these decoded fields:
-
-```text
-packet_type
-poll_frame_id
-response_frame_id
-reply_delay_samples
-```
-
-The three 32-bit fields enter the CRC one byte at a time, least-significant byte
-first.
 
 ### POLL and RESPONSE Content
 

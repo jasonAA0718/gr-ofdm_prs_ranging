@@ -40,7 +40,7 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         ##################################################
         self.anchor_config = anchor_config = load_anchor_config("/home/cnsl/Desktop/gr-ofdm_prs_ranging/tools/anchors_enu.csv")
         self.zc_length = zc_length = 819
-        self.tx_gain = tx_gain = 70
+        self.tx_gain = tx_gain = 66
         self.time_delays = time_delays = [0.041, 0.051, 0.067]
         self.samp_rate = samp_rate = 30000000
         self.rx_gain = rx_gain = 50
@@ -70,7 +70,7 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         self.uhd_usrp_source_0_0.set_time_unknown_pps(uhd.time_spec(0))
 
         self.uhd_usrp_source_0_0.set_center_freq(center_freq, 0)
-        self.uhd_usrp_source_0_0.set_antenna("TX/RX", 0)
+        self.uhd_usrp_source_0_0.set_antenna("RX2", 0)
         self.uhd_usrp_source_0_0.set_bandwidth(samp_rate, 0)
         self.uhd_usrp_source_0_0.set_gain(rx_gain, 0)
         self.uhd_usrp_source_0_0.set_min_output_buffer(1048576)
@@ -122,8 +122,8 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         ##################################################
         self.msg_connect((self.blocks_message_strobe_0, 'strobe'), (self.prs_rx_timekeeper_0, 'trigger_in'))
         self.msg_connect((self.ofdm_prs_ranging_prs_position_solver_0, 'diagnostic_out'), (self.cycle_summary_debug_0_0, 'print'))
-        self.msg_connect((self.ofdm_prs_ranging_prs_position_solver_0, 'diagnostic_out'), (self.prs_position_csv_logger_0, 'diagnostic_in'))
         self.msg_connect((self.ofdm_prs_ranging_prs_position_solver_0, 'position_out'), (self.prs_position_csv_logger_0, 'position_in'))
+        self.msg_connect((self.ofdm_prs_ranging_prs_position_solver_0, 'diagnostic_out'), (self.prs_position_csv_logger_0, 'diagnostic_in'))
         self.msg_connect((self.prs_channel_estimator_0, 'event_out'), (self.prs_acquisition_logger_0, 'frame_in'))
         self.msg_connect((self.prs_channel_estimator_0, 'channel_out'), (self.prs_phase_slope_estimator_0, 'channel_in'))
         self.msg_connect((self.prs_fft_receiver_0, 'symbols_out'), (self.prs_channel_estimator_0, 'symbols_in'))
