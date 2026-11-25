@@ -55,6 +55,7 @@ private:
     float d_zc_threshold;
     int d_min_frame_gap;
     std::vector<gr_complex> d_coarse;
+    double d_coarse_energy;
     int d_correlation_fft_len;
     int d_zc_search_before;
     int d_zc_search_after;

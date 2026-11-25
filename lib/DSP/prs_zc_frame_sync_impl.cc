@@ -120,7 +120,8 @@ prs_zc_frame_sync_impl::prs_zc_frame_sync_impl(double samp_rate,
     d_cfg.coarse_sync_len = coarse_sync_len;
     d_cfg.coarse_zc_root = coarse_zc_root;
     d_cfg.channel_id = channel_id;
-    d_coarse = coarse_sync_sequence(coarse_sync_len, coarse_zc_root);
+    d_coarse = coarse_sync_sequence(coarse_zc_root);
+    d_coarse_energy = coarse_sync_energy(d_coarse);
 
     message_port_register_in(pmt::mp("candidate_in"));
     message_port_register_out(pmt::mp("synchronized_frame_out"));
@@ -265,7 +266,7 @@ bool prs_zc_frame_sync_impl::search_zc(size_t search_start,
             static_cast<unsigned int>(zc_len));
 
         const double denominator_squared =
-            std::max(0.0, power) * static_cast<double>(zc_len);
+            std::max(0.0, power) * d_coarse_energy;
         const double metric_squared =
             denominator_squared > 0.0 ? std::norm(correlation) / denominator_squared : 0.0;
         if (metric_squared > best_metric_squared) {

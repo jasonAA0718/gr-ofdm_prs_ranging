@@ -49,6 +49,7 @@ private:
     float d_zc_threshold;
     int d_min_frame_gap;
     std::vector<gr_complex> d_coarse;
+    double d_coarse_energy;
     std::vector<gr_complex> d_buffer;
     size_t d_buffer_head;
     size_t d_next_scan_index;

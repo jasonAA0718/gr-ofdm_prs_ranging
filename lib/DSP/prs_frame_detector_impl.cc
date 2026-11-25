@@ -107,7 +107,8 @@ prs_frame_detector_impl::prs_frame_detector_impl(double samp_rate,
     d_cfg.coarse_sync_len = coarse_sync_len;
     d_cfg.coarse_zc_root = coarse_zc_root;
     d_cfg.channel_id = channel_id;
-    d_coarse = coarse_sync_sequence(d_cfg.coarse_sync_len, d_cfg.coarse_zc_root);
+    d_coarse = coarse_sync_sequence(d_cfg.coarse_zc_root);
+    d_coarse_energy = coarse_sync_energy(d_coarse);
     d_buffer.reserve(static_cast<size_t>(frame_len(d_cfg) + d_cfg.coarse_sync_len) * 2U);
     message_port_register_in(pmt::mp("tx_time_in"));
     message_port_register_out(pmt::mp("frame_out"));
@@ -264,7 +265,7 @@ float prs_frame_detector_impl::coarse_sync_metric(size_t coarse_index) const
         corr += sample * std::conj(d_coarse[i]);
         power += std::norm(sample);
     }
-    const double denom = std::sqrt(power * static_cast<double>(d_cfg.coarse_sync_len));
+    const double denom = std::sqrt(power * d_coarse_energy);
     return denom > 0.0 ? static_cast<float>(std::abs(corr) / denom) : 0.0f;
 }
 

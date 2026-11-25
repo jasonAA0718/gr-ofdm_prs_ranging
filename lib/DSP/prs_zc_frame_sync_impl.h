@@ -56,6 +56,7 @@ private:
     float d_zc_threshold;
     uint64_t d_next_recv_id;
     std::vector<gr_complex> d_coarse;
+    double d_coarse_energy;
     std::vector<gr_complex> d_scratch;
 
     void handle_candidate(const pmt::pmt_t& message);

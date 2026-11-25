@@ -34,10 +34,11 @@ int frame_len(const prs_rx_config& cfg)
                               cfg.fft_len, cfg.cp_len, cfg.prs_symbols) + cfg.payload_len;
 }
 
-std::vector<gr_complex> coarse_sync_sequence(int len, int root)
+std::vector<gr_complex> coarse_sync_sequence(int root)
 {
+    constexpr int len = phy::zc_chip_count;
     std::vector<gr_complex> seq;
-    seq.reserve(len);
+    seq.reserve(phy::coarse_sync_len);
     int effective_root = root % len;
     if (effective_root <= 0) {
         effective_root += len;
@@ -45,10 +46,20 @@ std::vector<gr_complex> coarse_sync_sequence(int len, int root)
     for (int n = 0; n < len; ++n) {
         const double phase =
             -pi * effective_root * n * (n + 1) / static_cast<double>(len);
-        seq.emplace_back(static_cast<float>(std::cos(phase)),
-                         static_cast<float>(std::sin(phase)));
+        const gr_complex chip(static_cast<float>(std::cos(phase)),
+                              static_cast<float>(std::sin(phase)));
+        seq.insert(seq.end(), phy::zc_samples_per_chip, chip);
     }
     return seq;
+}
+
+double coarse_sync_energy(const std::vector<gr_complex>& sequence)
+{
+    double energy = 0.0;
+    for (const auto& sample : sequence) {
+        energy += std::norm(sample);
+    }
+    return energy;
 }
 
 std::vector<gr_complex> prs_pilots(const prs_rx_config& cfg)

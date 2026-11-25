@@ -44,7 +44,8 @@ struct prs_cfo_estimate {
 int prs_start_offset(const prs_rx_config& cfg);
 int prs_len(const prs_rx_config& cfg);
 int frame_len(const prs_rx_config& cfg);
-std::vector<gr_complex> coarse_sync_sequence(int len, int root = 25);
+std::vector<gr_complex> coarse_sync_sequence(int root);
+double coarse_sync_energy(const std::vector<gr_complex>& sequence);
 std::vector<gr_complex> prs_pilots(const prs_rx_config& cfg);
 std::vector<float> active_frequencies(const prs_rx_config& cfg);
 std::vector<float> mc_ds_pilot_frequencies(const prs_rx_config& cfg);

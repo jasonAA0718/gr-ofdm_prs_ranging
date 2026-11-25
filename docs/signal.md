@@ -43,8 +43,11 @@ N_{\text{PRS}} = 127(512 + 64) = 73152
 ```
 
 The shared PHY profile in `lib/DSP/prs_phy_geometry.h` sets the QPSK preamble
-seed, the period/repeats/ZC length (128/17/819), and the POLL/RESPONSE ZC roots
-(25/29). TX selects the root from packet type. RX selects the expected root
+seed, the preamble period and repeat count (128/17), and the POLL/RESPONSE ZC
+roots (25/29). The ZC segment contains `zc_chip_count * zc_samples_per_chip`
+samples. The default is 819 chips at one sample per chip. For higher settings,
+TX and RX use the same rectangular chip waveform (each chip is held for that
+number of samples). TX selects the root from packet type. RX selects the expected root
 with `expect_response`. Rebuild and install the same profile at all stations
 after changing it. The main examples use 30 MS/s with a flowgraph-specific
 carrier frequency. The historical 256/4/419 examples below are calculation

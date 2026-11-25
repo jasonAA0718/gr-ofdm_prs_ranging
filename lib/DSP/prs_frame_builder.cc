@@ -43,7 +43,7 @@ void append_short_preamble(std::vector<gr_complex>& frame, const prs_frame_confi
 
 void append_coarse_sync(std::vector<gr_complex>& frame, const prs_frame_config& cfg)
 {
-    const auto seq = coarse_sync_sequence(cfg.coarse_sync_len, cfg.coarse_zc_root);
+    const auto seq = coarse_sync_sequence(cfg.coarse_zc_root);
     frame.insert(frame.end(), seq.begin(), seq.end());
 }
 

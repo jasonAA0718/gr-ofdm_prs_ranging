@@ -141,7 +141,8 @@ prs_fft_zc_frame_detector_impl::prs_fft_zc_frame_detector_impl(double samp_rate,
     d_cfg.coarse_sync_len = coarse_sync_len;
     d_cfg.coarse_zc_root = coarse_zc_root;
     d_cfg.channel_id = channel_id;
-    d_coarse = coarse_sync_sequence(d_cfg.coarse_sync_len, d_cfg.coarse_zc_root);
+    d_coarse = coarse_sync_sequence(d_cfg.coarse_zc_root);
+    d_coarse_energy = coarse_sync_energy(d_coarse);
     d_zc_fft = std::make_unique<gr::fft::fft_complex_fwd>(d_correlation_fft_len, 1);
     d_zc_ifft = std::make_unique<gr::fft::fft_complex_rev>(d_correlation_fft_len, 1);
     auto* matched_filter = d_zc_fft->get_inbuf();
@@ -503,7 +504,7 @@ bool prs_fft_zc_frame_detector_impl::fft_zc_search(size_t first_coarse,
         for (size_t i = 0; i < candidate_count; ++i) {
             const float magnitude = std::abs(correlation[zc_len - 1 + i]) * ifft_scale;
             const double denom = std::sqrt(
-                std::max(0.0, energy * static_cast<double>(d_cfg.coarse_sync_len)));
+                std::max(0.0, energy * d_coarse_energy));
             const float metric =
                 denom > 0.0 ? magnitude / static_cast<float>(denom) : 0.0f;
             const size_t coarse_index = block_start + i;

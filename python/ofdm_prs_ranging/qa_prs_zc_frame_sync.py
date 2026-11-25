@@ -149,7 +149,13 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
         tb.start()
         sync.to_basic_block()._post(pmt.intern("candidate_in"), candidate)
         deadline = time.monotonic() + 2.0
-        while releases.num_messages() == 0 and time.monotonic() < deadline:
+        # Message sinks run independently, so a release can arrive first.
+        while time.monotonic() < deadline:
+            if releases.num_messages() and diagnostics.num_messages():
+                diag = self._meta(diagnostics.get_message(0))
+                success = pmt.to_bool(pmt.dict_ref(diag, pmt.intern("success"), pmt.PMT_F))
+                if not success or frames.num_messages():
+                    break
             time.sleep(0.001)
         tb.stop()
         tb.wait()
