@@ -7,41 +7,30 @@ import time
 
 
 class qa_prs_window_capture(gr_unittest.TestCase):
-    L = 8
-    R = 4
-    NZ = 11
+    L = 128
+    R = 17
+    NZ = 819
     NG = ofdm_prs_ranging.PHY_LEADING_GUARD_SAMPLES
     NT = ofdm_prs_ranging.PHY_TAIL_GUARD_SAMPLES
-    FFT = 16
-    CP = 4
-    NSYM = 2
+    FFT = 512
+    CP = 64
+    NSYM = 127
     MARGIN = 64
 
     def _make_capture(self, queue_depth=3, enabled=True, threshold=0.8):
         return ofdm_prs_ranging.prs_window_capture(
             samp_rate=1e6,
-            fft_len=self.FFT,
-            cp_len=self.CP,
-            active_bins=self.FFT,
-            prs_symbols=self.NSYM,
-            preamble_len=self.L,
-            preamble_repeats=self.R,
-            coarse_sync_len=self.NZ,
-
             threshold=threshold,
             min_frame_gap=100,
             candidate_margin_before=self.MARGIN,
             candidate_margin_after=self.MARGIN,
             queue_depth=queue_depth,
-            acquisition_enabled=enabled,
-        )
+            acquisition_enabled=enabled)
 
-    @staticmethod
-    def _period():
-        return numpy.asarray(
-            [1 + 1j, 1 - 1j, -1 + 1j, -1 - 1j,
-             1 + 1j, -1 + 1j, 1 - 1j, -1 - 1j],
-            dtype=numpy.complex64) / numpy.sqrt(2.0)
+    def _period(self):
+        rng = numpy.random.default_rng(17)
+        return (rng.choice([-1, 1], self.L) +
+                1j * rng.choice([-1, 1], self.L)) / numpy.sqrt(2.0)
 
     def _samples(self, burst_starts, length):
         samples = numpy.zeros(length, dtype=numpy.complex64)
@@ -110,7 +99,7 @@ class qa_prs_window_capture(gr_unittest.TestCase):
         self.fail("reference preamble crossing not found")
 
     def test_metric_and_candidate_geometry(self):
-        samples = self._samples([2300], 4900)
+        samples = self._samples([5000], 90000)
         capture = self._make_capture()
         rx_tag = gr.tag_t()
         rx_tag.offset = 0
@@ -163,7 +152,7 @@ class qa_prs_window_capture(gr_unittest.TestCase):
         # Keep the scheduled boundary beyond the first scheduler buffer so the
         # asynchronous command is installed before that part of the stream arrives.
         burst_start = 50000
-        samples = self._samples([burst_start], 53000)
+        samples = self._samples([burst_start], 135000)
         capture = self._make_capture(enabled=False)
         # The complete preamble is already in history when this two-sample window opens.
         window_start = burst_start + self.L * self.R - 1
@@ -187,7 +176,7 @@ class qa_prs_window_capture(gr_unittest.TestCase):
 
     def test_absolute_time_window(self):
         burst_start = 50000
-        samples = self._samples([burst_start], 53000)
+        samples = self._samples([burst_start], 135000)
         capture = self._make_capture(enabled=False)
         window_start = burst_start + self.L * self.R - 1
         command = pmt.make_dict()
@@ -210,8 +199,8 @@ class qa_prs_window_capture(gr_unittest.TestCase):
         self.assertEqual(self._uint(meta, "window_id"), 31)
 
     def test_stalled_consumer_drops_without_stalling_stream(self):
-        burst_starts = [2300, 4800, 7300, 9800, 12300]
-        samples = self._samples(burst_starts, 15000)
+        burst_starts = [5000, 90000, 175000, 260000, 345000]
+        samples = self._samples(burst_starts, 430000)
         capture = self._make_capture(queue_depth=2)
         candidates, events = self._run(samples, capture)
 
@@ -228,7 +217,7 @@ class qa_prs_window_capture(gr_unittest.TestCase):
         self.assertEqual(last_full_count, len(burst_starts) - 2)
 
     def test_chunk_boundaries_preserve_candidate(self):
-        samples = self._samples([2300], 4900)
+        samples = self._samples([5000], 90000)
         reference, _ = self._run(
             samples, self._make_capture(), max_noutput_items=4096)
         self.assertEqual(reference.num_messages(), 1)
@@ -270,7 +259,7 @@ class qa_prs_window_capture(gr_unittest.TestCase):
                 reference_samples)
 
     def test_lockout_end_inside_chunk(self):
-        samples = self._samples([2300, 4800], 7300)
+        samples = self._samples([5000, 90000], 175000)
         candidates, _ = self._run(
             samples, self._make_capture(), max_noutput_items=1024)
         self.assertEqual(candidates.num_messages(), 2)
@@ -280,7 +269,7 @@ class qa_prs_window_capture(gr_unittest.TestCase):
         self.assertEqual(
             starts,
             [self._reference_first_crossing(samples, 0.8, 0),
-             self._reference_first_crossing(samples, 0.8, 4700)])
+             self._reference_first_crossing(samples, 0.8, 88000)])
 
 
 if __name__ == '__main__':

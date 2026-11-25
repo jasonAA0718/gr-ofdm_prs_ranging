@@ -30,12 +30,25 @@ pmt::pmt_t metadata(pmt::pmt_t msg)
     return pmt::is_dict(msg) ? msg : (pmt::is_pair(msg) ? pmt::car(msg) : pmt::PMT_NIL);
 }
 }
-prs_multi_anchor_cycle::sptr prs_multi_anchor_cycle::make(double fs,
-    const std::vector<int>& ids, const std::vector<double>& delays, int l, int r, int nz,
-    double before, double after, double grace, double cfo_max_age_s)
+prs_multi_anchor_cycle::sptr
+prs_multi_anchor_cycle::make(double fs,
+                             const std::vector<int>& ids,
+                             const std::vector<double>& delays,
+                             double before,
+                             double after,
+                             double grace,
+                             double cfo_max_age_s)
 {
-    return gnuradio::make_block_sptr<prs_multi_anchor_cycle_impl>(
-        fs, ids, delays, l, r, nz, before, after, grace, cfo_max_age_s);
+    return gnuradio::make_block_sptr<prs_multi_anchor_cycle_impl>(fs,
+                                                                  ids,
+                                                                  delays,
+                                                                  phy::preamble_len,
+                                                                  phy::preamble_repeats,
+                                                                  phy::coarse_sync_len,
+                                                                  before,
+                                                                  after,
+                                                                  grace,
+                                                                  cfo_max_age_s);
 }
 prs_multi_anchor_cycle_impl::prs_multi_anchor_cycle_impl(double fs,
     const std::vector<int>& ids, const std::vector<double>& delays, int l, int r, int nz,

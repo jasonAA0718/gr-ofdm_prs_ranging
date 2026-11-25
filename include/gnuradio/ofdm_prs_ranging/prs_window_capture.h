@@ -21,13 +21,6 @@ public:
     using sptr = std::shared_ptr<prs_window_capture>;
 
     static sptr make(double samp_rate = 30e6,
-                     int fft_len = 512,
-                     int cp_len = 64,
-                     int active_bins = 512,
-                     int prs_symbols = 127,
-                     int preamble_len = 128,
-                     int preamble_repeats = 17,
-                     int coarse_sync_len = 819,
                      float threshold = 0.09f,
                      int min_frame_gap = 10000,
                      int candidate_margin_before = 4096,

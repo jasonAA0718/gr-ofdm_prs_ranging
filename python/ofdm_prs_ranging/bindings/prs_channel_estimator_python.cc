@@ -8,10 +8,5 @@ void bind_prs_channel_estimator(py::module& m)
     py::class_<block, gr::block, gr::basic_block, std::shared_ptr<block>>(
         m, "prs_channel_estimator")
         .def(py::init(&block::make),
-             py::arg("samp_rate") = 10e6,
-             py::arg("fft_len") = 512,
-             py::arg("active_bins") = 512,
-             py::arg("prs_symbols") = 127,
-             py::arg("seed") = 13990001,
-             py::arg("mc_ds_gold_code_id") = 2);
+             py::arg("samp_rate") = 10e6);
 }

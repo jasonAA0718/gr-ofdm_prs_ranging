@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include "prs_phy_geometry.h"
 #include "prs_zc_frame_sync_impl.h"
 #include <gnuradio/io_signature.h>
 #include <volk/volk.h>
@@ -60,30 +61,24 @@ bool metadata_int_matches(const pmt::pmt_t& meta, const char* key_name, int expe
 } // namespace
 
 prs_zc_frame_sync::sptr prs_zc_frame_sync::make(double samp_rate,
-                                                int fft_len,
-                                                int cp_len,
-                                                int active_bins,
-                                                int prs_symbols,
-                                                int preamble_len,
-                                                int preamble_repeats,
-                                                int coarse_sync_len,
                                                 float preamble_threshold,
                                                 float zc_threshold,
-                                                int coarse_zc_root,
+                                                bool expect_response,
                                                 int channel_id)
 {
-    return gnuradio::make_block_sptr<prs_zc_frame_sync_impl>(samp_rate,
-                                                             fft_len,
-                                                             cp_len,
-                                                             active_bins,
-                                                             prs_symbols,
-                                                             preamble_len,
-                                                             preamble_repeats,
-                                                             coarse_sync_len,
-                                                             preamble_threshold,
-                                                             zc_threshold,
-                                                             coarse_zc_root,
-                                                             channel_id);
+    return gnuradio::make_block_sptr<prs_zc_frame_sync_impl>(
+        samp_rate,
+        phy::fft_len,
+        phy::cp_len,
+        phy::active_bins,
+        phy::prs_symbols,
+        phy::preamble_len,
+        phy::preamble_repeats,
+        phy::coarse_sync_len,
+        preamble_threshold,
+        zc_threshold,
+        phy::zc_root(expect_response),
+        channel_id);
 }
 
 prs_zc_frame_sync_impl::prs_zc_frame_sync_impl(double samp_rate,

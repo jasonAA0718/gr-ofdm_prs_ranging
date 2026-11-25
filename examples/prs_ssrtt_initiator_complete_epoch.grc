@@ -44,7 +44,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1152, 120.0]
+    coordinate: [912, 120.0]
     rotation: 0
     state: enabled
 - name: anchor_ids
@@ -56,7 +56,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [248, 120.0]
+    coordinate: [256, 128.0]
     rotation: 0
     state: enabled
 - name: anchor_ids
@@ -68,7 +68,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1424, 32.0]
+    coordinate: [1184, 32.0]
     rotation: 0
     state: disabled
 - name: center_freq
@@ -92,31 +92,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [960, 40.0]
-    rotation: 0
-    state: enabled
-- name: premble_length
-  id: variable
-  parameters:
-    comment: ''
-    value: '128'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [568, 40.0]
-    rotation: 0
-    state: enabled
-- name: premble_rep
-  id: variable
-  parameters:
-    comment: ''
-    value: '17'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [472, 40.0]
+    coordinate: [720, 40.0]
     rotation: 0
     state: enabled
 - name: processing_grace_s
@@ -128,7 +104,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1016, 120.0]
+    coordinate: [776, 120.0]
     rotation: 0
     state: enabled
 - name: receive_early_s
@@ -140,7 +116,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [760, 120.0]
+    coordinate: [520, 120.0]
     rotation: 0
     state: enabled
 - name: receive_late_s
@@ -152,7 +128,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [888, 120.0]
+    coordinate: [648, 120.0]
     rotation: 0
     state: enabled
 - name: rx_gain
@@ -164,7 +140,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [800, 40.0]
+    coordinate: [560, 40.0]
     rotation: 0
     state: enabled
 - name: samp_rate
@@ -208,7 +184,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1424, 120.0]
+    coordinate: [1184, 120.0]
     rotation: 0
     state: disabled
 - name: tx_gain
@@ -220,7 +196,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [880, 40.0]
+    coordinate: [640, 40.0]
     rotation: 0
     state: enabled
 - name: tx_gain
@@ -244,18 +220,6 @@ blocks:
     coordinate: [1312, 56.0]
     rotation: 0
     state: disabled
-- name: zc_length
-  id: variable
-  parameters:
-    comment: ''
-    value: '819'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [688, 40.0]
-    rotation: 0
-    state: enabled
 - name: blocks_message_strobe_0
   id: blocks_message_strobe
   parameters:
@@ -265,7 +229,7 @@ blocks:
     maxoutbuf: '0'
     minoutbuf: '0'
     msg: pmt.PMT_T
-    period: '500'
+    period: '100'
   states:
     bus_sink: false
     bus_source: false
@@ -285,7 +249,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1232, 1616.0]
+    coordinate: [1216, 1576.0]
     rotation: 0
     state: disabled
 - name: cycle_summary_debug
@@ -300,7 +264,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1224, 1344.0]
+    coordinate: [1264, 1312.0]
     rotation: 0
     state: disabled
 - name: cycle_summary_debug_0
@@ -315,7 +279,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [2280, 1360.0]
+    coordinate: [2328, 1360.0]
     rotation: 0
     state: disabled
 - name: cycle_summary_debug_0_0
@@ -332,7 +296,7 @@ blocks:
     bus_structure: null
     coordinate: [2296, 1592.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: import_0
   id: import
   parameters:
@@ -344,7 +308,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1144, 40.0]
+    coordinate: [904, 40.0]
     rotation: 0
     state: enabled
 - name: ofdm_prs_ranging_prs_position_solver_0
@@ -362,7 +326,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1152, 1504.0]
+    coordinate: [1208, 1472.0]
     rotation: 0
     state: enabled
 - name: prs_acquisition_logger_0
@@ -378,23 +342,18 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1696, 960.0]
+    coordinate: [1632, 960.0]
     rotation: 0
     state: enabled
 - name: prs_channel_estimator_0
   id: ofdm_prs_ranging_prs_channel_estimator
   parameters:
-    active_bins: '512'
     affinity: ''
     alias: ''
     comment: ''
-    fft_len: '512'
     maxoutbuf: '0'
-    mc_ds_gold_code_id: '2'
     minoutbuf: '0'
-    prs_symbols: '127'
     samp_rate: samp_rate
-    seed: '13990001'
   states:
     bus_sink: false
     bus_source: false
@@ -420,46 +379,35 @@ blocks:
 - name: prs_fft_receiver_0
   id: ofdm_prs_ranging_prs_fft_receiver
   parameters:
-    active_bins: '512'
     affinity: ''
     alias: ''
     comment: ''
-    cp_len: '64'
-    fft_len: '512'
     maxoutbuf: '0'
     minoutbuf: '0'
-    prs_symbols: '127'
     samp_rate: samp_rate
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [960, 784.0]
+    coordinate: [912, 768.0]
     rotation: 0
     state: enabled
 - name: prs_frame_detector_0_0
   id: ofdm_prs_ranging_prs_fft_zc_frame_detector
   parameters:
-    active_bins: '512'
     affinity: ''
     alias: ''
     cfo_compensation: 'True'
     channel_id: '1'
-    coarse_sync_len: zc_length
-    coarse_zc_root: '29'
     comment: Connect UHD Source here
     correlation_fft_len: '4096'
-    cp_len: '64'
-    fft_len: '512'
+    expect_response: '1'
     maxoutbuf: '0'
     min_frame_gap: '10000'
     minoutbuf: '0'
-    preamble_len: premble_length
-    preamble_repeats: premble_rep
-    prs_symbols: '127'
     reply_delay_s: '0.0'
     samp_rate: samp_rate
-    threshold: '0.4'
+    threshold: '0.2'
     time_gating: '1'
     window_after_s: '0.0077'
     window_before_s: '0.00166'
@@ -470,7 +418,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [616, 680.0]
+    coordinate: [520, 664.0]
     rotation: 0
     state: enabled
 - name: prs_multi_anchor_cycle_0
@@ -480,12 +428,9 @@ blocks:
     alias: ''
     anchor_ids: anchor_ids
     cfo_max_age_s: '5.0'
-    coarse_sync_len: zc_length
     comment: ''
     maxoutbuf: '0'
     minoutbuf: '0'
-    preamble_len: premble_length
-    preamble_repeats: premble_rep
     processing_grace_s: processing_grace_s
     samp_rate: samp_rate
     time_delays: time_delays
@@ -495,17 +440,15 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [544, 1184.0]
+    coordinate: [536, 1160.0]
     rotation: 0
     state: enabled
 - name: prs_phase_slope_estimator_0
   id: ofdm_prs_ranging_prs_phase_slope_estimator
   parameters:
-    active_bins: '512'
     affinity: ''
     alias: ''
     comment: ''
-    fft_len: '512'
     max_residual_rms: '1.0'
     maxoutbuf: '0'
     minoutbuf: '0'
@@ -514,7 +457,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1664, 744.0]
+    coordinate: [1600, 744.0]
     rotation: 0
     state: enabled
 - name: prs_position_csv_logger_0
@@ -552,27 +495,17 @@ blocks:
 - name: prs_source
   id: ofdm_prs_ranging_prs_timed_burst_source
   parameters:
-    active_bins: '512'
     affinity: ''
     alias: ''
     attach_tx_time: 'True'
     burst_period: '0.1'
-    coarse_sync_len: zc_length
-    coarse_zc_root: '25'
     comment: ''
-    cp_len: '64'
-    fft_len: '512'
     maxoutbuf: '0'
-    mc_ds_gold_code_id: '2'
     minoutbuf: '0'
     pings_per_trigger: '1'
-    preamble_len: premble_length
-    preamble_repeats: premble_rep
-    prs_symbols: '127'
     samp_rate: samp_rate
-    seed: '13990001'
     tx_amp: '0.7'
-    tx_lead_time: '0.1'
+    tx_lead_time: '0.001'
   states:
     bus_sink: false
     bus_source: false
@@ -878,7 +811,7 @@ blocks:
   parameters:
     affinity: ''
     alias: ''
-    ant0: '"RX2"'
+    ant0: '"TX/RX"'
     ant1: '"RX2"'
     ant10: '"RX2"'
     ant11: '"RX2"'
@@ -1332,7 +1265,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [2000, 760.0]
+    coordinate: [1936, 760.0]
     rotation: 0
     state: enabled
 - name: virtual_sink_0_0_0

@@ -6,6 +6,7 @@
  */
 
 #include "prs_fft_zc_frame_detector_impl.h"
+#include "prs_phy_geometry.h"
 #include "prs_protocol_metadata.h"
 #include <gnuradio/fft/fft.h>
 #include <gnuradio/io_signature.h>
@@ -18,16 +19,9 @@ namespace gr {
 namespace ofdm_prs_ranging {
 
 prs_fft_zc_frame_detector::sptr prs_fft_zc_frame_detector::make(double samp_rate,
-                                                                int fft_len,
-                                                                int cp_len,
-                                                                int active_bins,
-                                                                int prs_symbols,
-                                                                int preamble_len,
-                                                                int preamble_repeats,
-                                                                int coarse_sync_len,
                                                                 float threshold,
                                                                 int min_frame_gap,
-                                                                int coarse_zc_root,
+                                                                bool expect_response,
                                                                 int channel_id,
                                                                 bool time_gating,
                                                                 double reply_delay_s,
@@ -39,27 +33,28 @@ prs_fft_zc_frame_detector::sptr prs_fft_zc_frame_detector::make(double samp_rate
                                                                 int zc_search_after,
                                                                 bool cfo_compensation)
 {
-    return gnuradio::make_block_sptr<prs_fft_zc_frame_detector_impl>(samp_rate,
-                                                                     fft_len,
-                                                                     cp_len,
-                                                                     active_bins,
-                                                                     prs_symbols,
-                                                                     preamble_len,
-                                                                     preamble_repeats,
-                                                                     coarse_sync_len,
-                                                                     threshold,
-                                                                     min_frame_gap,
-                                                                     coarse_zc_root,
-                                                                     channel_id,
-                                                                     time_gating,
-                                                                     reply_delay_s,
-                                                                     window_before_s,
-                                                                     window_after_s,
-                                                                     zc_threshold,
-                                                                     correlation_fft_len,
-                                                                     zc_search_before,
-                                                                     zc_search_after,
-                                                                     cfo_compensation);
+    return gnuradio::make_block_sptr<prs_fft_zc_frame_detector_impl>(
+        samp_rate,
+        phy::fft_len,
+        phy::cp_len,
+        phy::active_bins,
+        phy::prs_symbols,
+        phy::preamble_len,
+        phy::preamble_repeats,
+        phy::coarse_sync_len,
+        threshold,
+        min_frame_gap,
+        phy::zc_root(expect_response),
+        channel_id,
+        time_gating,
+        reply_delay_s,
+        window_before_s,
+        window_after_s,
+        zc_threshold,
+        correlation_fft_len,
+        zc_search_before,
+        zc_search_after,
+        cfo_compensation);
 }
 
 prs_fft_zc_frame_detector_impl::prs_fft_zc_frame_detector_impl(double samp_rate,

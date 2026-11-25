@@ -167,8 +167,7 @@ class qa_prs_anchor_cfo(gr_unittest.TestCase):
         self.assertTrue(pmt.is_null(field(fresh[0], 'prs_channel_cfo_hz')))
 
     def render_response(self, anchor=0):
-        tx = prs.prs_timed_burst_source(samp_rate=self.FS, preamble_repeats=17,
-                                      coarse_sync_len=819, coarse_zc_root=29, attach_tx_time=False)
+        tx = prs.prs_timed_burst_source(samp_rate=self.FS, attach_tx_time=False)
         tb, head, sink = gr.top_block(), blocks.head(gr.sizeof_gr_complex, tx.frame_len()), blocks.vector_sink_c()
         tb.connect(tx, head, sink)
         tb.start()
@@ -249,9 +248,13 @@ class qa_prs_anchor_cfo(gr_unittest.TestCase):
         tag = gr.tag_utils.python_to_tag((0, pmt.intern('rx_time'), stamp(100.), pmt.intern('qa')))
         source = blocks.vector_source_c(samples, False, 1, [tag])
         source.set_min_output_buffer(len(samples))
-        detector = prs.prs_fft_zc_frame_detector(samp_rate=self.FS, preamble_repeats=17,
-            coarse_sync_len=819, coarse_zc_root=29, time_gating=True,
-            correlation_fft_len=2048, zc_threshold=.5, cfo_compensation=compensate)
+        detector = prs.prs_fft_zc_frame_detector(
+            samp_rate=self.FS,
+            expect_response=True,
+            time_gating=True,
+            correlation_fft_len=2048,
+            zc_threshold=.5,
+            cfo_compensation=compensate)
         fft, symbols, decoded, estimates = self.fft_pipeline()
         captured = blocks.message_debug()
         self.tb.connect(source, detector)
@@ -308,8 +311,10 @@ class qa_prs_anchor_cfo(gr_unittest.TestCase):
         injected = (frame*np.exp(2j*np.pi*cfo*np.arange(frame.size)/self.FS)).astype(np.complex64)
         samples = np.concatenate((np.zeros(2048, np.complex64), injected, np.zeros(4096, np.complex64)))
         source = blocks.vector_source_c(samples, False)
-        detector = prs.prs_fft_zc_frame_detector(samp_rate=self.FS, preamble_repeats=17,
-            coarse_sync_len=819, coarse_zc_root=29, correlation_fft_len=2048)
+        detector = prs.prs_fft_zc_frame_detector(
+            samp_rate=self.FS,
+            expect_response=True,
+            correlation_fft_len=2048)
         fft, symbols, decoded, estimates = self.fft_pipeline()
         captured = blocks.message_debug()
         self.tb.connect(source, detector)

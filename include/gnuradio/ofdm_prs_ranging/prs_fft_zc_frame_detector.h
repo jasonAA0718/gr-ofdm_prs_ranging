@@ -21,16 +21,9 @@ public:
     // tx_time_in additionally accepts explicit window_start/window_end (UHD seconds)
     // with cycle_sequence, expected_anchor_id and response_slot_index metadata.
     static sptr make(double samp_rate = 10e6,
-                     int fft_len = 512,
-                     int cp_len = 64,
-                     int active_bins = 512,
-                     int prs_symbols = 127,
-                     int preamble_len = 128,
-                     int preamble_repeats = 16,
-                     int coarse_sync_len = 839,
                      float threshold = 0.35f,
                      int min_frame_gap = 10000,
-                     int coarse_zc_root = 25,
+                     bool expect_response = false,
                      int channel_id = 0,
                      bool time_gating = false,
                      double reply_delay_s = 0.05,
@@ -39,7 +32,7 @@ public:
                      float zc_threshold = 0.35f,
                      int correlation_fft_len = 2048,
                      int zc_search_before = 1024,
-                     int zc_search_after = 1024,
+                     int zc_search_after = 3584,
                      bool cfo_compensation = true);
 };
 

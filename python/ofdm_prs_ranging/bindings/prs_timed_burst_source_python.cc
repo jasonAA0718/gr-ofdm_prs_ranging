@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(1)                                                       */
 /* BINDTOOL_USE_PYGCCXML(0)                                                        */
 /* BINDTOOL_HEADER_FILE(prs_timed_burst_source.h) */
-/* BINDTOOL_HEADER_FILE_HASH(d8b1c61123ce8c3be19381739d0985d5)                     */
+/* BINDTOOL_HEADER_FILE_HASH(5219d51d4d737fe32195f265564275e3)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -41,21 +41,11 @@ void bind_prs_timed_burst_source(py::module& m)
 
         .def(py::init(&prs_timed_burst_source::make),
              py::arg("samp_rate") = 1.0E+7,
-             py::arg("fft_len") = 512,
-             py::arg("cp_len") = 64,
-             py::arg("active_bins") = 512,
-             py::arg("prs_symbols") = 127,
-             py::arg("preamble_len") = 128,
-             py::arg("preamble_repeats") = 16,
-             py::arg("coarse_sync_len") = 839,
              py::arg("tx_lead_time") = 0.5,
              py::arg("burst_period") = 0.10000000000000001,
              py::arg("tx_amp") = 0.600000024F,
-             py::arg("seed") = 13990001,
              py::arg("pings_per_trigger") = 1,
              py::arg("attach_tx_time") = true,
-             py::arg("coarse_zc_root") = 25,
-             py::arg("mc_ds_gold_code_id") = 2,
              D(prs_timed_burst_source, make))
 
 

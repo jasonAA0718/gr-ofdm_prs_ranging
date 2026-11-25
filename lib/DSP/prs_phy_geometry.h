@@ -8,6 +8,23 @@ namespace phy {
 
 // Production burst geometry. These samples are included in the UHD TX time
 // reference and in RX frame-start reconstruction; they are never configurable.
+constexpr int fft_len = 512;
+constexpr int cp_len = 64;
+constexpr int active_bins = 512;
+constexpr int prs_symbols = 127;
+constexpr int preamble_len = 128;
+constexpr int preamble_repeats = 17;
+constexpr int coarse_sync_len = 819;
+constexpr int seed = 13990001;
+constexpr int mc_ds_gold_code_id = 2;
+constexpr int poll_zc_root = 25;
+constexpr int response_zc_root = 29;
+
+constexpr int zc_root(bool response)
+{
+    return response ? response_zc_root : poll_zc_root;
+}
+
 constexpr int leading_guard_samples = 1000;
 constexpr int tail_guard_samples = 1000;
 

@@ -4,55 +4,13 @@ category: '[ofdm_prs_ranging]'
 
 templates:
   imports: from gnuradio import ofdm_prs_ranging
-  make: |-
-    ofdm_prs_ranging.prs_timed_burst_source(
-        ${samp_rate}, ${fft_len}, ${cp_len}, ${active_bins}, ${prs_symbols},
-        ${preamble_len}, ${preamble_repeats}, ${coarse_sync_len},
-        ${tx_lead_time},
-        ${burst_period}, ${tx_amp}, ${seed}, ${pings_per_trigger},
-        ${attach_tx_time}, ${coarse_zc_root}, ${mc_ds_gold_code_id})
+  make: ofdm_prs_ranging.prs_timed_burst_source(${samp_rate}, ${tx_lead_time}, ${burst_period}, ${tx_amp}, ${pings_per_trigger}, ${attach_tx_time})
 
 parameters:
 - id: samp_rate
   label: Sample Rate
   dtype: real
   default: 10e6
-- id: fft_len
-  label: FFT Length
-  dtype: int
-  default: 512
-- id: cp_len
-  label: CP Length
-  dtype: int
-  default: 64
-- id: active_bins
-  label: Active Bins
-  dtype: int
-  default: 512
-- id: prs_symbols
-  label: PRS Symbols
-  dtype: int
-  default: 127
-- id: preamble_len
-  label: Preamble Length
-  dtype: int
-  default: 128
-- id: preamble_repeats
-  label: Preamble Repeats
-  dtype: int
-  default: 16
-- id: coarse_sync_len
-  label: Coarse Sync Length
-  dtype: int
-  default: 839
-- id: coarse_zc_root
-  label: Coarse ZC Root
-  dtype: int
-  default: 25
-- id: mc_ds_gold_code_id
-  label: Gold127 Code ID
-  dtype: int
-  default: 2
 - id: tx_lead_time
   label: TX Lead Time
   dtype: real
@@ -65,10 +23,6 @@ parameters:
   label: Payload/OFDM RMS
   dtype: real
   default: 0.6
-- id: seed
-  label: Preamble Seed
-  dtype: int
-  default: 13990001
 - id: pings_per_trigger
   label: Pings Per Trigger
   dtype: int

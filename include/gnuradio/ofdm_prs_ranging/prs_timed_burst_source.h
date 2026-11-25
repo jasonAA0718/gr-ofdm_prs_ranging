@@ -37,21 +37,11 @@ public:
      * creating new instances.
      */
     static sptr make(double samp_rate = 10e6,
-                     int fft_len = 512,
-                     int cp_len = 64,
-                     int active_bins = 512,
-                     int prs_symbols = 127,
-                     int preamble_len = 128,
-                     int preamble_repeats = 16,
-                     int coarse_sync_len = 839,
                      double tx_lead_time = 0.5,
                      double burst_period = 0.1,
                      float tx_amp = 0.6f,
-                     uint32_t seed = 13990001,
                      int pings_per_trigger = 1,
-                     bool attach_tx_time = true,
-                     int coarse_zc_root = 25,
-                     int mc_ds_gold_code_id = 2);
+                     bool attach_tx_time = true);
 
     virtual int frame_len() const = 0;
     virtual int prs_start() const = 0;

@@ -29,8 +29,8 @@ struct prs_frame_config {
     int payload_len;
     float tx_amp;
     uint32_t seed;
-    int coarse_zc_root = 25;
-    int mc_ds_gold_code_id = 2;
+    int coarse_zc_root = phy::poll_zc_root;
+    int mc_ds_gold_code_id = phy::mc_ds_gold_code_id;
 };
 
 struct prs_frame {

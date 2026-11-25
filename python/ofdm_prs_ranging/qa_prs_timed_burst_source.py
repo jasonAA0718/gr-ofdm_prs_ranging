@@ -33,7 +33,7 @@ class qa_prs_timed_burst_source(gr_unittest.TestCase):
 
     def test_waveform_length_and_offsets(self):
         src = prs_timed_burst_source()
-        expected_prs_start = 1000 + 128 * 16 + 839
+        expected_prs_start = 1000 + 128 * 17 + 819
         self.assertEqual(
             src.frame_len(), expected_prs_start + 127 * (512 + 64) + 1000)
         self.assertEqual(src.prs_start(), expected_prs_start)
@@ -51,13 +51,12 @@ class qa_prs_timed_burst_source(gr_unittest.TestCase):
             for key in ("zero_guard_len", "tail_guard_len"):
                 with self.assertRaises(TypeError):
                     factory(**{key: 1000})
-        for root, amplitude, preamble in ((25, 0.2, 128), (29, 0.7, 256)):
-            src = prs_timed_burst_source(coarse_zc_root=root, tx_amp=amplitude,
-                                         preamble_len=preamble, samp_rate=30e6)
+        for amplitude in (0.2, 0.7):
+            src = prs_timed_burst_source(tx_amp=amplitude, samp_rate=30e6)
             frame = numpy.asarray(src.frame_samples())
             numpy.testing.assert_array_equal(frame[:leading], 0)
             numpy.testing.assert_array_equal(frame[-tail:], 0)
-            self.assertEqual(src.frame_len(), leading + preamble * 16 + 839 + 127 * 576 + tail)
+            self.assertEqual(src.frame_len(), leading + 128 * 17 + 819 + 127 * 576 + tail)
             self.assertAlmostEqual(float(abs(frame[leading])), 0.95, places=6)
             self.assertLessEqual(float(numpy.max(numpy.abs(frame[src.prs_start():-tail]))), 0.900001)
 

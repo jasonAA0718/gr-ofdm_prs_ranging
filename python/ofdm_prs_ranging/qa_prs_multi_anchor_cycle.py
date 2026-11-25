@@ -342,9 +342,7 @@ class qa_prs_multi_anchor_cycle(gr_unittest.TestCase):
         self.assertEqual(self.cycle.active_cycle_count(), 0)
 
     def render_response(self, anchor, poll, delay, fs=1e6):
-        tx = prs.prs_timed_burst_source(samp_rate=fs, preamble_repeats=17,
-                                      coarse_sync_len=819, coarse_zc_root=29,
-                                      attach_tx_time=False)
+        tx = prs.prs_timed_burst_source(samp_rate=fs, attach_tx_time=False)
         head, sink = blocks.head(gr.sizeof_gr_complex, tx.frame_len()), blocks.vector_sink_c()
         tb = gr.top_block(); tb.connect(tx, head, sink); tb.start()
         self.post(tx, 'trigger', meta(packet_type=2, anchor_id=anchor, poll_id=poll,
@@ -384,9 +382,13 @@ class qa_prs_multi_anchor_cycle(gr_unittest.TestCase):
                 tag = gr.tag_utils.python_to_tag((0, pmt.intern('rx_time'), stamp(100.0), pmt.intern('qa')))
                 source = blocks.vector_source_c(samples, False, 1, [tag])
                 throttle = blocks.throttle(gr.sizeof_gr_complex, fs)
-                detector = prs.prs_fft_zc_frame_detector(samp_rate=fs, preamble_repeats=17,
-                    coarse_sync_len=819, coarse_zc_root=29, threshold=.3, zc_threshold=.5,
-                    time_gating=True, cfo_compensation=(case == 'production'))
+                detector = prs.prs_fft_zc_frame_detector(
+                    samp_rate=fs,
+                    expect_response=True,
+                    threshold=.3,
+                    zc_threshold=.5,
+                    time_gating=True,
+                    cfo_compensation=case == 'production')
                 cycle = prs.prs_multi_anchor_cycle(fs, [0, 1], delays)
                 keeper = prs.prs_rx_timekeeper(fs)
                 fft, channel, phase = prs.prs_fft_receiver(fs), prs.prs_channel_estimator(fs), prs.prs_phase_slope_estimator(fs)

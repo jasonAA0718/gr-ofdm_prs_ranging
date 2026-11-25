@@ -171,6 +171,19 @@ expired unanswered polls; response percentage includes all transmitted polls.
 A stale valid-frame timestamp produces `NO SIGNAL`. It displays the same
 relative SNR and live integer range, not an offline phase-corrected result.
 
+## Shared PRS Waveform
+
+All Initiator and Responder PRS blocks use the compile-time profile in
+[`lib/DSP/prs_phy_geometry.h`](lib/DSP/prs_phy_geometry.h). To change the
+repeated QPSK preamble or ZC settings, edit the profile and rebuild and install
+the module at every station. TX selects the ZC root from the packet type.
+Set `expect_response=True` on the Initiator RX detector and `False` on the
+Responder RX detector.
+
+External C++ and Python callers and GRC flowgraphs must use the updated block
+signatures. The profile replaces the waveform arguments. Sample rate,
+acquisition thresholds, CFO controls and ranging windows remain configurable.
+
 ## Profiling Removal
 
 Development processing-time instrumentation and `prs_timing_collector` have
@@ -181,8 +194,7 @@ or `block_b_total_time_ns`. Acquisition outcomes and sample/UHD timestamps
 remain available.
 
 External C++ and Python callers must remove the former profiling argument.
-In particular, `prs_channel_estimator` now takes `mc_ds_gold_code_id` immediately
-after `seed`, and `prs_ssrtt_responder` takes `anchor_id` immediately after
+`prs_ssrtt_responder` takes `anchor_id` immediately after
 `reply_delay_samples`. Update external GRC files to remove the parameter and
 any connections to `timing_out`; remove timing collector blocks. Rebuild and
 reinstall before running flowgraphs. UHD timing, timed TX, ranging calibration,
@@ -388,15 +400,15 @@ The SS-TWR Solver still calculates one anchor-specific range. The cycle manager
 owns schedule validation, association, duplicate handling, finalization and
 complete-observation storage. It does not recalculate or filter ranges.
 
-The constructor retains its argument order and two-anchor defaults. Configure
-between one and eight unique packet anchor IDs in 0..7 with matching delays:
+The constructor takes the schedule and derives the frame duration from the
+shared PHY profile. Configure between one and eight unique packet anchor IDs in
+0..7 with matching delays:
 
 ```python
 cycle = ofdm_prs_ranging.prs_multi_anchor_cycle(
     samp_rate=30e6,
     anchor_ids=[0, 1, 2, 3],
     time_delays=[0.031, 0.081, 0.131, 0.181],  # seconds
-    preamble_len=128, preamble_repeats=17, coarse_sync_len=819,
     window_before_s=0.002, window_after_s=0.005,
     processing_grace_s=0.1)
 ```

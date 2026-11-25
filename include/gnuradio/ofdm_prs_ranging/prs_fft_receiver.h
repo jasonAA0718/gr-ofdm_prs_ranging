@@ -20,11 +20,7 @@ class OFDM_PRS_RANGING_API prs_fft_receiver : virtual public gr::block
 {
 public:
     typedef std::shared_ptr<prs_fft_receiver> sptr;
-    static sptr make(double samp_rate = 10e6,
-                     int fft_len = 512,
-                     int cp_len = 64,
-                     int active_bins = 512,
-                     int prs_symbols = 127);
+    static sptr make(double samp_rate = 10e6);
 };
 
 } // namespace ofdm_prs_ranging

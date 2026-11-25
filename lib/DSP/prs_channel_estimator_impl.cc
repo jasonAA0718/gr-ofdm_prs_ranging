@@ -8,6 +8,7 @@
 #include "mc_ds_prs.h"
 #include "prs_channel_estimator_impl.h"
 #include "prs_payload_codec.h"
+#include "prs_phy_geometry.h"
 #include <gnuradio/io_signature.h>
 #include <algorithm>
 #include <array>
@@ -23,19 +24,14 @@ namespace {
 constexpr double pi = 3.141592653589793238462643383279502884;
 }
 
-prs_channel_estimator::sptr prs_channel_estimator::make(double samp_rate,
-                                                        int fft_len,
-                                                        int active_bins,
-                                                        int prs_symbols,
-                                                        uint32_t seed,
-                                                        int mc_ds_gold_code_id)
+prs_channel_estimator::sptr prs_channel_estimator::make(double samp_rate)
 {
     return gnuradio::make_block_sptr<prs_channel_estimator_impl>(samp_rate,
-                                                                 fft_len,
-                                                                 active_bins,
-                                                                 prs_symbols,
-                                                                 seed,
-                                                                 mc_ds_gold_code_id);
+                                                                 phy::fft_len,
+                                                                 phy::active_bins,
+                                                                 phy::prs_symbols,
+                                                                 phy::seed,
+                                                                 phy::mc_ds_gold_code_id);
 }
 
 prs_channel_estimator_impl::prs_channel_estimator_impl(double samp_rate,

@@ -20,15 +20,9 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
         source = blocks.vector_source_c(samples, False)
         detector = ofdm_prs_ranging.prs_fft_zc_frame_detector(
             samp_rate=30e6,
-            preamble_len=256,
-            preamble_repeats=4,
-            coarse_sync_len=419,
-            threshold=0.35,
             zc_threshold=0.4,
             correlation_fft_len=2048,
-            zc_search_before=1024,
-            zc_search_after=1024,
-        )
+            zc_search_before=1024)
         frame_debug = blocks.message_debug()
         self.tb.connect(source, detector)
         self.tb.msg_connect((detector, "frame_out"), (frame_debug, "store"))
@@ -36,13 +30,7 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
         return frame_debug
 
     def test_clean_cfo_frame_finds_exact_boundary(self):
-        tx = ofdm_prs_ranging.prs_timed_burst_source(
-            samp_rate=30e6,
-            preamble_len=256,
-            preamble_repeats=4,
-            coarse_sync_len=419,
-            attach_tx_time=False,
-        )
+        tx = ofdm_prs_ranging.prs_timed_burst_source(samp_rate=30e6, attach_tx_time=False)
         frame = numpy.asarray(tx.frame_samples(), dtype=numpy.complex64)
         cfo_hz = 900.0
         phase = numpy.arange(frame.size) * (2.0 * math.pi * cfo_hz / 30e6)
@@ -85,18 +73,12 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
             abs(pmt.to_long(
                 pmt.dict_ref(metadata, pmt.intern("zc_gate_offset_samples"), pmt.PMT_NIL)
             )),
-            1024,
+            3584,
         )
 
     def test_prs_channel_cfo_feedback_drives_next_acquisition(self):
         samp_rate = 30e6
-        tx = ofdm_prs_ranging.prs_timed_burst_source(
-            samp_rate=samp_rate,
-            preamble_len=256,
-            preamble_repeats=4,
-            coarse_sync_len=419,
-            attach_tx_time=False,
-        )
+        tx = ofdm_prs_ranging.prs_timed_burst_source(samp_rate=samp_rate, attach_tx_time=False)
         frame = numpy.asarray(tx.frame_samples(), dtype=numpy.complex64)
         cfo_hz = 900.0
         phase = numpy.arange(frame.size) * (2.0 * math.pi * cfo_hz / samp_rate)
@@ -108,15 +90,11 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
         source = blocks.vector_source_c(samples, False)
         detector = ofdm_prs_ranging.prs_fft_zc_frame_detector(
             samp_rate=samp_rate,
-            preamble_len=256,
-            preamble_repeats=4,
-            coarse_sync_len=419,
-            threshold=0.35,
+            threshold=0.8,
             zc_threshold=0.4,
             correlation_fft_len=2048,
             zc_search_before=1024,
-            zc_search_after=1024,
-        )
+            zc_search_after=2500)
         debug = blocks.message_debug()
         feedback = pmt.make_dict()
         feedback = pmt.dict_add(
@@ -163,13 +141,7 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
 
     def test_earliest_threshold_peak_wins_over_stronger_delayed_path(self):
         samp_rate = 30e6
-        tx = ofdm_prs_ranging.prs_timed_burst_source(
-            samp_rate=samp_rate,
-            preamble_len=256,
-            preamble_repeats=4,
-            coarse_sync_len=419,
-            attach_tx_time=False,
-        )
+        tx = ofdm_prs_ranging.prs_timed_burst_source(samp_rate=samp_rate, attach_tx_time=False)
         frame = numpy.asarray(tx.frame_samples(), dtype=numpy.complex64)
         prefix = 1500
         echo_delay = 8
@@ -182,16 +154,12 @@ class qa_prs_fft_zc_detector(gr_unittest.TestCase):
         source = blocks.vector_source_c(samples, False)
         detector = ofdm_prs_ranging.prs_fft_zc_frame_detector(
             samp_rate=samp_rate,
-            preamble_len=256,
-            preamble_repeats=4,
-            coarse_sync_len=419,
-            threshold=0.35,
+            threshold=0.8,
             zc_threshold=0.50,
             correlation_fft_len=2048,
             zc_search_before=1024,
-            zc_search_after=1024,
-            cfo_compensation=False,
-        )
+            zc_search_after=2500,
+            cfo_compensation=False)
         debug = blocks.message_debug()
         self.tb.connect(source, detector)
         self.tb.msg_connect((detector, "frame_out"), (debug, "store"))

@@ -6,6 +6,7 @@
  */
 
 #include "prs_fft_receiver_impl.h"
+#include "prs_phy_geometry.h"
 #include <gnuradio/io_signature.h>
 #include <algorithm>
 #include <cmath>
@@ -14,14 +15,10 @@
 namespace gr {
 namespace ofdm_prs_ranging {
 
-prs_fft_receiver::sptr prs_fft_receiver::make(double samp_rate,
-                                              int fft_len,
-                                              int cp_len,
-                                              int active_bins,
-                                              int prs_symbols)
+prs_fft_receiver::sptr prs_fft_receiver::make(double samp_rate)
 {
     return gnuradio::make_block_sptr<prs_fft_receiver_impl>(
-        samp_rate, fft_len, cp_len, active_bins, prs_symbols);
+        samp_rate, phy::fft_len, phy::cp_len, phy::active_bins, phy::prs_symbols);
 }
 
 prs_fft_receiver_impl::prs_fft_receiver_impl(double samp_rate,

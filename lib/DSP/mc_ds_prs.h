@@ -9,6 +9,7 @@
 #define INCLUDED_OFDM_PRS_RANGING_MC_DS_PRS_H
 
 #include "gold127_codes.h"
+#include "prs_phy_geometry.h"
 #include <gnuradio/gr_complex.h>
 #include <array>
 #include <cstddef>
@@ -17,14 +18,15 @@
 namespace gr {
 namespace ofdm_prs_ranging {
 
-constexpr int mc_ds_fft_len = 512;
-constexpr int mc_ds_cp_len = 64;
-constexpr int mc_ds_symbol_count = gold127_code_length;
+constexpr int mc_ds_fft_len = phy::fft_len;
+constexpr int mc_ds_cp_len = phy::cp_len;
+constexpr int mc_ds_symbol_count = phy::prs_symbols;
+static_assert(mc_ds_symbol_count == gold127_code_length);
 constexpr int mc_ds_bin_period = 4;
 constexpr int mc_ds_data_bin_remainder = 3;
 constexpr int mc_ds_data_bin_count = 128;
 constexpr int mc_ds_pilot_bin_count = 384;
-constexpr int mc_ds_default_gold_code_id = 2;
+constexpr int mc_ds_default_gold_code_id = phy::mc_ds_gold_code_id;
 
 constexpr char mc_ds_data_scrambler[] =
     "1101110100111011011101111000111100101011000010000110100011100101"

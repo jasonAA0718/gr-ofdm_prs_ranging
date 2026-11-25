@@ -209,11 +209,11 @@ BOOST_AUTO_TEST_CASE(test_frame_section_levels)
 {
     auto source = prs_timed_burst_source::make();
     const auto frame = source->frame_samples();
-    const size_t preamble_start = 1000;
-    const size_t preamble_length = 128 * 16;
+    const size_t preamble_start = phy::leading_guard_samples;
+    const size_t preamble_length = phy::preamble_len * phy::preamble_repeats;
     const size_t coarse_start = preamble_start + preamble_length;
     const double preamble_rms = rms(frame, preamble_start, preamble_length);
-    const double coarse_rms = rms(frame, coarse_start, 839);
+    const double coarse_rms = rms(frame, coarse_start, phy::coarse_sync_len);
     const double ofdm_rms = rms(
         frame, static_cast<size_t>(source->prs_start()), mc_ds_fft_len + mc_ds_cp_len);
     const auto peak =

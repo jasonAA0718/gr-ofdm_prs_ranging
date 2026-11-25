@@ -149,10 +149,8 @@ class qa_prs_receiver(gr_unittest.TestCase):
             float(numpy.dot(MC_DS_CODE, wrong_code))) / 127.0
         self.assertLess(normalized_cross_correlation, 0.25)
 
-        with self.assertRaises(ValueError):
-            ofdm_prs_ranging.prs_channel_estimator(mc_ds_gold_code_id=-1)
-        with self.assertRaises(ValueError):
-            ofdm_prs_ranging.prs_channel_estimator(mc_ds_gold_code_id=129)
+        with self.assertRaises(TypeError):
+            ofdm_prs_ranging.prs_channel_estimator(mc_ds_gold_code_id=3)
 
     def test_sequential_poll_ids_round_trip(self):
         count = 3
@@ -222,7 +220,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
         self.tb = gr.top_block()
         source = blocks.vector_source_c(
             [0j] * 300 + list(sink.data()) + [0j] * 300, False)
-        detector = ofdm_prs_ranging.prs_frame_detector(threshold=0.30)
+        detector = ofdm_prs_ranging.prs_frame_detector(threshold=0.30, expect_response=True)
         fft = ofdm_prs_ranging.prs_fft_receiver()
         channel = ofdm_prs_ranging.prs_channel_estimator()
         debug = blocks.message_debug()
@@ -250,16 +248,11 @@ class qa_prs_receiver(gr_unittest.TestCase):
 
     def test_prs_cp_cfo_does_not_depend_on_preamble_cfo(self):
         samp_rate = 30e6
-        tx = ofdm_prs_ranging.prs_timed_burst_source(
-            samp_rate=samp_rate,
-            preamble_len=256,
-            preamble_repeats=4,
-            coarse_sync_len=419,
-            attach_tx_time=False)
+        tx = ofdm_prs_ranging.prs_timed_burst_source(samp_rate=samp_rate, attach_tx_time=False)
         frame = numpy.asarray(tx.frame_samples(), dtype=numpy.complex64)
 
         preamble_start = 1000
-        preamble_samples = 256 * 4
+        preamble_samples = 128 * 17
         biased_cfo_hz = 350.0
         indices = numpy.arange(preamble_samples, dtype=numpy.float64)
         frame[preamble_start:preamble_start + preamble_samples] *= numpy.exp(
@@ -270,12 +263,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
                                frame,
                                numpy.zeros(300, numpy.complex64))),
             False)
-        detector = ofdm_prs_ranging.prs_frame_detector(
-            samp_rate=samp_rate,
-            preamble_len=256,
-            preamble_repeats=4,
-            coarse_sync_len=419,
-            threshold=0.30)
+        detector = ofdm_prs_ranging.prs_frame_detector(samp_rate=samp_rate, threshold=0.30)
         debug = blocks.message_debug()
         self.tb.connect(source, detector)
         self.tb.msg_connect((detector, "frame_out"), (debug, "store"))
@@ -329,13 +317,14 @@ class qa_prs_receiver(gr_unittest.TestCase):
                 meta, pmt.intern("prs_cp_cfo_coherence"), pmt.PMT_NIL)),
                 0.99)
 
-    def test_coarse_zc_root_29_detects_and_labels_channel(self):
-        tx = ofdm_prs_ranging.prs_timed_burst_source(
-            attach_tx_time=False, coarse_zc_root=29)
+    def test_coarse_zc_root_25_detects_and_labels_channel(self):
+        tx = ofdm_prs_ranging.prs_timed_burst_source(attach_tx_time=False)
         data = [0j] * 300 + list(tx.frame_samples()) + [0j] * 300
         timing = blocks.vector_source_c(data, False)
         detector = ofdm_prs_ranging.prs_frame_detector(
-            threshold=0.30, coarse_zc_root=29, channel_id=1)
+            threshold=0.30,
+            expect_response=False,
+            channel_id=1)
         debug = blocks.message_debug()
 
         self.tb.connect(timing, detector)
@@ -344,17 +333,15 @@ class qa_prs_receiver(gr_unittest.TestCase):
 
         self.assertGreaterEqual(debug.num_messages(), 1)
         meta = pmt.car(debug.get_message(0))
-        self.assertEqual(pmt.to_long(pmt.dict_ref(meta, pmt.intern("coarse_zc_root"), pmt.PMT_NIL)), 29)
+        self.assertEqual(pmt.to_long(pmt.dict_ref(meta, pmt.intern("coarse_zc_root"), pmt.PMT_NIL)), 25)
         self.assertEqual(pmt.to_long(pmt.dict_ref(meta, pmt.intern("channel_id"), pmt.PMT_NIL)), 1)
         self.assertGreater(pmt.to_double(pmt.dict_ref(meta, pmt.intern("coarse_metric"), pmt.PMT_NIL)), 0.9)
 
     def test_coarse_zc_root_mismatch_rejects_frame(self):
-        tx = ofdm_prs_ranging.prs_timed_burst_source(
-            attach_tx_time=False, coarse_zc_root=29)
+        tx = ofdm_prs_ranging.prs_timed_burst_source(attach_tx_time=False)
         data = [0j] * 300 + list(tx.frame_samples()) + [0j] * 300
         timing = blocks.vector_source_c(data, False)
-        detector = ofdm_prs_ranging.prs_frame_detector(
-            threshold=0.30, coarse_zc_root=25)
+        detector = ofdm_prs_ranging.prs_frame_detector(threshold=0.30, expect_response=True)
         debug = blocks.message_debug()
 
         self.tb.connect(timing, detector)
@@ -403,8 +390,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
         signed_order = numpy.concatenate(
             (native[:, 256:], native[:, :256]), axis=1).reshape(-1)
 
-        estimator = ofdm_prs_ranging.prs_channel_estimator(
-            10e6, 512, 512, 127, 13990001, 2)
+        estimator = ofdm_prs_ranging.prs_channel_estimator(10e6)
         debug = blocks.message_debug()
         symbols = pmt.init_c32vector(
             len(signed_order), [complex(value) for value in signed_order])
@@ -443,11 +429,9 @@ class qa_prs_receiver(gr_unittest.TestCase):
         received = (signed * expected_channel[None, :] *
                     rotations[:, None]).reshape(-1)
 
-        estimator = ofdm_prs_ranging.prs_channel_estimator(
-            samp_rate, 512, 512, 127, 13990001, 2)
+        estimator = ofdm_prs_ranging.prs_channel_estimator(samp_rate)
         debug = blocks.message_debug()
-        phase = ofdm_prs_ranging.prs_phase_slope_estimator(
-            samp_rate, 512, 512, 1.0)
+        phase = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 1.0)
         phase_debug = blocks.message_debug()
         meta = pmt.dict_add(pmt.make_dict(),
                             pmt.intern("prs_cp_cfo_hz"),
@@ -491,8 +475,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
             -1j * 2.0 * numpy.pi * frequencies *
             (delay_samples / samp_rate))
 
-        estimator = ofdm_prs_ranging.prs_phase_slope_estimator(
-            samp_rate, 512, 512, 1.0)
+        estimator = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 1.0)
         debug = blocks.message_debug()
         meta = pmt.make_dict()
         meta = pmt.dict_add(
@@ -628,10 +611,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
 
     def test_time_gating_logs_zc_sync_failure(self):
         samp_rate = 1e6
-        tx = ofdm_prs_ranging.prs_timed_burst_source(
-            samp_rate=samp_rate,
-            attach_tx_time=False,
-            coarse_zc_root=29)
+        tx = ofdm_prs_ranging.prs_timed_burst_source(samp_rate=samp_rate, attach_tx_time=False)
         frame = list(tx.frame_samples())
         target_start = 20000
         data = [0j] * 120000
@@ -645,7 +625,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
         detector = ofdm_prs_ranging.prs_frame_detector(
             samp_rate=samp_rate,
             threshold=0.30,
-            coarse_zc_root=25,
+            expect_response=True,
             time_gating=True,
             reply_delay_s=0.0,
             window_before_s=0.001,
@@ -895,8 +875,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
     def test_v2_one_anchor_complete_software_chain(self):
         fs = 30e6
         poll = ofdm_prs_ranging.prs_timed_burst_source(samp_rate=fs, attach_tx_time=False)
-        response = ofdm_prs_ranging.prs_timed_burst_source(samp_rate=fs, attach_tx_time=False,
-                                                         coarse_zc_root=29)
+        response = ofdm_prs_ranging.prs_timed_burst_source(samp_rate=fs, attach_tx_time=False)
         rx_tag = gr.tag_utils.python_to_tag((0, pmt.intern("rx_time"),
             pmt.make_tuple(pmt.from_uint64(10), pmt.from_double(0.0)), pmt.intern("qa")))
         source = blocks.vector_source_c(list(poll.frame_samples()), False, 1, [rx_tag])
@@ -932,7 +911,10 @@ class qa_prs_receiver(gr_unittest.TestCase):
         self.tb = gr.top_block()
         rx_tag.value = pmt.make_tuple(pmt.from_uint64(10), pmt.from_double(0.0500136))
         source = blocks.vector_source_c(list(sink.data()), False, 1, [rx_tag])
-        detector = ofdm_prs_ranging.prs_frame_detector(samp_rate=fs, threshold=0.30, coarse_zc_root=29)
+        detector = ofdm_prs_ranging.prs_frame_detector(
+            samp_rate=fs,
+            threshold=0.30,
+            expect_response=True)
         fft = ofdm_prs_ranging.prs_fft_receiver(samp_rate=fs)
         channel = ofdm_prs_ranging.prs_channel_estimator(samp_rate=fs)
         phase = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate=fs)

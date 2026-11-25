@@ -7,6 +7,7 @@
 
 #include "prs_frame_builder.h"
 #include "prs_payload_codec.h"
+#include "prs_phy_geometry.h"
 #include "prs_protocol_metadata.h"
 #include "prs_timed_burst_source_impl.h"
 #include <gnuradio/io_signature.h>
@@ -60,38 +61,29 @@ bool dict_has_key(const pmt::pmt_t& dict, const char* key)
 #endif
 
 prs_timed_burst_source::sptr prs_timed_burst_source::make(double samp_rate,
-                                                          int fft_len,
-                                                          int cp_len,
-                                                          int active_bins,
-                                                          int prs_symbols,
-                                                          int preamble_len,
-                                                          int preamble_repeats,
-                                                          int coarse_sync_len,
                                                           double tx_lead_time,
                                                           double burst_period,
                                                           float tx_amp,
-                                                          uint32_t seed,
                                                           int pings_per_trigger,
-                                                          bool attach_tx_time,
-                                                          int coarse_zc_root,
-                                                          int mc_ds_gold_code_id)
+                                                          bool attach_tx_time)
 {
-    return gnuradio::make_block_sptr<prs_timed_burst_source_impl>(samp_rate,
-                                                                  fft_len,
-                                                                  cp_len,
-                                                                  active_bins,
-                                                                  prs_symbols,
-                                                                  preamble_len,
-                                                                  preamble_repeats,
-                                                                  coarse_sync_len,
-                                                                  tx_lead_time,
-                                                                  burst_period,
-                                                                  tx_amp,
-                                                                  seed,
-                                                                  pings_per_trigger,
-                                                                  attach_tx_time,
-                                                                  coarse_zc_root,
-                                                                  mc_ds_gold_code_id);
+    return gnuradio::make_block_sptr<prs_timed_burst_source_impl>(
+        samp_rate,
+        phy::fft_len,
+        phy::cp_len,
+        phy::active_bins,
+        phy::prs_symbols,
+        phy::preamble_len,
+        phy::preamble_repeats,
+        phy::coarse_sync_len,
+        tx_lead_time,
+        burst_period,
+        tx_amp,
+        phy::seed,
+        pings_per_trigger,
+        attach_tx_time,
+        phy::poll_zc_root,
+        phy::mc_ds_gold_code_id);
 }
 
 prs_timed_burst_source_impl::prs_timed_burst_source_impl(double samp_rate,
@@ -222,7 +214,9 @@ void prs_timed_burst_source_impl::prepare_burst_frame(uint64_t frame_id)
     info.reply_delay_samples = d_current_burst.reply_delay_samples;
     info.poll_fine_delay_q10 = d_current_burst.poll_fine_delay_q10;
     info.fine_delay_valid = d_current_burst.fine_delay_valid;
-    d_burst_frame = prs_frame_builder::build(frame_config(), info).samples;
+    auto cfg = frame_config();
+    cfg.coarse_zc_root = phy::zc_root(info.packet_type == prs_packet_type_response);
+    d_burst_frame = prs_frame_builder::build(cfg, info).samples;
 }
 
 void prs_timed_burst_source_impl::forecast(int noutput_items,

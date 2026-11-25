@@ -6,6 +6,7 @@
  */
 
 #include "prs_phase_slope_estimator_impl.h"
+#include "prs_phy_geometry.h"
 #include <gnuradio/io_signature.h>
 #include <algorithm>
 #include <cmath>
@@ -18,12 +19,10 @@ constexpr double pi = 3.141592653589793238462643383279502884;
 }
 
 prs_phase_slope_estimator::sptr prs_phase_slope_estimator::make(double samp_rate,
-                                                                int fft_len,
-                                                                int active_bins,
                                                                 float max_residual_rms)
 {
     return gnuradio::make_block_sptr<prs_phase_slope_estimator_impl>(
-        samp_rate, fft_len, active_bins, max_residual_rms);
+        samp_rate, phy::fft_len, phy::active_bins, max_residual_rms);
 }
 
 prs_phase_slope_estimator_impl::prs_phase_slope_estimator_impl(double samp_rate,

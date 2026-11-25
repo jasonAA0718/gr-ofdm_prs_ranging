@@ -33,18 +33,6 @@ options:
     state: enabled
 
 blocks:
-- name: gold_code_id
-  id: variable
-  parameters:
-    comment: ''
-    value: '2'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [610, 30]
-    rotation: 0
-    state: enabled
 - name: iq_file
   id: variable
   parameters:
@@ -55,30 +43,6 @@ blocks:
     bus_source: false
     bus_structure: null
     coordinate: [300, 30]
-    rotation: 0
-    state: enabled
-- name: preamble_len
-  id: variable
-  parameters:
-    comment: ''
-    value: '128'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [750, 30]
-    rotation: 0
-    state: enabled
-- name: preamble_repeats
-  id: variable
-  parameters:
-    comment: ''
-    value: '17'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [890, 30]
     rotation: 0
     state: enabled
 - name: samp_rate
@@ -93,23 +57,11 @@ blocks:
     coordinate: [200, 40.0]
     rotation: 0
     state: enabled
-- name: zc_length
+- name: expect_response
   id: variable
   parameters:
     comment: ''
-    value: '819'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [1040, 30]
-    rotation: 0
-    state: enabled
-- name: zc_root
-  id: variable
-  parameters:
-    comment: ''
-    value: '25'
+    value: 'False'
   states:
     bus_sink: false
     bus_source: false
@@ -120,17 +72,12 @@ blocks:
 - name: channel
   id: ofdm_prs_ranging_prs_channel_estimator
   parameters:
-    active_bins: '512'
     affinity: ''
     alias: ''
     comment: ''
-    fft_len: '512'
     maxoutbuf: '0'
-    mc_ds_gold_code_id: gold_code_id
     minoutbuf: '0'
-    prs_symbols: '127'
     samp_rate: samp_rate
-    seed: '13990001'
   states:
     bus_sink: false
     bus_source: false
@@ -156,15 +103,11 @@ blocks:
 - name: fft
   id: ofdm_prs_ranging_prs_fft_receiver
   parameters:
-    active_bins: '512'
     affinity: ''
     alias: ''
     comment: ''
-    cp_len: '64'
-    fft_len: '512'
     maxoutbuf: '0'
     minoutbuf: '0'
-    prs_symbols: '127'
     samp_rate: samp_rate
   states:
     bus_sink: false
@@ -192,23 +135,16 @@ blocks:
   id: ofdm_prs_ranging_prs_window_capture
   parameters:
     acquisition_enabled: 'True'
-    active_bins: '512'
     affinity: ''
     alias: ''
     candidate_margin_after: '4096'
     candidate_margin_before: '4096'
-    coarse_sync_len: '819'
     comment: ''
-    cp_len: '64'
-    fft_len: '512'
     maxoutbuf: '0'
     min_frame_gap: '10000'
     minoutbuf: '0'
-    preamble_len: '128'
-    preamble_repeats: '17'
-    prs_symbols: '127'
     queue_depth: '3'
-    samp_rate: 30e6
+    samp_rate: samp_rate
     threshold: '0.09'
   states:
     bus_sink: false
@@ -220,22 +156,15 @@ blocks:
 - name: ofdm_prs_ranging_prs_zc_frame_sync_0
   id: ofdm_prs_ranging_prs_zc_frame_sync
   parameters:
-    active_bins: '512'
     affinity: ''
     alias: ''
     channel_id: '0'
-    coarse_sync_len: '819'
-    coarse_zc_root: '25'
+    expect_response: expect_response
     comment: ''
-    cp_len: '64'
-    fft_len: '512'
     maxoutbuf: '0'
     minoutbuf: '0'
-    preamble_len: '128'
-    preamble_repeats: '17'
     preamble_threshold: '0.15'
-    prs_symbols: '127'
-    samp_rate: 30e6
+    samp_rate: samp_rate
     zc_threshold: '0.35'
   states:
     bus_sink: false
@@ -251,7 +180,7 @@ blocks:
     alias: ''
     begin_tag: pmt.PMT_NIL
     comment: ''
-    file: /home/cnsl/Desktop/gr-ofdm_prs_ranging/tools/iq_handoff/handoff.cf32
+    file: iq_file
     length: '0'
     maxoutbuf: '0'
     minoutbuf: '0'

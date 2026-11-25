@@ -36,12 +36,9 @@ class prs_ssrtt_responder_anchor_2(gr.top_block):
         ##################################################
         self.samp_rate = samp_rate = 30000000
         self.response_delay_seconds = response_delay_seconds = 0.067
-        self.zc_length = zc_length = 819
         self.tx_gain = tx_gain = 70
         self.rx_gain = rx_gain = 50
         self.reply_delay_samples = reply_delay_samples = int(response_delay_seconds*samp_rate + 0.5)
-        self.premble_rep = premble_rep = 17
-        self.premble_length = premble_length = 128
         self.center_freq = center_freq = 1330e6
         self.anchor_id = anchor_id = 2
 
@@ -85,20 +82,27 @@ class prs_ssrtt_responder_anchor_2(gr.top_block):
         self.uhd_usrp_sink_0_0.set_min_output_buffer(1048576)
         self.prs_text_ui_0 = ofdm_prs_ranging.prs_text_ui("responder", 1.5, 1.0, 2.0, True)
         self.prs_ssrtt_responder_0 = ofdm_prs_ranging.prs_ssrtt_responder(samp_rate, reply_delay_samples, anchor_id)
-        self.prs_source = ofdm_prs_ranging.prs_timed_burst_source(
-            samp_rate, 512, 64, 512, 127,
-            premble_length, premble_rep, zc_length,
-            0.1,
-            0.1, 0.7, 13990001, 1,
-            True, 29, 2)
-        self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 512, 512, 1.0)
-        self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate, 512, 64, 512, 127)
+        self.prs_source = ofdm_prs_ranging.prs_timed_burst_source(samp_rate, 0.1, 0.1, 0.7, 1, True)
+        self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 1.0)
+        self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate)
         self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger("CSV/anchor2_measurements.csv", 1)
-        self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate, 512, 512, 127, 13990001, 2)
+        self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate)
         self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/anchor2_acquisition.csv", "responder", 1)
-        self.ofdm_prs_ranging_prs_zc_frame_sync_0 = ofdm_prs_ranging.prs_zc_frame_sync(30e6, 512, 64, 512, 127, 128, 17, 819, 0.15, 0.35, 25, 0)
+        self.ofdm_prs_ranging_prs_zc_frame_sync_0 = ofdm_prs_ranging.prs_zc_frame_sync(
+            30e6,
+            0.15,
+            0.35,
+            False,
+            0)
         self.ofdm_prs_ranging_prs_zc_frame_sync_0.set_processor_affinity([2])
-        self.ofdm_prs_ranging_prs_window_capture_0 = ofdm_prs_ranging.prs_window_capture(30e6, 512, 64, 512, 127, 128, 17, 819, 0.12, 10000, 4096, 4096, 2, True)
+        self.ofdm_prs_ranging_prs_window_capture_0 = ofdm_prs_ranging.prs_window_capture(
+            30e6,
+            0.12,
+            10000,
+            4096,
+            4096,
+            2,
+            True)
 
 
         ##################################################
@@ -139,12 +143,6 @@ class prs_ssrtt_responder_anchor_2(gr.top_block):
         self.response_delay_seconds = response_delay_seconds
         self.set_reply_delay_samples(int(self.response_delay_seconds*self.samp_rate + 0.5))
 
-    def get_zc_length(self):
-        return self.zc_length
-
-    def set_zc_length(self, zc_length):
-        self.zc_length = zc_length
-
     def get_tx_gain(self):
         return self.tx_gain
 
@@ -164,18 +162,6 @@ class prs_ssrtt_responder_anchor_2(gr.top_block):
 
     def set_reply_delay_samples(self, reply_delay_samples):
         self.reply_delay_samples = reply_delay_samples
-
-    def get_premble_rep(self):
-        return self.premble_rep
-
-    def set_premble_rep(self, premble_rep):
-        self.premble_rep = premble_rep
-
-    def get_premble_length(self):
-        return self.premble_length
-
-    def set_premble_length(self, premble_length):
-        self.premble_length = premble_length
 
     def get_center_freq(self):
         return self.center_freq

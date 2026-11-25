@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include "prs_phy_geometry.h"
 #include "prs_window_capture_impl.h"
 #include <gnuradio/io_signature.h>
 #include <algorithm>
@@ -52,13 +53,6 @@ pmt::pmt_t time_tuple(double time)
 } // namespace
 
 prs_window_capture::sptr prs_window_capture::make(double samp_rate,
-                                                  int fft_len,
-                                                  int cp_len,
-                                                  int active_bins,
-                                                  int prs_symbols,
-                                                  int preamble_len,
-                                                  int preamble_repeats,
-                                                  int coarse_sync_len,
                                                   float threshold,
                                                   int min_frame_gap,
                                                   int candidate_margin_before,
@@ -67,13 +61,13 @@ prs_window_capture::sptr prs_window_capture::make(double samp_rate,
                                                   bool acquisition_enabled)
 {
     return gnuradio::make_block_sptr<prs_window_capture_impl>(samp_rate,
-                                                              fft_len,
-                                                              cp_len,
-                                                              active_bins,
-                                                              prs_symbols,
-                                                              preamble_len,
-                                                              preamble_repeats,
-                                                              coarse_sync_len,
+                                                              phy::fft_len,
+                                                              phy::cp_len,
+                                                              phy::active_bins,
+                                                              phy::prs_symbols,
+                                                              phy::preamble_len,
+                                                              phy::preamble_repeats,
+                                                              phy::coarse_sync_len,
                                                               threshold,
                                                               min_frame_gap,
                                                               candidate_margin_before,

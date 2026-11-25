@@ -20,11 +20,11 @@ class OFDM_PRS_RANGING_API prs_multi_anchor_cycle : virtual public gr::block
 public:
     using sptr = std::shared_ptr<prs_multi_anchor_cycle>;
     static sptr make(double samp_rate = 30e6,
-                     const std::vector<int>& anchor_ids = {0, 1},
-                     const std::vector<double>& time_delays = {0.031, 0.081},
-                     int preamble_len = 128, int preamble_repeats = 17,
-                     int coarse_sync_len = 819, double window_before_s = 0.002,
-                     double window_after_s = 0.005, double processing_grace_s = 0.1,
+                     const std::vector<int>& anchor_ids = { 0, 1 },
+                     const std::vector<double>& time_delays = { 0.031, 0.081 },
+                     double window_before_s = 0.002,
+                     double window_after_s = 0.005,
+                     double processing_grace_s = 0.1,
                      double cfo_max_age_s = 5.0);
     virtual size_t active_cycle_count() const = 0;
 };

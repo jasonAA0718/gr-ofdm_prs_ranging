@@ -9,7 +9,5 @@ void bind_prs_phase_slope_estimator(py::module& m)
         m, "prs_phase_slope_estimator")
         .def(py::init(&block::make),
              py::arg("samp_rate") = 10e6,
-             py::arg("fft_len") = 512,
-             py::arg("active_bins") = 512,
              py::arg("max_residual_rms") = 1.0f);
 }

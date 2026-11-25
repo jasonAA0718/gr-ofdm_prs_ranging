@@ -9,16 +9,9 @@ void bind_prs_fft_zc_frame_detector(py::module& m)
         m, "prs_fft_zc_frame_detector")
         .def(py::init(&block::make),
              py::arg("samp_rate") = 10e6,
-             py::arg("fft_len") = 512,
-             py::arg("cp_len") = 64,
-             py::arg("active_bins") = 512,
-             py::arg("prs_symbols") = 127,
-             py::arg("preamble_len") = 128,
-             py::arg("preamble_repeats") = 16,
-             py::arg("coarse_sync_len") = 839,
              py::arg("threshold") = 0.35f,
              py::arg("min_frame_gap") = 10000,
-             py::arg("coarse_zc_root") = 25,
+             py::arg("expect_response") = false,
              py::arg("channel_id") = 0,
              py::arg("time_gating") = false,
              py::arg("reply_delay_s") = 0.05,
@@ -27,6 +20,6 @@ void bind_prs_fft_zc_frame_detector(py::module& m)
              py::arg("zc_threshold") = 0.35f,
              py::arg("correlation_fft_len") = 2048,
              py::arg("zc_search_before") = 1024,
-             py::arg("zc_search_after") = 1024,
+             py::arg("zc_search_after") = 3584,
              py::arg("cfo_compensation") = true);
 }

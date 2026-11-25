@@ -8,16 +8,16 @@ import time
 
 class qa_prs_zc_frame_sync(gr_unittest.TestCase):
     FS = 1e6
-    FFT = 32
-    CP = 8
-    ACTIVE = 32
-    NSYM = 3
-    L = 16
-    R = 5
-    NZ = 31
+    FFT = 512
+    CP = 64
+    ACTIVE = 512
+    NSYM = 127
+    L = 128
+    R = 17
+    NZ = 819
     NG = ofdm_prs_ranging.PHY_LEADING_GUARD_SAMPLES
     NT = ofdm_prs_ranging.PHY_TAIL_GUARD_SAMPLES
-    ROOT = 7
+    ROOT = 25
     CHANNEL = 4
     PREAMBLE_THRESHOLD = 0.8
     ZC_THRESHOLD = 0.8
@@ -33,18 +33,10 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
     def _sync(self):
         return ofdm_prs_ranging.prs_zc_frame_sync(
             self.FS,
-            self.FFT,
-            self.CP,
-            self.ACTIVE,
-            self.NSYM,
-            self.L,
-            self.R,
-            self.NZ,
             self.PREAMBLE_THRESHOLD,
             self.ZC_THRESHOLD,
-            self.ROOT,
-            self.CHANNEL,
-        )
+            False,
+            self.CHANNEL)
 
     def _period(self):
         rng = numpy.random.default_rng(17)
@@ -172,7 +164,7 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
         self.assertTrue(pmt.to_bool(pmt.dict_ref(diag, pmt.intern("success"), pmt.PMT_F)))
         self.assertEqual(self._symbol(diag, "failure_reason"), "NONE")
         self.assertEqual(self._uint(diag, "selected_local_zc_index"), zc_local)
-        self.assertAlmostEqual(self._double(diag, "coarse_metric"), 1.0, places=5)
+        self.assertAlmostEqual(self._double(diag, "coarse_metric"), 1.0, delta=2e-5)
         self.assertAlmostEqual(self._double(diag, "preamble_cfo_hz"), 0.0, delta=0.2)
 
         frame_pdu = frames.get_message(0)
@@ -200,7 +192,7 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
         self.assertEqual(self._uint(release, "candidate_id"), 1)
 
     def test_positive_and_negative_cfo(self):
-        for index, injected in enumerate((3500.0, -4200.0), start=10):
+        for index, injected in enumerate((2500.0, -3200.0), start=10):
             with self.subTest(cfo_hz=injected):
                 candidate, _, _, zc_local = self._candidate(
                     candidate_id=index, cfo_hz=injected)
@@ -237,7 +229,7 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
             frames, diag, _ = self._process(candidate)
             self.assertEqual(frames.num_messages(), 1)
             metrics.append(self._double(diag, "coarse_metric"))
-        self.assertAlmostEqual(metrics[0], metrics[1], places=5)
+        self.assertAlmostEqual(metrics[0], metrics[1], delta=2e-5)
 
     def test_zc_failure_releases_credit(self):
         candidate, _, _, _ = self._candidate(candidate_id=40, valid_zc=False)
@@ -299,9 +291,9 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
         self.assertEqual(self._uint(release, "candidate_id"), 61)
 
     def test_window_capture_to_zc_sync_path(self):
-        frame_start = 500
+        frame_start = 8000
         frame = self._frame()
-        stream = numpy.zeros(frame_start + len(frame) + 2000, dtype=numpy.complex64)
+        stream = numpy.zeros(frame_start + len(frame) + 5000, dtype=numpy.complex64)
         stream[frame_start:frame_start + len(frame)] = frame
         rx_tag = gr.tag_t()
         rx_tag.offset = 0
@@ -311,14 +303,25 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
         source = blocks.vector_source_c(stream, False, 1, [rx_tag])
         throttle = blocks.throttle(gr.sizeof_gr_complex, self.FS, True)
         capture = ofdm_prs_ranging.prs_window_capture(
-            self.FS, self.FFT, self.CP, self.ACTIVE, self.NSYM, self.L, self.R,
-            self.NZ, self.PREAMBLE_THRESHOLD, 300, 64, 64,
-            1, True)
+            self.FS,
+            self.PREAMBLE_THRESHOLD,
+            300,
+            4096,
+            4096,
+            1,
+            True)
         sync = self._sync()
         legacy = ofdm_prs_ranging.prs_frame_detector(
-            self.FS, self.FFT, self.CP, self.ACTIVE, self.NSYM, self.L, self.R,
-            self.NZ, self.PREAMBLE_THRESHOLD, 300, self.ROOT,
-            self.CHANNEL, False, 0.05, 0.0002, 0.004, self.ZC_THRESHOLD)
+            self.FS,
+            self.PREAMBLE_THRESHOLD,
+            300,
+            False,
+            self.CHANNEL,
+            False,
+            0.05,
+            0.0002,
+            0.004,
+            self.ZC_THRESHOLD)
         frames = blocks.message_debug()
         legacy_frames = blocks.message_debug()
         diagnostics = blocks.message_debug()
@@ -341,7 +344,11 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
             time.sleep(0.002)
         tb.stop()
         tb.wait()
-        self.assertEqual(frames.num_messages(), 1)
+        self.assertEqual(frames.num_messages(), 1,
+                         [str(diagnostics.get_message(j)) for j in
+                          range(diagnostics.num_messages())] +
+                         [str(capture_events.get_message(j)) for j in
+                          range(capture_events.num_messages())])
         self.assertEqual(legacy_frames.num_messages(), 1)
         self.assertEqual(diagnostics.num_messages(), 1)
         output = frames.get_message(0)

@@ -21,18 +21,18 @@ namespace ofdm_prs_ranging {
 
 struct prs_rx_config {
     double samp_rate = 10e6;
-    int fft_len = 512;
-    int cp_len = 64;
-    int active_bins = 512;
-    int prs_symbols = 127;
-    int preamble_len = 128;
-    int preamble_repeats = 16;
-    int coarse_sync_len = 839;
+    int fft_len = phy::fft_len;
+    int cp_len = phy::cp_len;
+    int active_bins = phy::active_bins;
+    int prs_symbols = phy::prs_symbols;
+    int preamble_len = phy::preamble_len;
+    int preamble_repeats = phy::preamble_repeats;
+    int coarse_sync_len = phy::coarse_sync_len;
     int payload_len = 0;
-    uint32_t seed = 13990001;
-    int coarse_zc_root = 25;
+    uint32_t seed = phy::seed;
+    int coarse_zc_root = phy::poll_zc_root;
     int channel_id = 0;
-    int mc_ds_gold_code_id = 2;
+    int mc_ds_gold_code_id = phy::mc_ds_gold_code_id;
 };
 
 struct prs_cfo_estimate {

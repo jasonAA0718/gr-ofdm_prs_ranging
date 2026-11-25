@@ -26,9 +26,9 @@ prs_symbols       = 127
 Gold code ID      = 2
 ```
 
-The code ID is configurable; 512 bins, CP 64, and 127 symbols are enforced by
-the current transmitter. The sample rate is configurable as well; numerical
-examples in this document use 30 MS/s.
+The shared C++ PHY profile sets Gold code ID 2 and fixes OFDM at 512 bins,
+CP 64, and 127 symbols. The sample rate is configurable. Numerical examples
+in this document use 30 MS/s.
 
 The OFDM PRS-like section length is
 
@@ -42,10 +42,13 @@ For these OFDM values:
 N_{\text{PRS}} = 127(512 + 64) = 73152
 ```
 
-Acquisition geometry is configurable and must match the peer transmitter.
-The main examples use preamble period/repeats/ZC length 128/17/819,
-30 MS/s and 1060 MHz. Historical numerical examples below use 256/4/419;
-these are calculation references rather than supplied flowgraphs.
+The shared PHY profile in `lib/DSP/prs_phy_geometry.h` sets the QPSK preamble
+seed, the period/repeats/ZC length (128/17/819), and the POLL/RESPONSE ZC roots
+(25/29). TX selects the root from packet type. RX selects the expected root
+with `expect_response`. Rebuild and install the same profile at all stations
+after changing it. The main examples use 30 MS/s with a flowgraph-specific
+carrier frequency. The historical 256/4/419 examples below are calculation
+references.
 Leading and tail guards are fixed at 1000 samples each in
 `lib/DSP/prs_phy_geometry.h`; constructors and GRC do not expose guard controls.
 The TX timestamp is the first complete-burst sample, including the leading guard.

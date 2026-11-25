@@ -3,19 +3,12 @@ label: PRS ZC Frame Sync
 category: '[ofdm_prs_ranging]'
 templates:
   imports: from gnuradio import ofdm_prs_ranging
-  make: ofdm_prs_ranging.prs_zc_frame_sync(${samp_rate}, ${fft_len}, ${cp_len}, ${active_bins}, ${prs_symbols}, ${preamble_len}, ${preamble_repeats}, ${coarse_sync_len}, ${preamble_threshold}, ${zc_threshold}, ${coarse_zc_root}, ${channel_id})
+  make: ofdm_prs_ranging.prs_zc_frame_sync(${samp_rate}, ${preamble_threshold}, ${zc_threshold}, ${expect_response}, ${channel_id})
 parameters:
 - {id: samp_rate, label: Sample Rate, dtype: real, default: 30e6}
-- {id: fft_len, label: FFT Length, dtype: int, default: 512}
-- {id: cp_len, label: CP Length, dtype: int, default: 64}
-- {id: active_bins, label: Active Bins, dtype: int, default: 512}
-- {id: prs_symbols, label: PRS Symbols, dtype: int, default: 127}
-- {id: preamble_len, label: Preamble Length, dtype: int, default: 128}
-- {id: preamble_repeats, label: Preamble Repeats, dtype: int, default: 17}
-- {id: coarse_sync_len, label: ZC Length, dtype: int, default: 819}
 - {id: preamble_threshold, label: Preamble Threshold, dtype: real, default: 0.09}
 - {id: zc_threshold, label: ZC Threshold, dtype: real, default: 0.35}
-- {id: coarse_zc_root, label: Coarse ZC Root, dtype: int, default: 25}
+- {id: expect_response, label: Expect RESPONSE (False = POLL), dtype: bool, default: 'False'}
 - {id: channel_id, label: Channel ID, dtype: int, default: 0}
 inputs:
 - {label: candidate_in, domain: message}
