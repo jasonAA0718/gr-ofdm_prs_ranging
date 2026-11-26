@@ -34,7 +34,8 @@ def load_golay_prs_native():
         golay_a = numpy.concatenate((previous_a, previous_b))
         golay_b = numpy.concatenate((previous_a, -previous_b))
     return numpy.stack(
-        [golay_a if symbol % 2 == 0 else golay_b for symbol in range(127)]
+        [golay_a if symbol % 2 == 0 else golay_b
+         for symbol in range(ofdm_prs_ranging.PHY_PRS_SYMBOLS)]
     ).astype(numpy.complex64)
 
 
@@ -387,7 +388,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
 
     def test_mc_ds_channel_estimator_unity_channel(self):
         native = load_golay_prs_native().copy()
-        native *= MC_DS_CODE[:, None]
+        native *= MC_DS_CODE[:ofdm_prs_ranging.PHY_PRS_SYMBOLS, None]
         signed_order = numpy.concatenate(
             (native[:, 256:], native[:, :256]), axis=1).reshape(-1)
 
@@ -418,7 +419,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
         cfo_hz = 350.0
         delay_samples = 0.25
         native = load_golay_prs_native().copy()
-        native *= MC_DS_CODE[:, None]
+        native *= MC_DS_CODE[:ofdm_prs_ranging.PHY_PRS_SYMBOLS, None]
         signed = numpy.concatenate((native[:, 256:], native[:, :256]), axis=1)
         frequencies = numpy.arange(-256, 256, dtype=numpy.float64) * samp_rate / 512.0
         expected_channel = numpy.exp(
@@ -426,7 +427,7 @@ class qa_prs_receiver(gr_unittest.TestCase):
         symbol_period = (512 + 64) / samp_rate
         rotations = numpy.exp(
             1j * 2.0 * numpy.pi * cfo_hz * symbol_period *
-            numpy.arange(127, dtype=numpy.float64))
+            numpy.arange(ofdm_prs_ranging.PHY_PRS_SYMBOLS, dtype=numpy.float64))
         received = (signed * expected_channel[None, :] *
                     rotations[:, None]).reshape(-1)
 
@@ -452,6 +453,9 @@ class qa_prs_receiver(gr_unittest.TestCase):
         self.assertGreaterEqual(debug.num_messages(), 1)
         msg = debug.get_message(0)
         result = pmt.car(msg)
+        self.assertEqual(pmt.to_long(pmt.dict_ref(
+            result, pmt.intern("mc_ds_code_length"), pmt.PMT_NIL)),
+            ofdm_prs_ranging.PHY_PRS_SYMBOLS)
         self.assertAlmostEqual(pmt.to_double(pmt.dict_ref(
             result, pmt.intern("prs_channel_cfo_hz"), pmt.PMT_NIL)),
             cfo_hz, delta=0.05)

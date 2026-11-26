@@ -150,10 +150,9 @@ void prs_timed_burst_source_impl::validate_parameters() const
     if (d_fft_len <= 0 || d_cp_len < 0 || d_cp_len > d_fft_len) {
         throw std::invalid_argument("invalid fft_len/cp_len");
     }
-    if (d_fft_len != 512 || d_active_bins != 512 || d_prs_symbols != 127 ||
-        d_cp_len != 64) {
-        throw std::invalid_argument("MC-DS PRS requires fft_len=512, active_bins=512, "
-                                    "prs_symbols=127, cp_len=64");
+    if (d_fft_len != phy::fft_len || d_active_bins != phy::active_bins ||
+        d_prs_symbols != phy::prs_symbols || d_cp_len != phy::cp_len) {
+        throw std::invalid_argument("MC-DS PRS TX geometry must match the shared PHY profile");
     }
     if (d_prs_symbols <= 0 || d_preamble_len <= 0 || d_preamble_repeats <= 0 ||
         d_coarse_sync_len <= 0) {

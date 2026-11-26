@@ -14,7 +14,7 @@ class qa_prs_window_capture(gr_unittest.TestCase):
     NT = ofdm_prs_ranging.PHY_TAIL_GUARD_SAMPLES
     FFT = 512
     CP = 64
-    NSYM = 127
+    NSYM = ofdm_prs_ranging.PHY_PRS_SYMBOLS
     MARGIN = 64
 
     def _make_capture(self, queue_depth=3, enabled=True, threshold=0.8):

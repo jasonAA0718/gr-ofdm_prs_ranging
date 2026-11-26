@@ -197,3 +197,11 @@ ctest --test-dir build --output-on-failure
 - Do not treat current GRC selection of experimental FFT-ZC as proof of accuracy,
   or missing workbooks/plan files as evidence of verified behavior. State what
   could not be established and keep future estimator improvements labeled.
+## Notion Research Sync
+For any task that modifies code, runs tests, or produces
+experimental results:
+1. Read NOTION_SYNC_RULES.md.
+2. Inspect the actual code changes and test evidence.
+3. Prepare an update for the existing Notion databases.
+4. Ask for my approval before writing to Notion.
+5. After approval, update the matching records.

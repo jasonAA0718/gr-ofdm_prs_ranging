@@ -11,7 +11,7 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
     FFT = 512
     CP = 64
     ACTIVE = 512
-    NSYM = 127
+    NSYM = ofdm_prs_ranging.PHY_PRS_SYMBOLS
     L = ofdm_prs_ranging.PHY_PREAMBLE_LEN
     R = ofdm_prs_ranging.PHY_PREAMBLE_REPEATS
     ZC_CHIPS = ofdm_prs_ranging.PHY_ZC_CHIP_COUNT

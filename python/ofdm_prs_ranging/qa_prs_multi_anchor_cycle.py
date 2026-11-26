@@ -362,7 +362,7 @@ class qa_prs_multi_anchor_cycle(gr_unittest.TestCase):
         slow_frames = frames
         bad_first = frames[0].copy()
         start = prs.prs_timed_burst_source().prs_start()
-        section = bad_first[start:start + 127 * 576].reshape(127, 576)
+        section = bad_first[start:start + prs.PHY_PRS_SYMBOLS * 576].reshape(-1, 576)
         bins = np.fft.fft(section[:, 64:], axis=1); bins[:, 3] *= -1
         useful = np.fft.ifft(bins, axis=1).astype(np.complex64)
         section[:, 64:] = useful; section[:, :64] = useful[:, -64:]

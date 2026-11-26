@@ -13,7 +13,7 @@ Roadmap, proposed changes, and outstanding experiments are in local
 
 ## Current Implementation
 
-The current waveform combines 127 Gold-spread OFDM symbols with a repeated
+The current waveform combines 32 Gold-spread OFDM symbols with a repeated
 QPSK acquisition preamble and coarse ZC synchronization. Every OFDM symbol
 has 512 bins and a 64-sample CP: 384 pilot bins and 128 data/padding bins.
 The 80-bit packet v2, including CRC, is carried inside OFDM. There is
@@ -22,7 +22,7 @@ no standalone time-domain BPSK payload in the current receiver chain.
 | Capability | Implementation status |
 |---|---|
 | Timed POLL/RESPONSE SS-TWR | Implemented using UHD sample timestamps and timed TX |
-| Integrated OFDM payload | Implemented; 512 bins, 127 Gold chips, fixed data scrambler |
+| Integrated OFDM payload | Implemented; 512 bins, 32 chips from a Gold127 row per burst, fixed data scrambler |
 | Local-ZC detector | Available as `prs_frame_detector` |
 | FFT-ZC detector | Available as `prs_fft_zc_frame_detector`; selected by the main GRCs |
 | CFO handling | Per-anchor TDMA CFO feedback with a 5 s default lifetime; managed pre-FFT compensation plus residual pilot/data phase alignment; legacy `prs_cfo_in` retained |
@@ -64,7 +64,8 @@ legacy continuous path: channel_estimator.channel_out -> detector.prs_cfo_in (op
 The detector extracts a complete raw complex frame with timing and acquisition
 metadata. It measures CP CFO but does not decode the OFDM payload. The FFT
 receiver removes CPs, applies a managed frame's requested time-domain CFO
-correction, performs 127 FFTs, and reorders bins into signed-frequency order. The channel estimator removes known pilots/Gold chips, estimates
+correction, performs one FFT per symbol, and reorders bins into signed-frequency
+order. The channel estimator removes known pilots/Gold chips, estimates
 inter-symbol CFO, aligns and averages pilot channels, and despreads/equalizes
 the data before CRC checking. The phase estimator receives the compact
 384-bin channel vector.
@@ -98,9 +99,10 @@ configured frame and scheduling assumptions.
 
 See [signal.md](docs/signal.md) for exact bin indexing, spreading, CRC, normalization,
 detector equations, and CFO observation lengths. The current shared OFDM
-geometry is 512/64/127 at 30 MS/s, giving 73,152 OFDM samples or 2.4384 ms.
-The Gold CSV is compiled into `lib/DSP/gold127_codes.h`; no CSV is loaded at
-runtime. The length-512 Golay A/B pilots are generated at compile time in
+uses 512 FFT bins, a 64-sample CP, and 32 symbols, giving 18,432 OFDM samples
+or 0.6144 ms at 30 MS/s. The Gold CSV is compiled into
+`lib/DSP/gold127_codes.h`. A burst uses the first `prs_symbols` chips of its
+configured Gold code. The length-512 Golay A/B pilots are generated at compile time in
 `lib/DSP/mc_ds_prs.h`. MT19937 remains only in the repeated QPSK preamble.
 
 Repeated-preamble and ZC RMS are fixed at 0.95. Each CP-plus-OFDM symbol is
@@ -113,8 +115,10 @@ TX and RX. Guard constructor arguments and GRC controls have been removed;
 external positional callers must remove the former ninth and tenth arguments.
 No ignored compatibility arguments are retained. Rebuild/reinstall consumers.
 
-The main examples use 128/17/819 preamble period/repeats/ZC, 31 ms replies,
-and 30 MS/s at 1060 MHz.
+The shared profile uses a 128-sample preamble period with 17 repetitions
+and 419 ZC chips at two samples per chip. The complete burst is 23,446 samples,
+or approximately 0.782 ms at 30 MS/s. Reply delays and carrier settings are
+specified in the flowgraphs.
 Runtime gain, thresholds, delays, receive margins and strobe settings remain
 configurable. The user's main initiator threshold selections are preserved.
 The split acquisition example and committed responder Python use
@@ -515,8 +519,9 @@ the configured `anchor_ids` order, independently of response arrival order:
 
 The new `examples/prs_ssrtt_initiator_complete_epoch.grc` and its generated
 Python demonstrate four configurable anchors and print complete epochs. The
-known-working single-link and two-anchor examples are preserved. At 30 MS/s
-the complete RESPONSE is 78147 samples / 2.6049 ms. The example uses 50 ms
+known-working single-link and two-anchor examples are preserved. The historical
+127-symbol profile used for these calculations had a complete RESPONSE of
+78147 samples / 2.6049 ms at 30 MS/s. This schedule uses 50 ms
 start spacing, leaving 47.3951 ms between nominal bursts and 40.3951 ms between
 the 2 ms-early / 5 ms-late receive windows. Its final window ends 188.6049 ms
 after T1; the 100 ms grace reaches 288.6049 ms. The inherited 500 ms POLL

@@ -54,8 +54,7 @@ void append_prs_symbols(std::vector<gr_complex>& frame,
     if (cfg.fft_len != mc_ds_fft_len || cfg.active_bins != mc_ds_fft_len ||
         cfg.cp_len != mc_ds_cp_len || cfg.prs_symbols != mc_ds_symbol_count) {
         throw std::invalid_argument(
-            "MC-DS PRS requires fft_len=512, cp_len=64, active_bins=512, "
-            "prs_symbols=127");
+            "MC-DS PRS frame geometry must match the shared PHY profile");
     }
     if (cfg.mc_ds_gold_code_id < 0 || cfg.mc_ds_gold_code_id >= gold127_family_size) {
         throw std::invalid_argument("mc_ds_gold_code_id must be in [0, 128]");

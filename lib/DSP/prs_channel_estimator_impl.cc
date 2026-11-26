@@ -53,7 +53,7 @@ prs_channel_estimator_impl::prs_channel_estimator_impl(double samp_rate,
     if (fft_len != mc_ds_fft_len || active_bins != mc_ds_fft_len ||
         prs_symbols != mc_ds_symbol_count) {
         throw std::invalid_argument(
-            "MC-DS channel estimator requires 512 bins and 127 symbols");
+            "MC-DS channel estimator geometry must match the shared PHY profile");
     }
     if (mc_ds_gold_code_id < 0 || mc_ds_gold_code_id >= gold127_family_size) {
         throw std::invalid_argument("mc_ds_gold_code_id must be in [0, 128]");
@@ -267,7 +267,7 @@ void prs_channel_estimator_impl::handle_symbols(pmt::pmt_t msg)
         meta, pmt::mp("channel_bins"), pmt::from_long(mc_ds_pilot_bin_count));
     meta = pmt::dict_add(meta, pmt::mp("mc_ds_enabled"), pmt::PMT_T);
     meta = pmt::dict_add(
-        meta, pmt::mp("mc_ds_code_length"), pmt::from_long(gold127_code_length));
+        meta, pmt::mp("mc_ds_code_length"), pmt::from_long(d_cfg.prs_symbols));
     meta = pmt::dict_add(
         meta, pmt::mp("mc_ds_code_id"), pmt::from_long(d_cfg.mc_ds_gold_code_id));
     meta = pmt::dict_add(

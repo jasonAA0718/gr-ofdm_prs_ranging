@@ -22,13 +22,13 @@ At 30 MS/s, the enforced current OFDM geometry and default code selection are:
 fft_len           = 512
 cp_len            = 64
 active_bins       = 512
-prs_symbols       = 127
+prs_symbols       = 32
 Gold code ID      = 2
 ```
 
-The shared C++ PHY profile sets Gold code ID 2 and fixes OFDM at 512 bins,
-CP 64, and 127 symbols. The sample rate is configurable. Numerical examples
-in this document use 30 MS/s.
+The shared C++ PHY profile selects Gold code ID 2 and sets OFDM to 512 bins,
+CP 64, and 32 symbols. The symbol count can be set to 2–127 in the PHY profile.
+The sample rate is configurable. Numerical examples use 30 MS/s.
 
 The OFDM PRS-like section length is
 
@@ -39,15 +39,14 @@ N_{\text{PRS}} = N_{\text{sym}}(N_{\text{FFT}} + N_{\text{CP}})
 For these OFDM values:
 
 ```math
-N_{\text{PRS}} = 127(512 + 64) = 73152
+N_{\text{PRS}} = 32(512 + 64) = 18432
 ```
 
 The shared PHY profile in `lib/DSP/prs_phy_geometry.h` sets the QPSK preamble
 seed, the preamble period and repeat count (128/17), and the POLL/RESPONSE ZC
 roots (25/29). The ZC segment contains `zc_chip_count * zc_samples_per_chip`
-samples. The default is 819 chips at one sample per chip. For higher settings,
-TX and RX use the same rectangular chip waveform (each chip is held for that
-number of samples). TX selects the root from packet type. RX selects the expected root
+samples. The current profile uses 419 chips at two samples per chip, giving
+838 samples. TX and RX hold each chip for the configured number of samples. TX selects the root from packet type. RX selects the expected root
 with `expect_response`. Rebuild and install the same profile at all stations
 after changing it. The main examples use 30 MS/s with a flowgraph-specific
 carrier frequency. The historical 256/4/419 examples below are calculation
@@ -225,8 +224,7 @@ detector success alone does not imply payload success.
 
 ## MC-DS OFDM Payload and PRS
 
-The current packet v2 carries 80 logical bits inside the existing OFDM symbols.
-RF airtime, 512/64/127 geometry, Gold references and carrier allocation are unchanged.
+Packet v2 carries 80 logical bits inside the OFDM symbols.
 There is no standalone time-domain payload. Native data bins are `k=4q+3`:
 384 pilots and 128 data/padding bins. Positions `q=0...79` carry packet/CRC;
 `q=80...127` are 48 logical zero padding bits.
@@ -279,7 +277,9 @@ including the 48 padding positions, use this shared production scrambler.
 
 Let $c_i[m]$ be chip `m` from row `i` of
 `lib/DSP/gold127_family_bipolar.csv`, where row index equals code_id. The
-default is `code_id=2`; each row has 127 real chips in `{-1,+1}`. Let $G_m[k]$ be
+default is `code_id=2`. Each row has 127 real chips in `{-1,+1}`, and each
+burst uses the first `prs_symbols` chips. RX reports the number used in
+`mc_ds_code_length`. Let $G_m[k]$ be
 Golay A512 for even `m` and Golay B512 for odd `m`. The native-IFFT input is
 
 ```math
@@ -294,8 +294,8 @@ The one chip $c_i[m]$ multiplies the complete 512-bin symbol. It is not applied
 per subcarrier or per time sample. Every symbol repeats the same 128 scrambled
 data values. RX removes the Gold chip and Golay sign before inter-symbol CFO
 estimation. After CFO phase alignment, it averages channel estimates across
-all 127 symbols on the 384 pilot bins. Data bins are Gold-despread, coherently
-combined across 127 symbols, equalized by adjacent-pilot interpolation, and
+all configured symbols on the 384 pilot bins. Data bins are Gold-despread,
+coherently combined across the same symbols, equalized by adjacent-pilot interpolation, and
 hard-decided. RX XORs the same scrambler, discards positions `80...127`, and
 parses/checks the 80-bit v2 packet, CRC and reserved bits.
 
@@ -392,11 +392,11 @@ A_next = [A, B]
 B_next = [A, -B]
 ```
 
-The 127 symbols assign:
+The current 32-symbol burst alternates the Golay pair.
 
 ```text
-even symbols 0,2,...,126 -> A512
-odd symbols 1,3,...,125  -> B512
+even symbols 0,2,...,30 -> A512
+odd symbols 1,3,...,31  -> B512
 ```
 
 TX uses native `k=0...511` without fftshift. Pilot positions use the Golay
@@ -454,7 +454,7 @@ The channel CFO calculation below gives one symbol rotation
 r_m = e^{-j 2 \pi \hat {f}_H m T_{sym}}.
 ```
 RX multiplies each pilot estimate by
-that rotation, then averages all 127 symbols:
+that rotation, then averages all configured symbols:
 
 ```math
 \tilde H_m[k]=r_m\hat H_m[k],\qquad
@@ -543,7 +543,7 @@ The shared OFDM geometry is:
 
 ```text
 Fs = 30 MHz
-NFFT = 512, NCP = 64, M = 127, K = 384 pilot bins
+NFFT = 512, NCP = 64, M = 32, K = 384 pilot bins
 ```
 
 Historical preamble calculations below use Lp=256, R=4.
@@ -650,10 +650,10 @@ and its normalized coherence is
 For the current geometry:
 
 ```text
-correlation products = M NCP = 127(64) = 8128
-selected input samples = 16256
+correlation products = M NCP = 32(64) = 2048
+selected input samples = 4096
 correlation lag = 512 / 30 MHz = 17.067 us
-complete PRS span = 127(512+64) = 73152 samples = 2.4384 ms
+complete PRS span = 32(512+64) = 18432 samples = 0.6144 ms
 raw unambiguous CFO range = +/-Fs/(2NFFT) = +/-29.297 kHz
 CFO alias interval = Fs/NFFT = 58.594 kHz
 ```
@@ -711,10 +711,10 @@ the accumulated powers of the two members of every adjacent-symbol pair. The
 current geometry gives:
 
 ```text
-per-symbol pilot-channel estimates = MK = 127(384) = 48768
-adjacent-symbol products = (M-1)K = 126(384) = 48384
+per-symbol pilot-channel estimates = MK = 32(384) = 12288
+adjacent-symbol products = (M-1)K = 31(384) = 11904
 adjacent-symbol separation = 576 samples = 19.2 us
-complete PRS span = 73152 samples = 2.4384 ms
+complete PRS span = 18432 samples = 0.6144 ms
 raw unambiguous CFO range = +/-Fs/[2(NFFT+NCP)] = +/-26.042 kHz
 CFO alias interval = Fs/(NFFT+NCP) = 52.083 kHz
 ```
@@ -738,8 +738,8 @@ and the CFO-aligned channel used by the phase-slope estimator is
 | Estimate | Products | Correlation separation | Observation span | Raw CFO range | Current role |
 |---|---:|---:|---:|---:|---|
 | Preamble `hat f_p` | 768 | 256 samples | 1024 samples | +/-58.594 kHz | Disabled; acquisition gate only |
-| PRS CP `hat f_CP` | 8128 | 512 samples | 73152-sample PRS span | +/-29.297 kHz | Channel-CFO unwrap reference |
-| PRS channel `hat f_H` | 48384 | 576 samples | 73152-sample PRS span | +/-26.042 kHz | Pilot/data inter-symbol phase alignment |
+| PRS CP `hat f_CP` | 2048 | 512 samples | 18432-sample PRS span | +/-29.297 kHz | Channel-CFO unwrap reference |
+| PRS channel `hat f_H` | 11904 | 576 samples | 18432-sample PRS span | +/-26.042 kHz | Pilot/data inter-symbol phase alignment |
 
 Raw CP CFO and the reconstructed total channel CFO should be approximately
 equal for a stable oscillator and a correctly extracted frame. Differences close to `Fs/N_FFT` or
@@ -991,11 +991,11 @@ selected POLL frame-start RX time to scheduled first RESPONSE burst sample.
 It is used unchanged by SS-TWR. The initiator's expected sample delay only
 checks schedule consistency; it never overwrites the decoded packet.
 
-For the new examples, the complete frame is:
+With the current PHY profile, the complete frame is
 
 ```text
-N_response = 1000 + 128*17 + 819 + 127*(512+64) + 1000 = 78147 samples
-T_response = 78147 / 30e6 = 0.0026049 seconds
+N_response = 1000 + 128*17 + 419*2 + 32*(512+64) + 1000 = 23446 samples
+T_response = 23446 / 30e6 = 0.00078153 seconds (approx.)
 ```
 
 For POLL TX time T1, sample delay Di, early margin E and late margin L,
@@ -1006,18 +1006,18 @@ With E=2 ms and L=5 ms, the example offsets relative to T1 are:
 
 | Anchor | Expected RESPONSE start | Capture interval |
 |---|---:|---|
-| 0 | 31 ms | [29, 38.6049) ms |
-| 1 | 81 ms | [79, 88.6049) ms |
-| 2 | 131 ms | [129, 138.6049) ms |
-| 3 | 181 ms | [179, 188.6049) ms |
+| 0 | 31 ms | [29, 36.7815) ms |
+| 1 | 81 ms | [79, 86.7815) ms |
+| 2 | 131 ms | [129, 136.7815) ms |
+| 3 | 181 ms | [179, 186.7815) ms |
 
-Physical frame spacing is 50 ms, leaving 47.3951 ms between nominal bursts
-and 40.3951 ms between receive windows. Margins cover initial scheduling,
+Physical frame spacing is 50 ms, leaving 49.2185 ms between nominal bursts
+and 42.2185 ms between receive windows. Margins cover initial scheduling,
 propagation and arrival uncertainty; they are not validated RF bounds.
-For the four-anchor example the final window ends at T1+188.6049 ms. A finite
+For the four-anchor example the final window ends at T1+186.7815 ms. A finite
 100 ms DSP-drain grace delays summary/epoch emission and state cleanup until
-hardware RX time reaches T1+288.6049 ms. For the existing two-anchor example,
-substitute final-window end T1+88.6049 ms and finalization T1+188.6049 ms.
+hardware RX time reaches T1+286.7815 ms. For the existing two-anchor example,
+substitute final-window end T1+86.7815 ms and finalization T1+186.7815 ms.
 This grace permits downstream queues to finish; it does not extend RF windows
 or enter the SS-TWR equation. Heartbeats are generated by `prs_rx_timekeeper`
 at at most 100 Hz of consumed RX time, including cycles with no responses.

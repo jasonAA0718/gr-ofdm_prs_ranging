@@ -21,7 +21,8 @@ namespace ofdm_prs_ranging {
 constexpr int mc_ds_fft_len = phy::fft_len;
 constexpr int mc_ds_cp_len = phy::cp_len;
 constexpr int mc_ds_symbol_count = phy::prs_symbols;
-static_assert(mc_ds_symbol_count == gold127_code_length);
+// Each burst uses a prefix of the Gold code. Channel CFO needs adjacent symbols.
+static_assert(mc_ds_symbol_count >= 2 && mc_ds_symbol_count <= gold127_code_length);
 constexpr int mc_ds_bin_period = 4;
 constexpr int mc_ds_data_bin_remainder = 3;
 constexpr int mc_ds_data_bin_count = 128;

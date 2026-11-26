@@ -25,6 +25,7 @@ except ImportError:
 
 
 class qa_prs_timed_burst_source(gr_unittest.TestCase):
+    PRS_SAMPLES = ofdm_prs_ranging.PHY_PRS_SYMBOLS * (512 + 64)
     ACQUISITION_SAMPLES = (
         ofdm_prs_ranging.PHY_PREAMBLE_LEN * ofdm_prs_ranging.PHY_PREAMBLE_REPEATS +
         ofdm_prs_ranging.PHY_ZC_CHIP_COUNT * ofdm_prs_ranging.PHY_ZC_SAMPLES_PER_CHIP
@@ -43,9 +44,9 @@ class qa_prs_timed_burst_source(gr_unittest.TestCase):
         )
         self.assertEqual(
             src.frame_len(),
-            expected_prs_start + 127 * (512 + 64) + ofdm_prs_ranging.PHY_TAIL_GUARD_SAMPLES)
+            expected_prs_start + self.PRS_SAMPLES + ofdm_prs_ranging.PHY_TAIL_GUARD_SAMPLES)
         self.assertEqual(src.prs_start(), expected_prs_start)
-        self.assertEqual(src.prs_len(), 127 * (512 + 64))
+        self.assertEqual(src.prs_len(), self.PRS_SAMPLES)
 
     def test_guards_are_fixed_and_not_constructor_controls(self):
         leading = ofdm_prs_ranging.PHY_LEADING_GUARD_SAMPLES
@@ -65,7 +66,7 @@ class qa_prs_timed_burst_source(gr_unittest.TestCase):
             numpy.testing.assert_array_equal(frame[:leading], 0)
             numpy.testing.assert_array_equal(frame[-tail:], 0)
             self.assertEqual(
-                src.frame_len(), leading + self.ACQUISITION_SAMPLES + 127 * 576 + tail)
+                src.frame_len(), leading + self.ACQUISITION_SAMPLES + self.PRS_SAMPLES + tail)
             self.assertAlmostEqual(float(abs(frame[leading])), 0.95, places=6)
             self.assertLessEqual(float(numpy.max(numpy.abs(frame[src.prs_start():-tail]))), 0.900001)
 

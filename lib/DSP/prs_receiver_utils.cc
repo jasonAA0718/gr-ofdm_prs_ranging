@@ -67,7 +67,7 @@ std::vector<gr_complex> prs_pilots(const prs_rx_config& cfg)
     if (cfg.fft_len != mc_ds_fft_len || cfg.active_bins != mc_ds_fft_len ||
         cfg.prs_symbols != mc_ds_symbol_count) {
         throw std::invalid_argument(
-            "MC-DS PRS requires fft_len=512, active_bins=512, prs_symbols=127");
+            "MC-DS PRS pilot geometry must match the shared PHY profile");
     }
 
     std::vector<gr_complex> pilots;

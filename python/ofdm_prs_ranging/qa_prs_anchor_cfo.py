@@ -195,7 +195,8 @@ class qa_prs_anchor_cfo(gr_unittest.TestCase):
         frame, start = self.render_response()
         fft, symbols, decoded, estimates = self.fft_pipeline()
         self.start()
-        expected = np.fft.fft(frame[start:start+127*576].reshape(127, 576)[:, 64:], axis=1)
+        stop = start + prs.PHY_PRS_SYMBOLS * 576
+        expected = np.fft.fft(frame[start:stop].reshape(-1, 576)[:, 64:], axis=1)
         expected = np.concatenate((expected[:, 256:], expected[:, :256]), axis=1).ravel()
         for index, total in enumerate((70000., -65000.)):
             injected = (frame*np.exp(2j*np.pi*total*np.arange(frame.size)/self.FS)).astype(np.complex64)
