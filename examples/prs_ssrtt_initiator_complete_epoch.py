@@ -104,7 +104,7 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
             anchor_config[1],
             0.0
         )
-        self.blocks_message_strobe_0 = blocks.message_strobe(pmt.PMT_T, 100)
+        self.blocks_message_strobe_0 = blocks.message_strobe(pmt.PMT_T, 200)
 
 
         ##################################################
@@ -121,8 +121,8 @@ class prs_ssrtt_initiator_complete_epoch(gr.top_block):
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'observation_out'), (self.ofdm_prs_ranging_prs_position_solver_0, 'epoch_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'measurement_out'), (self.prs_csv_logger_0, 'measurement_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'window_out'), (self.prs_frame_detector_0_0, 'tx_time_in'))
-        self.msg_connect((self.prs_multi_anchor_cycle_0, 'solver_tx_out'), (self.prs_ssrtt_solver_0, 'tx_time_in'))
         self.msg_connect((self.prs_multi_anchor_cycle_0, 'solver_measurement_out'), (self.prs_ssrtt_solver_0, 'measurement_in'))
+        self.msg_connect((self.prs_multi_anchor_cycle_0, 'solver_tx_out'), (self.prs_ssrtt_solver_0, 'tx_time_in'))
         self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_multi_anchor_cycle_0, 'measurement_in'))
         self.msg_connect((self.prs_rx_timekeeper_0, 'clock_out'), (self.prs_multi_anchor_cycle_0, 'clock_in'))
         self.msg_connect((self.prs_rx_timekeeper_0, 'timed_trigger_out'), (self.prs_source, 'trigger'))

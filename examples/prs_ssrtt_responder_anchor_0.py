@@ -35,8 +35,8 @@ class prs_ssrtt_responder_anchor_0(gr.top_block):
         # Variables
         ##################################################
         self.samp_rate = samp_rate = 30000000
-        self.response_delay_seconds = response_delay_seconds = 0.041
-        self.tx_gain = tx_gain = 70
+        self.response_delay_seconds = response_delay_seconds = 0.044
+        self.tx_gain = tx_gain = 55
         self.rx_gain = rx_gain = 50
         self.reply_delay_samples = reply_delay_samples = int(response_delay_seconds*samp_rate + 0.5)
         self.center_freq = center_freq = 1330e6
@@ -88,28 +88,16 @@ class prs_ssrtt_responder_anchor_0(gr.top_block):
         self.uhd_usrp_sink_0_0.set_gain(tx_gain, 0)
         self.uhd_usrp_sink_0_0.set_min_output_buffer(1048576)
         self.prs_text_ui_0 = ofdm_prs_ranging.prs_text_ui("responder", 1.5, 1.0, 2.0, True)
-        self.prs_ssrtt_responder_0 = ofdm_prs_ranging.prs_ssrtt_responder(samp_rate, reply_delay_samples, anchor_id)
+        self.prs_ssrtt_responder_0 = ofdm_prs_ranging.prs_ssrtt_responder(samp_rate, reply_delay_samples, anchor_id, 0.4, "CSV/poll_tracking_anchor0.csv", 0.1)
         self.prs_source = ofdm_prs_ranging.prs_timed_burst_source(samp_rate, 0.1, 0.1, 0.7, 1, True)
         self.prs_phase_slope_estimator_0 = ofdm_prs_ranging.prs_phase_slope_estimator(samp_rate, 1.0)
         self.prs_fft_receiver_0 = ofdm_prs_ranging.prs_fft_receiver(samp_rate)
         self.prs_csv_logger_0 = ofdm_prs_ranging.prs_csv_logger("CSV/anchor0_measurements.csv", 1)
         self.prs_channel_estimator_0 = ofdm_prs_ranging.prs_channel_estimator(samp_rate)
         self.prs_acquisition_logger_0 = ofdm_prs_ranging.prs_acquisition_logger("CSV/anchor0_acquisition.csv", "responder", 1)
-        self.ofdm_prs_ranging_prs_zc_frame_sync_0 = ofdm_prs_ranging.prs_zc_frame_sync(
-            30e6,
-            0.15,
-            0.35,
-            False,
-            0)
+        self.ofdm_prs_ranging_prs_zc_frame_sync_0 = ofdm_prs_ranging.prs_zc_frame_sync(30e6, 0.15, 0.35, False, 0)
         self.ofdm_prs_ranging_prs_zc_frame_sync_0.set_processor_affinity([2])
-        self.ofdm_prs_ranging_prs_window_capture_0 = ofdm_prs_ranging.prs_window_capture(
-            30e6,
-            0.12,
-            10000,
-            4096,
-            4096,
-            2,
-            True)
+        self.ofdm_prs_ranging_prs_window_capture_0 = ofdm_prs_ranging.prs_window_capture(30e6, 0.12, 10000, 4096, 4096, 2, True)
 
 
         ##################################################
@@ -127,6 +115,7 @@ class prs_ssrtt_responder_anchor_0(gr.top_block):
         self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_ssrtt_responder_0, 'measurement_in'))
         self.msg_connect((self.prs_phase_slope_estimator_0, 'measurement_out'), (self.prs_text_ui_0, 'measurement_in'))
         self.msg_connect((self.prs_source, 'tx_time_out'), (self.prs_text_ui_0, 'tx_in'))
+        self.msg_connect((self.prs_ssrtt_responder_0, 'trigger_out'), (self.ofdm_prs_ranging_prs_window_capture_0, 'window_in'))
         self.msg_connect((self.prs_ssrtt_responder_0, 'trigger_out'), (self.prs_source, 'trigger'))
         self.connect((self.prs_source, 0), (self.uhd_usrp_sink_0_0, 0))
         self.connect((self.uhd_usrp_source_0_0_0, 0), (self.ofdm_prs_ranging_prs_window_capture_0, 0))

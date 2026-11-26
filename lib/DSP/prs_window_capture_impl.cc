@@ -229,6 +229,14 @@ void prs_window_capture_impl::handle_window(const pmt::pmt_t& message)
     }
 
     std::lock_guard<std::mutex> lock(d_window_mutex);
+    if (pmt::eq(pmt::dict_ref(msg, pmt::mp("poll_tracking_window"), pmt::PMT_F),
+                pmt::PMT_T)) {
+        if (!window.by_time) {
+            d_poll_window = active_interval{window.start_sample, window.end_sample,
+                                            window.window_id, window.attempt_id};
+        }
+        return;
+    }
     d_windows.push_back(window);
 }
 
@@ -317,7 +325,23 @@ std::vector<prs_window_capture_impl::active_interval>
 prs_window_capture_impl::active_intervals(uint64_t abs_start, uint64_t abs_stop)
 {
     if (d_acquisition_enabled.load(std::memory_order_relaxed)) {
-        return { { abs_start, abs_stop, 0, 0 } };
+        std::lock_guard<std::mutex> lock(d_window_mutex);
+        if (!d_poll_window || d_poll_window->end <= abs_start) {
+            d_poll_window.reset();
+            return { { abs_start, abs_stop, 0, 0 } };
+        }
+        const auto& window = *d_poll_window;
+        std::vector<active_interval> intervals;
+        const uint64_t start = std::max(abs_start, window.start);
+        const uint64_t end = std::min(abs_stop, window.end);
+        if (start < end) {
+            intervals.push_back({start, end, window.window_id, window.attempt_id});
+        }
+        // Resume normal scanning after the predicted window, even if it missed.
+        if (window.end < abs_stop) {
+            intervals.push_back({window.end, abs_stop, 0, 0});
+        }
+        return intervals;
     }
 
     std::vector<window_spec> windows;
@@ -816,15 +840,7 @@ int prs_window_capture_impl::general_work(int noutput_items,
     const uint64_t abs_stop = abs_start + static_cast<uint64_t>(ninput);
     update_rx_time_tags(abs_start, abs_stop);
 
-    const bool continuous_acquisition =
-        d_acquisition_enabled.load(std::memory_order_relaxed);
-    const active_interval continuous_interval{ abs_start, abs_stop, 0, 0 };
-
-    // If continuous_acquisition is true, the entire input is treated as a single interval
-    // Otherwise, the segment is split into multiple intervals based on the active windows
-    std::vector<active_interval> intervals = continuous_acquisition
-                                                 ? std::vector<active_interval>()
-                                                 : active_intervals(abs_start, abs_stop);
+    const auto intervals = active_intervals(abs_start, abs_stop);
     size_t interval_index = 0;
 
     const uint64_t preamble_total = static_cast<uint64_t>(d_cfg.preamble_len) *
@@ -884,18 +900,14 @@ int prs_window_capture_impl::general_work(int noutput_items,
             }
 
             const active_interval* interval = nullptr;
-            if (continuous_acquisition) {
-                interval = &continuous_interval;
-            } else {
-                while (interval_index < intervals.size() &&
-                       intervals[interval_index].end <= cursor) {
-                    ++interval_index;
-                }
-                if (interval_index < intervals.size() &&
-                    intervals[interval_index].start <= cursor &&
-                    cursor < intervals[interval_index].end) {
-                    interval = &intervals[interval_index];
-                }
+            while (interval_index < intervals.size() &&
+                   intervals[interval_index].end <= cursor) {
+                ++interval_index;
+            }
+            if (interval_index < intervals.size() &&
+                intervals[interval_index].start <= cursor &&
+                cursor < intervals[interval_index].end) {
+                interval = &intervals[interval_index];
             }
             if (interval == nullptr) {
                 const uint64_t disabled_end =

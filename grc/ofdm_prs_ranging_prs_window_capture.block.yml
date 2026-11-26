@@ -19,4 +19,8 @@ inputs:
 outputs:
 - {label: candidate_out, domain: message}
 - {label: event_out, domain: message, optional: true}
+documentation: |-
+  Keep Acquisition Enabled true for Responder timing feedback. Each
+  poll_tracking_window from trigger_out temporarily limits new preamble searches
+  to its sample bounds. Continuous acquisition resumes when the window expires.
 file_format: 1

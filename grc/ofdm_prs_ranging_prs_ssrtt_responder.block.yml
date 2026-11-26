@@ -3,14 +3,23 @@ label: PRS SS-RTT Responder
 category: '[ofdm_prs_ranging]'
 templates:
   imports: from gnuradio import ofdm_prs_ranging
-  make: ofdm_prs_ranging.prs_ssrtt_responder(${samp_rate}, ${reply_delay_samples}, ${anchor_id})
+  make: ofdm_prs_ranging.prs_ssrtt_responder(${samp_rate}, ${reply_delay_samples}, ${anchor_id}, ${poll_period_s}, ${poll_tracking_csv}, ${poll_window_margin_s})
 parameters:
 - {id: samp_rate, label: Sample Rate, dtype: real, default: 10e6}
 - {id: reply_delay_samples, label: Reply Delay Samples, dtype: int, default: 50000}
 - {id: anchor_id, label: Anchor ID (0..7), dtype: int, default: 0}
+- {id: poll_period_s, label: Nominal POLL Period (s), dtype: real, default: '0.0'}
+- {id: poll_tracking_csv, label: POLL Tracking CSV, dtype: string, default: '""'}
+- {id: poll_window_margin_s, label: POLL Window Margin (s), dtype: real, default: '0.0'}
 inputs:
 - {label: measurement_in, domain: message}
 outputs:
 - {label: trigger_out, domain: message}
 - {label: diagnostic_out, domain: message, optional: true}
+documentation: |-
+  Set a positive Nominal POLL Period and a CSV path to append timing predictions
+  for valid POLLs. An empty path disables logging.
+  Set a positive POLL Window Margin to include a one-shot acquisition window
+  for the next POLL in trigger_out. Connect trigger_out to Window Capture
+  window_in as well as the timed burst source. The response uses measured rx_time.
 file_format: 1

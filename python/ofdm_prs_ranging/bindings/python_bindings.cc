@@ -62,6 +62,11 @@ PYBIND11_MODULE(ofdm_prs_ranging_python, m)
     init_numpy();
     m.attr("PHY_LEADING_GUARD_SAMPLES") = gr::ofdm_prs_ranging::phy::leading_guard_samples;
     m.attr("PHY_TAIL_GUARD_SAMPLES") = gr::ofdm_prs_ranging::phy::tail_guard_samples;
+    m.attr("PHY_PREAMBLE_LEN") = gr::ofdm_prs_ranging::phy::preamble_len;
+    m.attr("PHY_PREAMBLE_REPEATS") = gr::ofdm_prs_ranging::phy::preamble_repeats;
+    m.attr("PHY_ZC_CHIP_COUNT") = gr::ofdm_prs_ranging::phy::zc_chip_count;
+    m.attr("PHY_ZC_SAMPLES_PER_CHIP") = gr::ofdm_prs_ranging::phy::zc_samples_per_chip;
+    m.attr("PHY_POLL_ZC_ROOT") = gr::ofdm_prs_ranging::phy::poll_zc_root;
 
     // Allow access to base block methods
     py::module::import("gnuradio.gr");

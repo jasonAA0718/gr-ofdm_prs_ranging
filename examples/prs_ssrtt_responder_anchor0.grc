@@ -73,7 +73,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '0.041'
+    value: '0.044'
   states:
     bus_sink: false
     bus_source: false
@@ -90,7 +90,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [784, 40.0]
+    coordinate: [480, 32.0]
     rotation: 0
     state: enabled
 - name: samp_rate
@@ -109,12 +109,12 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: '70'
+    value: '55'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [864, 40.0]
+    coordinate: [560, 32.0]
     rotation: 0
     state: enabled
 - name: blocks_file_sink_0
@@ -287,6 +287,9 @@ blocks:
     comment: ''
     maxoutbuf: '0'
     minoutbuf: '0'
+    poll_period_s: '0.4'
+    poll_tracking_csv: '"CSV/poll_tracking_anchor0.csv"'
+    poll_window_margin_s: '0.1'
     reply_delay_samples: reply_delay_samples
     samp_rate: samp_rate
   states:
@@ -1189,6 +1192,7 @@ connections:
 - [prs_source, tx_time_out, virtual_sink_0_0, '0']
 - [prs_ssrtt_responder_0, trigger_out, virtual_sink_0, '0']
 - [uhd_usrp_source_0_0_0, '0', ofdm_prs_ranging_prs_window_capture_0, '0']
+- [virtual_source_0, '0', ofdm_prs_ranging_prs_window_capture_0, window_in]
 - [virtual_source_0, '0', prs_source, trigger]
 - [virtual_source_1, '0', prs_text_ui_0, tx_in]
 - [virtual_source_1_0, '0', prs_text_ui_0, frame_in]

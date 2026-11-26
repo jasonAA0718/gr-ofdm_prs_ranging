@@ -171,6 +171,68 @@ expired unanswered polls; response percentage includes all transmitted polls.
 A stale valid-frame timestamp produces `NO SIGNAL`. It displays the same
 relative SNR and live integer range, not an offline phase-corrected result.
 
+### Responder POLL arrival-time tracking
+
+In the [PRS SS-RTT Responder block](grc/ofdm_prs_ranging_prs_ssrtt_responder.block.yml),
+set **Nominal POLL Period (s)** to the expected Initiator POLL interval and
+**POLL Tracking CSV** to a path specific to that anchor. For a 200 ms
+`message_strobe`, set the nominal period to `0.2`. The logger appends to the
+file. An empty path disables CSV output. The RESPONSE is scheduled from the
+current POLL's measured `rx_time`.
+
+The [tracker](lib/USRP/prs_ssrtt_responder_impl.cc) uses the Responder's local
+UHD `rx_time` from each accepted, CRC-valid POLL. It skips duplicate POLLs and
+timestamps that do not advance. Let `t_prev` and `t_rx` be the previous and
+current arrival times, `T_nom` the configured period, `T_prev` the last
+estimated period, and `Fs` the Responder sample rate. The 16-bit forward
+`poll_id` difference `k` handles lost POLLs and wraparound. For example,
+`65535 → 0` gives `k=1`, and `0 → 2` gives `k=2`.
+
+| CSV field | Calculation |
+|---|---|
+| `predicted_rx_time_s` | `t_prev + k * T_prev` |
+| `residual_samples` | `(t_rx - (t_prev + k * T_prev)) * Fs` |
+| `nominal_residual_samples` | `(t_rx - (t_prev + k * T_nom)) * Fs` |
+| `observed_period_s` | `(t_rx - t_prev) / k` |
+| `estimated_period_s` | `T_new = T_prev + (observed_period_s - T_prev) / 8` in `TRACKING` |
+| `next_poll_rx_time_s` | `t_rx + T_new`, assuming the next ID advances by one |
+| `apparent_skew_ppm` | `(T_new / T_nom - 1) * 1e6` |
+
+The current residual uses the period estimate available **before** the current
+measurement. The update is an exponential moving average with weight 1/8 on
+the newest observed period. A positive residual means the POLL arrived late.
+Compare the 95th percentile of the absolute residuals on the same tracking
+rows to assess whether the estimated period would allow a narrower search window.
+
+`START` initializes the period to `T_nom`. `ID_RESET` restarts at `T_nom`
+when the modulo ID difference is zero or at least 32768. Both statuses leave
+the current prediction and residuals blank. `CADENCE_RESET` restarts at
+`T_nom` when the observed period differs from it by more than 50%, and retains
+the residual for that arrival.
+
+`apparent_skew_ppm` measures the arrival cadence relative to the configured
+period. It includes Initiator TX scheduling jitter and changes in propagation
+delay. To evaluate SS-TWR clock-rate compensation offline, match Initiator UHD
+TX and Responder RX timestamps by `poll_id` in a static capture. The live
+solver still uses the reported reply delay directly.
+
+#### Using the prediction to limit acquisition
+
+Connect Responder `trigger_out` to Window Capture `window_in` in parallel with
+the existing timed TX connection. Keep **Acquisition Enabled** set to true
+and set **POLL Window Margin (s)** to a positive margin. The anchor 0 example
+uses `0.0005` s. Set the margin to zero for continuous searching with optional
+CSV logging.
+
+The first accepted POLL seeds the estimate. Once the tracker obtains a valid
+period observation, the trigger includes one window for the next POLL. Its
+`start_sample` is the predicted frame start minus the margin. Its `end_sample`
+includes the margin, leading guard, and repeated preamble so Window Capture
+can evaluate the preamble at the latest expected arrival. Window Capture
+skips new preamble searches until the window starts, finishes any candidate it
+has already started, and resumes continuous searching when the window expires
+unless it has received a newer prediction. CSV output is optional in this mode.
+
 ## Shared PRS Waveform
 
 All Initiator and Responder PRS blocks use the compile-time profile in

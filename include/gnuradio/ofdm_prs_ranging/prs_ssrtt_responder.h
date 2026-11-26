@@ -10,6 +10,7 @@
 
 #include <gnuradio/block.h>
 #include <gnuradio/ofdm_prs_ranging/api.h>
+#include <string>
 
 namespace gr {
 namespace ofdm_prs_ranging {
@@ -20,7 +21,10 @@ public:
     typedef std::shared_ptr<prs_ssrtt_responder> sptr;
     static sptr make(double samp_rate = 10e6,
                      uint64_t reply_delay_samples = 50000,
-                     uint64_t anchor_id = 0);
+                     uint64_t anchor_id = 0,
+                     double poll_period_s = 0.0,
+                     const std::string& poll_tracking_csv = "",
+                     double poll_window_margin_s = 0.0);
 };
 
 } // namespace ofdm_prs_ranging

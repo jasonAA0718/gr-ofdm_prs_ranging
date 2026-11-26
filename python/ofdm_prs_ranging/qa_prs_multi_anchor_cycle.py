@@ -31,7 +31,6 @@ def stamp(t):
 class qa_prs_multi_anchor_cycle(gr_unittest.TestCase):
     FS = 30e6
     DELAYS = [0.031, 0.081]
-    FRAME_S = 78147 / FS
 
     def setUp(self):
         self.tb = gr.top_block()
@@ -113,7 +112,7 @@ class qa_prs_multi_anchor_cycle(gr_unittest.TestCase):
         self.assertEqual(get(w[0], 'expected_reply_delay_samples'), 930001)
         self.assertEqual(get(w[1], 'expected_reply_delay_samples'), 2430001)
         self.assertAlmostEqual(get(w[0], 'window_end') - get(w[0], 'window_start'),
-                               .002 + self.FRAME_S + .005)
+                               .002 + prs.prs_timed_burst_source().frame_len() / self.FS + .005)
 
     def test_two_anchors_arrival_order_and_first_valid_duplicate(self):
         self.setup_cycle(); w = self.open_cycle()
@@ -362,7 +361,7 @@ class qa_prs_multi_anchor_cycle(gr_unittest.TestCase):
                              for i, delay in enumerate(self.DELAYS)]
         slow_frames = frames
         bad_first = frames[0].copy()
-        start = 1000 + 128 * 17 + 819
+        start = prs.prs_timed_burst_source().prs_start()
         section = bad_first[start:start + 127 * 576].reshape(127, 576)
         bins = np.fft.fft(section[:, 64:], axis=1); bins[:, 3] *= -1
         useful = np.fft.ifft(bins, axis=1).astype(np.complex64)

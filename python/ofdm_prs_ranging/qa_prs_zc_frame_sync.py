@@ -12,12 +12,14 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
     CP = 64
     ACTIVE = 512
     NSYM = 127
-    L = 128
-    R = 17
-    NZ = 819
+    L = ofdm_prs_ranging.PHY_PREAMBLE_LEN
+    R = ofdm_prs_ranging.PHY_PREAMBLE_REPEATS
+    ZC_CHIPS = ofdm_prs_ranging.PHY_ZC_CHIP_COUNT
+    SPS = ofdm_prs_ranging.PHY_ZC_SAMPLES_PER_CHIP
+    NZ = ZC_CHIPS * SPS
     NG = ofdm_prs_ranging.PHY_LEADING_GUARD_SAMPLES
     NT = ofdm_prs_ranging.PHY_TAIL_GUARD_SAMPLES
-    ROOT = 25
+    ROOT = ofdm_prs_ranging.PHY_POLL_ZC_ROOT
     CHANNEL = 4
     PREAMBLE_THRESHOLD = 0.8
     ZC_THRESHOLD = 0.8
@@ -46,12 +48,13 @@ class qa_prs_zc_frame_sync(gr_unittest.TestCase):
              for value in values], dtype=numpy.complex64) / numpy.sqrt(2.0)
 
     def _zc(self):
-        n = numpy.arange(self.NZ, dtype=numpy.float64)
-        root = self.ROOT % self.NZ
+        n = numpy.arange(self.ZC_CHIPS, dtype=numpy.float64)
+        root = self.ROOT % self.ZC_CHIPS
         if root <= 0:
-            root += self.NZ
-        return numpy.exp(-1j * numpy.pi * root * n * (n + 1) / self.NZ).astype(
-            numpy.complex64)
+            root += self.ZC_CHIPS
+        chips = numpy.exp(
+            -1j * numpy.pi * root * n * (n + 1) / self.ZC_CHIPS).astype(numpy.complex64)
+        return numpy.repeat(chips, self.SPS)
 
     def _frame(self, valid_preamble=True, valid_zc=True):
         frame = numpy.zeros(self.frame_len, dtype=numpy.complex64)

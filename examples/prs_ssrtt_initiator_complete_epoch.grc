@@ -229,7 +229,7 @@ blocks:
     maxoutbuf: '0'
     minoutbuf: '0'
     msg: pmt.PMT_T
-    period: '100'
+    period: '200'
   states:
     bus_sink: false
     bus_source: false

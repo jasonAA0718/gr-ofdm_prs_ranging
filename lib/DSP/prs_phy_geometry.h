@@ -14,7 +14,7 @@ constexpr int active_bins = 512;
 constexpr int prs_symbols = 127;
 constexpr int preamble_len = 128;
 constexpr int preamble_repeats = 17;
-constexpr int zc_chip_count = 819;
+constexpr int zc_chip_count = 419;
 constexpr int zc_samples_per_chip = 2;
 static_assert(zc_samples_per_chip > 0);
 constexpr int coarse_sync_len = zc_chip_count * zc_samples_per_chip;

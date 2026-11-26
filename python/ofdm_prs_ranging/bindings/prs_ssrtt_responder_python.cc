@@ -10,5 +10,8 @@ void bind_prs_ssrtt_responder(py::module& m)
         .def(py::init(&block::make),
              py::arg("samp_rate") = 10e6,
              py::arg("reply_delay_samples") = 50000,
-             py::arg("anchor_id") = 0);
+             py::arg("anchor_id") = 0,
+             py::arg("poll_period_s") = 0.0,
+             py::arg("poll_tracking_csv") = "",
+             py::arg("poll_window_margin_s") = 0.0);
 }

@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <deque>
 #include <mutex>
+#include <optional>
 #include <vector>
 
 namespace gr {
@@ -112,6 +113,7 @@ private:
     std::deque<rx_time_anchor> d_rx_time_anchors;
     std::mutex d_window_mutex;
     std::vector<window_spec> d_windows;
+    std::optional<active_interval> d_poll_window;
 
     std::mutex d_credit_mutex;
     std::unordered_set<uint64_t> d_outstanding_candidates;

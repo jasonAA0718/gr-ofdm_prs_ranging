@@ -25,6 +25,11 @@ except ImportError:
 
 
 class qa_prs_timed_burst_source(gr_unittest.TestCase):
+    ACQUISITION_SAMPLES = (
+        ofdm_prs_ranging.PHY_PREAMBLE_LEN * ofdm_prs_ranging.PHY_PREAMBLE_REPEATS +
+        ofdm_prs_ranging.PHY_ZC_CHIP_COUNT * ofdm_prs_ranging.PHY_ZC_SAMPLES_PER_CHIP
+    )
+
     def setUp(self):
         self.tb = gr.top_block()
 
@@ -33,9 +38,12 @@ class qa_prs_timed_burst_source(gr_unittest.TestCase):
 
     def test_waveform_length_and_offsets(self):
         src = prs_timed_burst_source()
-        expected_prs_start = 1000 + 128 * 17 + 819
+        expected_prs_start = (
+            ofdm_prs_ranging.PHY_LEADING_GUARD_SAMPLES + self.ACQUISITION_SAMPLES
+        )
         self.assertEqual(
-            src.frame_len(), expected_prs_start + 127 * (512 + 64) + 1000)
+            src.frame_len(),
+            expected_prs_start + 127 * (512 + 64) + ofdm_prs_ranging.PHY_TAIL_GUARD_SAMPLES)
         self.assertEqual(src.prs_start(), expected_prs_start)
         self.assertEqual(src.prs_len(), 127 * (512 + 64))
 
@@ -56,7 +64,8 @@ class qa_prs_timed_burst_source(gr_unittest.TestCase):
             frame = numpy.asarray(src.frame_samples())
             numpy.testing.assert_array_equal(frame[:leading], 0)
             numpy.testing.assert_array_equal(frame[-tail:], 0)
-            self.assertEqual(src.frame_len(), leading + 128 * 17 + 819 + 127 * 576 + tail)
+            self.assertEqual(
+                src.frame_len(), leading + self.ACQUISITION_SAMPLES + 127 * 576 + tail)
             self.assertAlmostEqual(float(abs(frame[leading])), 0.95, places=6)
             self.assertLessEqual(float(numpy.max(numpy.abs(frame[src.prs_start():-tail]))), 0.900001)
 

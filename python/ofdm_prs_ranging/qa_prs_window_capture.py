@@ -7,9 +7,9 @@ import time
 
 
 class qa_prs_window_capture(gr_unittest.TestCase):
-    L = 128
-    R = 17
-    NZ = 819
+    L = ofdm_prs_ranging.PHY_PREAMBLE_LEN
+    R = ofdm_prs_ranging.PHY_PREAMBLE_REPEATS
+    NZ = ofdm_prs_ranging.PHY_ZC_CHIP_COUNT * ofdm_prs_ranging.PHY_ZC_SAMPLES_PER_CHIP
     NG = ofdm_prs_ranging.PHY_LEADING_GUARD_SAMPLES
     NT = ofdm_prs_ranging.PHY_TAIL_GUARD_SAMPLES
     FFT = 512
@@ -197,6 +197,73 @@ class qa_prs_window_capture(gr_unittest.TestCase):
         meta = self._meta(candidates.get_message(0))
         self.assertEqual(self._uint(meta, "first_preamble_crossing_index"), burst_start)
         self.assertEqual(self._uint(meta, "window_id"), 31)
+
+    def test_responder_feedback_limits_next_poll_and_expires(self):
+        for hit in (True, False):
+            with self.subTest(poll_in_window=hit):
+                # A decoy before the window and a POLL after it expires.
+                burst_starts = [110000, 311000, 430000] if hit else [110000, 430000]
+                samples = self._samples(burst_starts, 540000)
+                capture = self._make_capture()
+                responder = ofdm_prs_ranging.prs_ssrtt_responder(
+                    1e6, 5000, 0, poll_period_s=0.15, poll_window_margin_s=0.0005)
+                candidates = blocks.message_debug()
+                triggers = blocks.message_debug()
+                source = blocks.vector_source_c(samples)
+                throttle = blocks.throttle(gr.sizeof_gr_complex, 1e6, True)
+                tb = gr.top_block()
+                tb.connect(source, throttle, capture)
+                tb.msg_connect(responder, "trigger_out", capture, "window_in")
+                tb.msg_connect(responder, "trigger_out", triggers, "store")
+                tb.msg_connect(capture, "candidate_out", candidates, "store")
+                tb.start(4096)
+                try:
+                    # Inject two decoded POLLs to establish the period independently
+                    # of CSV logging and use real stream processing for the next window.
+                    for poll_id, frame_start in ((8, 10000), (9, 160000)):
+                        meta = pmt.make_dict()
+                        for key, value in (
+                            ("frame_id_valid", pmt.PMT_T),
+                            ("packet_type", pmt.from_long(1)),
+                            ("poll_id", pmt.from_uint64(poll_id)),
+                            ("frame_start", pmt.from_uint64(frame_start)),
+                            ("rx_time", pmt.make_tuple(
+                                pmt.from_uint64(10), pmt.from_double(frame_start / 1e6))),
+                        ):
+                            meta = pmt.dict_add(meta, pmt.intern(key), value)
+                        responder.to_basic_block()._post(
+                            pmt.intern("measurement_in"), pmt.cons(meta, pmt.PMT_NIL))
+                    deadline = time.monotonic() + 3.0
+                    expected_count = 2 if hit else 1
+                    while time.monotonic() < deadline:
+                        if (capture.nitems_read(0) == len(samples) and
+                                candidates.num_messages() >= expected_count):
+                            break
+                        time.sleep(0.001)
+                    self.assertEqual(capture.nitems_read(0), len(samples))
+                finally:
+                    tb.stop()
+                    tb.wait()
+
+                self.assertEqual(triggers.num_messages(), 2)
+                marker = pmt.intern("poll_tracking_window")
+                self.assertTrue(pmt.is_null(pmt.dict_ref(
+                    triggers.get_message(0), marker, pmt.PMT_NIL)))
+                prediction = triggers.get_message(1)
+                self.assertTrue(pmt.to_bool(pmt.dict_ref(prediction, marker, pmt.PMT_F)))
+                self.assertAlmostEqual(self._uint(prediction, "start_sample"), 309500, delta=1)
+                self.assertAlmostEqual(
+                    self._uint(prediction, "end_sample"),
+                    310500 + self.NG + self.L * self.R, delta=1)
+                self.assertEqual(self._uint(prediction, "poll_id"), 9)
+                reply_frac = pmt.dict_ref(prediction, pmt.intern("tx_time_frac"), pmt.PMT_NIL)
+                self.assertAlmostEqual(pmt.to_double(reply_frac), 0.165)
+                self.assertEqual(candidates.num_messages(), expected_count)
+                window_ids = [
+                    self._uint(self._meta(candidates.get_message(i)), "window_id")
+                    for i in range(candidates.num_messages())
+                ]
+                self.assertEqual(window_ids, [10, 0] if hit else [0])
 
     def test_stalled_consumer_drops_without_stalling_stream(self):
         burst_starts = [5000, 90000, 175000, 260000, 345000]

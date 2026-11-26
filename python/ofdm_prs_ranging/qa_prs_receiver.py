@@ -6,6 +6,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
+import csv
 import os
 import tempfile
 import time
@@ -1054,6 +1055,54 @@ class qa_prs_receiver(gr_unittest.TestCase):
         self.assertEqual(pmt.to_uint64(pmt.dict_ref(trigger, pmt.intern("reply_delay_samples"), pmt.PMT_NIL)), 50000)
         self.assertEqual(pmt.to_uint64(pmt.dict_ref(trigger, pmt.intern("tx_time_secs"), pmt.PMT_NIL)), 10)
         self.assertAlmostEqual(pmt.to_double(pmt.dict_ref(trigger, pmt.intern("tx_time_frac"), pmt.PMT_NIL)), 0.255)
+
+    def test_responder_poll_tracking_logs_prediction_without_changing_reply(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "poll_tracking.csv")
+            responder = ofdm_prs_ranging.prs_ssrtt_responder(
+                10e6, 50000, 2, poll_period_s=0.2, poll_tracking_csv=path)
+            replies = blocks.message_debug()
+            self.tb.msg_connect((responder, "trigger_out"), (replies, "store"))
+            self.tb.start()
+            try:
+                # 10 ppm difference, a 16-bit wrap, a duplicate, and a skipped ID.
+                for poll_id, fraction in ((65535, 0.001), (0, 0.201002), (0, 0.201002),
+                                          (2, 0.601006), (3, 0.991006)):
+                    meta = pmt.make_dict()
+                    for key, value in (
+                        ("frame_id_valid", pmt.PMT_T),
+                        ("packet_type", pmt.from_long(1)),
+                        ("poll_id", pmt.from_uint64(poll_id)),
+                        ("rx_time", pmt.make_tuple(pmt.from_uint64(10), pmt.from_double(fraction))),
+                    ):
+                        meta = pmt.dict_add(meta, pmt.intern(key), value)
+                    responder.to_basic_block()._post(
+                        pmt.intern("measurement_in"), pmt.cons(meta, pmt.PMT_NIL))
+                deadline = time.monotonic() + 2.0
+                while replies.num_messages() < 4 and time.monotonic() < deadline:
+                    time.sleep(0.001)
+            finally:
+                self.tb.stop()
+                self.tb.wait()
+
+            self.assertEqual(replies.num_messages(), 4)
+            reply = pmt.to_double(pmt.dict_ref(
+                replies.get_message(2), pmt.intern("tx_time_frac"), pmt.PMT_NIL))
+            self.assertAlmostEqual(reply, 0.606006)
+            with open(path, newline="") as stream:
+                rows = list(csv.DictReader(stream))
+            self.assertEqual([int(row["poll_id"]) for row in rows], [65535, 0, 2, 3])
+            self.assertEqual(rows[0]["status"], "START")
+            self.assertEqual(rows[0]["residual_samples"], "")
+            self.assertAlmostEqual(float(rows[0]["next_poll_rx_time_s"]), 10.201)
+            self.assertEqual(rows[1]["poll_id_step"], "1")
+            self.assertAlmostEqual(float(rows[1]["residual_samples"]), 20.0)
+            self.assertEqual(rows[2]["poll_id_step"], "2")
+            self.assertAlmostEqual(float(rows[2]["residual_samples"]), 35.0)
+            self.assertAlmostEqual(float(rows[2]["nominal_residual_samples"]), 40.0)
+            self.assertAlmostEqual(float(rows[2]["observed_period_s"]), 0.200002)
+            self.assertEqual(rows[3]["status"], "CADENCE_RESET")
+            self.assertAlmostEqual(float(rows[3]["estimated_period_s"]), 0.2)
 
     def test_ssrtt_solver_reports_synthetic_timestamp_rtt(self):
         samp_rate = 10e6
